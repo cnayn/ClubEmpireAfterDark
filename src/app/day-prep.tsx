@@ -64,7 +64,8 @@ export default function DayPrepScreen() {
   const canOpen = validSchedule && canAfford && requirement.met;
 
   const onOpen = () => {
-    if (runNight({ ...config, eventId, staffOnDuty: onDuty })) router.replace('/results');
+    // Night resolves now; the timeline narrates it before the books (Results).
+    if (runNight({ ...config, eventId, staffOnDuty: onDuty })) router.replace('/night-timeline');
   };
 
   return (
