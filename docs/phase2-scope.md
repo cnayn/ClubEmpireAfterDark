@@ -33,6 +33,10 @@ bartender (service capacity) and bouncer (security mod).
 
 # PHASE 2A — Named Staff
 
+> **Principle: Named staff is a swap, not an addition.** Staff replace the
+> abstract bartender-count / security-level levers and must keep mapping onto the
+> same internal sim quantities — never a parallel system bolted on top.
+
 ## A. Scope
 
 **In scope (2A):**

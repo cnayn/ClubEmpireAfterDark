@@ -3,6 +3,9 @@
 Incremental. Each phase ends in something playable. We do **not** build
 everything at once.
 
+> **North-star rule:** Legibility before depth; depend only on what exists; the
+> reckoning ships before the reward.
+
 ## Phase 0 — Foundations (scaffold)
 - Expo + TypeScript project, navigation, folder structure.
 - Design tokens + base components (`Screen`, `Card`, `StatCard`, buttons,
@@ -61,4 +64,35 @@ Split into two slices to avoid overloading implementation. See
 ## Guardrails (all phases)
 Offline-only, no backend/multiplayer/3D/ads/IAP, no real celebrity names,
 shady content stays satire/risk/compliance — never instructional.
-```
+
+## Dependency map (strict build order)
+
+Each layer depends only on layers above it — *depend only on what exists*.
+
+1. **WMT / telemetry** — the legibility layer (results notes, result tags, "why"
+   feedback). Everything later leans on the player understanding cause→effect.
+2. **Phase 2A — named staff swap** (bartenders + bouncers). ✅ done.
+3. **Phase 2B — events + DJs** — DJs only if they pass the baseline-neutral gate
+   (see note below); otherwise the DJ slips to Phase 3.
+4. **Phase 3 — VIP vs regulars, interior slots, door stance, compliance,
+   equipment, staff trust.**
+5. **Phase 4 — city heat, rivals, Clean vs Wild / Club Policy, referrals,
+   cliques.**
+6. **Hard-deferred — online club visits and free-form interior redesign.**
+
+## Phase 2B DJ gate (note)
+
+A Phase 2B DJ is just a staffer who only touches **draw, quality, cost, and one
+existing risk** — and proves it against the balance harness. If it needs anything
+else, or if the baseline-neutral version is too dull to ship, it becomes a
+**Phase 3 DJ** instead. (Consistent with: named staff is a swap, not an addition.)
+
+## Dangerous-system framing (all risky mechanics)
+
+- mechanics, not methods
+- business / reputation risk, not instruction
+- manage exposure, not behavior
+- no explicit real-world how-to
+- no glamorized violence
+
+See `.claude/skills/nightclub-safety-framing` for the working guardrail.
