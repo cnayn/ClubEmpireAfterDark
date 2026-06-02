@@ -46,6 +46,10 @@ export default function StaffScreen() {
         <Text variant="heading">Your Crew</Text>
         <Pill label={money(club.cash)} color={colors.success} />
       </View>
+      <Text variant="label" muted>
+        Everyone here is hired (on your roster). Choose who's On or Off Duty for tonight in Day Prep.
+        Firing removes someone for good.
+      </Text>
 
       {club.staff.map((m) => (
         <Card key={m.id} accent={roleAccent(m)}>
@@ -63,7 +67,7 @@ export default function StaffScreen() {
             {m.description}
           </Text>
           <Button
-            label={canFireStaff(club.staff, m.id) ? 'Let go' : 'Last bartender — keep'}
+            label={canFireStaff(club.staff, m.id) ? 'Fire (remove from roster)' : 'Last bartender — keep'}
             variant="secondary"
             disabled={!canFireStaff(club.staff, m.id)}
             onPress={() => fireStaff(m.id)}
@@ -73,6 +77,10 @@ export default function StaffScreen() {
 
       <Text variant="heading" style={styles.sectionTitle}>
         For Hire
+      </Text>
+      <Text variant="label" muted>
+        Not on your roster yet. Hiring adds them for a one-time fee; you then pay their wage only on
+        nights they're On Duty.
       </Text>
       {candidates.length === 0 ? (
         <Text variant="body" muted>

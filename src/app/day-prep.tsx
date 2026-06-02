@@ -151,20 +151,29 @@ export default function DayPrepScreen() {
         </Text>
       </Card>
 
-      <Card title="Tonight's Crew">
-        {club.staff.map((m) => (
-          <Toggle
-            key={m.id}
-            label={`${m.name} · ${ROLE_LABEL[m.role]}`}
-            description={`${money(m.salary)}/night · ${strengthLabel(m.skill)}${
-              m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : ''
-            }`}
-            value={onDuty.includes(m.id)}
-            onChange={() => toggleStaff(m.id)}
-            accent={m.role === 'bouncer' ? colors.neonCyan : colors.neonViolet}
-          />
-        ))}
-        <Button label="Manage Staff" variant="secondary" onPress={() => router.push('/staff')} />
+      <Card title="On Duty Tonight">
+        <Text variant="label" muted>
+          Toggle off to rest someone tonight — they stay hired, and you only pay who works.
+        </Text>
+        {club.staff.map((m) => {
+          const working = onDuty.includes(m.id);
+          const trait = m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : '';
+          return (
+            <Toggle
+              key={m.id}
+              label={`${m.name} · ${ROLE_LABEL[m.role]}`}
+              description={
+                working
+                  ? `On duty · paid ${money(m.salary)} tonight · ${strengthLabel(m.skill)}${trait}`
+                  : `Off duty · not scheduled, no wage tonight · ${strengthLabel(m.skill)}${trait}`
+              }
+              value={working}
+              onChange={() => toggleStaff(m.id)}
+              accent={m.role === 'bouncer' ? colors.neonCyan : colors.neonViolet}
+            />
+          );
+        })}
+        <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
       </Card>
 
       <Card title="Policy">
