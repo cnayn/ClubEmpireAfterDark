@@ -46,6 +46,30 @@ describe('runNight guards', () => {
   });
 });
 
+describe('event guards', () => {
+  it('rejects a locked event (Grand Opening on a fresh club)', () => {
+    const result = useGameStore.getState().runNight({ ...configFromRoster(), eventId: 'grand-opening' });
+    expect(result).toBeNull();
+    expect(useGameStore.getState().club!.day).toBe(1);
+  });
+
+  it('rejects an unlocked event the club cannot afford within the reserve', () => {
+    const club = useGameStore.getState().club!;
+    // Rising Name unlocks Grand Opening, but cash can't cover $600 + reserve.
+    useGameStore.setState({ club: { ...club, reputation: 45, cash: 700 } });
+    expect(useGameStore.getState().runNight({ ...configFromRoster(), eventId: 'grand-opening' })).toBeNull();
+  });
+
+  it('opens an unlocked, affordable event', () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, reputation: 45, cash: 5000 } });
+    const result = useGameStore.getState().runNight({ ...configFromRoster(), eventId: 'grand-opening' });
+    expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('grand-opening');
+    expect(useGameStore.getState().club!.day).toBe(2);
+  });
+});
+
 describe('shop reserve uses staff salaries', () => {
   it('blocks a purchase that would leave less than a minimum night', () => {
     const club = useGameStore.getState().club!;

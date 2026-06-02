@@ -42,9 +42,33 @@ export interface StaffMember {
   description: string;
 }
 
-/** Tonight's event. Frozen to the identity-neutral baseline in Phase 2A;
- *  widened to a union in Phase 2B. */
-export type EventId = 'regular';
+/** Tonight's event (Phase 2B). `regular` (Quiet Night) is the identity-neutral
+ *  baseline carried over from Phase 2A. */
+export type EventId =
+  | 'regular'
+  | 'private-party'
+  | 'student-night'
+  | 'grand-opening'
+  | 'industry-night';
+
+/**
+ * An event is a modifier vector that re-weights the night — never a self-contained
+ * payoff. Quiet Night = all-neutral (draw/spend ×1, risk/repMod +0, amplify ×1,
+ * cost/fee 0). See docs/phase2-scope.md (Phase 2B). Unlock/requirement/readiness
+ * are derived in src/domain/events.ts, not stored here.
+ */
+export interface EventDef {
+  id: EventId;
+  name: string;
+  description: string; // one-line fantasy
+  cost: number; // upfront $ to throw the event
+  bookingFee: number; // guaranteed $ revenue (Private Party)
+  drawMod: number; // × attendance
+  spendMod: number; // × bar spend per guest
+  riskMod: number; // + incident chance
+  repMod: number; // flat + to reputation delta
+  repAmplify: number; // × the whole reputation swing (spotlight events)
+}
 
 /** Permanent effects an upgrade contributes once owned. All optional/additive. */
 export interface UpgradeEffect {
@@ -114,6 +138,8 @@ export interface NightResult {
   incidents: number;
   noShows: number; // staff who didn't turn up
   eventId: EventId;
+  eventCost: number; // upfront cost paid for tonight's event
+  bookingFee: number; // guaranteed revenue from tonight's event
   reputationBefore: number;
   reputationAfter: number;
   reputationDelta: number;

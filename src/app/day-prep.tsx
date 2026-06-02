@@ -1,24 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
-import { ResultRow, SegmentedControl, Toggle } from '@/components/Controls';
+import { Pill, ResultRow, SegmentedControl, Toggle } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { MUSIC_LABEL } from '@/domain/balance';
-import {
-  isValidSchedule,
-  ROLE_LABEL,
-  strengthLabel,
-  TRAIT_LABEL,
-  wagesForOnDuty,
-} from '@/domain/staff';
-import type { DayConfig, Level, MusicStyle, SmokingPolicy } from '@/domain/types';
+import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
+import { isValidSchedule, ROLE_LABEL, strengthLabel, TRAIT_LABEL, wagesForOnDuty } from '@/domain/staff';
+import type { DayConfig, Level, MusicStyle, ResultNote, SmokingPolicy } from '@/domain/types';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
-import { colors } from '@/theme/tokens';
+import { colors, radius, spacing } from '@/theme/tokens';
 
 const LEVELS: { value: Level; label: string }[] = [
   { value: 'low', label: 'Low' },
@@ -29,6 +24,13 @@ const LEVELS: { value: Level; label: string }[] = [
 const MUSIC: { value: MusicStyle; label: string }[] = (
   Object.keys(MUSIC_LABEL) as MusicStyle[]
 ).map((m) => ({ value: m, label: MUSIC_LABEL[m] }));
+
+const NOTE_COLOR: Record<ResultNote['tone'], string> = {
+  good: colors.success,
+  bad: colors.danger,
+  warn: colors.warning,
+  info: colors.neonCyan,
+};
 
 export default function DayPrepScreen() {
   const club = useGameStore((s) => s.club);
@@ -43,49 +45,92 @@ export default function DayPrepScreen() {
   const set = <K extends keyof DayConfig>(key: K, value: DayConfig[K]) =>
     setConfig((c) => ({ ...c, [key]: value }));
 
-  // Drop any scheduled ids that are no longer employed (e.g. fired since last night).
+  // Drop scheduled ids no longer employed (fired since last night).
   const onDuty = config.staffOnDuty.filter((id) => club.staff.some((m) => m.id === id));
   const toggleStaff = (id: string) =>
     set('staffOnDuty', onDuty.includes(id) ? onDuty.filter((x) => x !== id) : [...onDuty, id]);
 
-  const fixedCosts = wagesForOnDuty(club.staff, onDuty);
+  // Locked-event fallback: a saved event that's no longer unlocked reverts to Quiet.
+  const available = unlockedEvents(club);
+  const eventId = available.some((e) => e.id === config.eventId) ? config.eventId : 'regular';
+  const event = getEvent(eventId);
+  const requirement = eventRequirement(club, eventId);
+  const readiness = eventReadiness(club, { ...config, eventId, staffOnDuty: onDuty });
+
+  const wages = wagesForOnDuty(club.staff, onDuty);
+  const outlay = wages + event.cost;
   const validSchedule = isValidSchedule(club.staff, onDuty);
-  const canAfford = club.cash >= fixedCosts;
-  const canOpen = validSchedule && canAfford;
+  const canAfford = club.cash >= outlay;
+  const canOpen = validSchedule && canAfford && requirement.met;
 
   const onOpen = () => {
-    if (runNight({ ...config, staffOnDuty: onDuty })) router.replace('/results');
+    if (runNight({ ...config, eventId, staffOnDuty: onDuty })) router.replace('/results');
   };
 
   return (
     <Screen
       footer={
         <View style={{ gap: 8 }}>
-          <ResultRow
-            label="Tonight's wages"
-            value={money(fixedCosts)}
-            valueColor={canAfford ? colors.warning : colors.danger}
-          />
+          <ResultRow label="Tonight's wages" value={money(wages)} valueColor={colors.warning} />
+          {event.cost > 0 ? (
+            <ResultRow label={`${event.name} cost`} value={`-${money(event.cost)}`} valueColor={colors.warning} />
+          ) : null}
+          {event.bookingFee > 0 ? (
+            <ResultRow label="Booking fee" value={`+${money(event.bookingFee)}`} valueColor={colors.success} />
+          ) : null}
           {!validSchedule ? (
             <Text variant="label" color={colors.danger}>
               You need at least one bartender on duty to open.
             </Text>
+          ) : !requirement.met ? (
+            <Text variant="label" color={colors.danger}>
+              {requirement.reason}
+            </Text>
           ) : !canAfford ? (
             <Text variant="label" color={colors.danger}>
-              You can't cover tonight's wages ({money(club.cash)} in the bank).
-              Send someone home to open the doors.
+              You can't cover tonight's outlay ({money(club.cash)} in the bank).
             </Text>
           ) : null}
           <Button label="Open the Doors" onPress={onOpen} disabled={!canOpen} />
         </View>
       }
     >
+      <Card title="Tonight's Event">
+        {available.map((e) => {
+          const selected = e.id === eventId;
+          return (
+            <Pressable
+              key={e.id}
+              onPress={() => set('eventId', e.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              style={[styles.eventRow, selected && styles.eventRowSel]}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="body" color={selected ? colors.neonMagenta : colors.textPrimary}>
+                  {e.name}
+                </Text>
+                <Text variant="label" muted>
+                  {e.description}
+                </Text>
+              </View>
+              {e.cost > 0 ? (
+                <Pill label={`-${money(e.cost)}`} color={colors.warning} />
+              ) : e.bookingFee > 0 ? (
+                <Pill label={`+${money(e.bookingFee)}`} color={colors.success} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+        {readiness.messages.map((m, i) => (
+          <Text key={i} variant="label" color={NOTE_COLOR[m.tone]}>
+            {m.text}
+          </Text>
+        ))}
+      </Card>
+
       <Card title="Music">
-        <SegmentedControl
-          value={config.music}
-          options={MUSIC}
-          onChange={(v) => set('music', v)}
-        />
+        <SegmentedControl value={config.music} options={MUSIC} onChange={(v) => set('music', v)} />
       </Card>
 
       <Card title="Pricing">
@@ -140,3 +185,17 @@ export default function DayPrepScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  eventRowSel: { borderColor: colors.neonMagenta },
+});

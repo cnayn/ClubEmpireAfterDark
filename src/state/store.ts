@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 
+import { eventRequirement, getEvent, isUnlocked } from '@/domain/events';
 import {
   canFireStaff,
   getCandidate,
@@ -69,8 +70,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!club) return null;
     // Schedule must be valid (employed, unique, ≥1 bartender).
     if (!isValidSchedule(club.staff, config.staffOnDuty)) return null;
-    // Bankruptcy guard: never open a night the club can't pay its on-duty staff.
-    if (club.cash < wagesForOnDuty(club.staff, config.staffOnDuty)) return null;
+    // Event must be unlocked and its fee must respect the minimum-night reserve.
+    if (!isUnlocked(club, config.eventId)) return null;
+    if (!eventRequirement(club, config.eventId).met) return null;
+    // Bankruptcy guard: cover tonight's on-duty wages AND the event's upfront cost.
+    const eventCost = getEvent(config.eventId).cost;
+    if (club.cash < wagesForOnDuty(club.staff, config.staffOnDuty) + eventCost) return null;
     const { result, nextClub } = resolveNight(club, config, nightSeed(club));
     set({ club: nextClub, lastResult: result });
     void saveClub(nextClub);

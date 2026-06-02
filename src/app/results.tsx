@@ -3,9 +3,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card, StatCard } from '@/components/Card';
-import { ResultRow } from '@/components/Controls';
+import { Pill, ResultRow } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
+import { getEvent } from '@/domain/events';
 import type { ResultNote } from '@/domain/types';
 import { money, moneyColor, signed, signedMoney } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -45,9 +46,12 @@ export default function ResultsScreen() {
         </View>
       }
     >
-      <Text variant="label" muted>
-        NIGHT {result.day} — THE MORNING AFTER
-      </Text>
+      <View style={styles.headerRow}>
+        <Text variant="label" muted style={{ flex: 1 }}>
+          NIGHT {result.day} — THE MORNING AFTER
+        </Text>
+        <Pill label={getEvent(result.eventId).name} color={colors.neonViolet} />
+      </View>
 
       <View style={styles.row}>
         <StatCard
@@ -76,9 +80,17 @@ export default function ResultsScreen() {
         <ResultRow label="Cover charge" value={money(result.coverRevenue)} />
         <ResultRow label="Bar" value={money(result.barRevenue)} />
         {result.vipBonus > 0 ? <ResultRow label="VIP spend" value={money(result.vipBonus)} /> : null}
+        {result.bookingFee > 0 ? <ResultRow label="Booking fee" value={money(result.bookingFee)} /> : null}
         <ResultRow label="Revenue" value={money(result.revenue)} strong valueColor={colors.success} />
         <View style={styles.divider} />
         <ResultRow label="Wages" value={`-${money(result.wages)}`} />
+        {result.eventCost > 0 ? (
+          <ResultRow
+            label={`${getEvent(result.eventId).name} cost`}
+            value={`-${money(result.eventCost)}`}
+            valueColor={colors.warning}
+          />
+        ) : null}
         {result.fines > 0 ? (
           <ResultRow label="Fines" value={`-${money(result.fines)}`} valueColor={colors.danger} />
         ) : null}
@@ -116,6 +128,7 @@ export default function ResultsScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.xs },
   note: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start', paddingVertical: spacing.xs },

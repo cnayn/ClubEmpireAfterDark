@@ -1,9 +1,9 @@
 # Phase 2 Scope — Named Staff (2A) + Events (2B)
 
-> **Status:** **Phase 2A implemented** (2026-06-02) — tests + typecheck + bundle
-> green, early-game balance preserved (decision-log #0009). **Phase 2B not started.**
-> Phase 2 is split into two slices to avoid overloading implementation:
-> **Phase 2A = named staff**, **Phase 2B = events**. 2B only begins after approval.
+> **Status:** **Phase 2A + 2B implemented** (2026-06-02) — tests + typecheck +
+> bundle green; Quiet-Night-only play preserves the Phase 2A baseline exactly;
+> events pass no-dominance / survivability / requirement-bites (decision-log
+> #0009, #0010). DJs remain deferred behind the baseline-neutral gate.
 
 This document is the **authoritative boundary** for Phase 2. If a feature is not
 listed in the "In scope" sections below, it is **not** in Phase 2A.
@@ -214,12 +214,22 @@ playable v2 club with a non-empty roster and a valid `lastConfig`.
 
 ---
 
-# PHASE 2B — Events (DEFERRED)
+# PHASE 2B — Events (IMPLEMENTED)
 
-**Do not implement yet.** Begins only after Phase 2A is stable and approved.
-Phase 2B adds a **tiny static event catalog**, an event picker in Day Prep,
-event modifiers in the resolver, event result lines, event tests — and the
-**DJ role** (whose vibe/music-match hooks finally have meaning).
+Shipped the static event catalog (`src/domain/events.ts`), the Day Prep event
+picker, the resolver modifier vector, event result lines, and tests. The **DJ
+role was NOT shipped** — it stays deferred behind the baseline-neutral gate
+(roadmap). Implemented with the three-gate model:
+- **Unlock** — reputation tier OR tutorial milestone only (`unlockedEvents`).
+- **Requirement** — reserve-aware affordability; the only hard block.
+- **Readiness** — advisory only, never blocks (`eventReadiness`).
+
+Events: Quiet Night (`regular`, identity), Private Party, Student Night, Grand
+Opening / Re-Launch, Industry Night. Happy Hour deferred. No save migration was
+needed (gates derive from `ClubState`; `eventId` default stays `regular`). See
+docs/economy.md (Phase 2B) and decision-log #0010.
+
+Original plan (kept for reference):
 
 Event catalog (2B):
 - Regular Night (identity baseline — already present as the 2A placeholder)

@@ -14,6 +14,7 @@
  */
 
 import * as B from '@/domain/balance';
+import { eventResultNotes, getEvent } from '@/domain/events';
 import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
 import { aggregateEffects } from '@/domain/upgrades';
@@ -34,6 +35,10 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   // --- Staff: who showed, and what the crew is worth (no-show draws first) ---
   const crew = aggregateOnDuty(club.staff, config.staffOnDuty, rng);
 
+  // Tonight's event is a deterministic modifier vector (no new RNG draws).
+  // Quiet Night (`regular`) is all-neutral, so its path is identical to Phase 2A.
+  const event = getEvent(config.eventId);
+
   const capacity = club.baseCapacity + fx.capacity;
   const repFactor = B.REP_FLOOR + (1 - B.REP_FLOOR) * (club.reputation / 100);
 
@@ -46,7 +51,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const smokingDraw = config.smoking === 'relaxed' ? B.SMOKING_RELAXED_DRAW : 0;
   const noise = rng.range(0.9, 1.1);
 
-  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * noise;
+  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise;
   const guests = clamp(Math.round(expected), 0, capacity);
 
   // --- Service capacity (bartenders gate bar revenue) ---
@@ -60,13 +65,13 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const avgDrinks = B.AVG_DRINKS_PER_GUEST * lerp(1.1, 0.85, drinkV);
 
   const coverRevenue = Math.round(guests * coverPrice);
-  const barRevenue = Math.round(guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio);
+  const barRevenue = Math.round(guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * event.spendMod);
 
   // --- Incidents & risk (security mod derives from on-duty bouncers) ---
   const crowdPressure = capacity > 0 ? guests / capacity : 0;
   const securityMod = B.bouncerSecurityMod(crew.bouncerUnits) * (fx.securityDiscount ? 0.8 : 1);
   const riskFromSmoking = config.smoking === 'relaxed' ? B.RELAXED_SMOKING_RISK : 0;
-  const incidentChance = clamp(crowdPressure * 0.5 * securityMod + riskFromSmoking, 0, 0.9);
+  const incidentChance = clamp(crowdPressure * 0.5 * securityMod + riskFromSmoking + event.riskMod, 0, 0.9);
 
   let incidents = 0;
   if (rng.chance(incidentChance)) {
@@ -88,7 +93,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     ? Math.round(guests * B.VIP_SPEND_PER_GUEST * (vipSatisfaction / 100) * (fx.vipBonus ? 1.6 : 1))
     : 0;
 
-  const revenue = coverRevenue + barRevenue + vipBonus;
+  const revenue = coverRevenue + barRevenue + vipBonus + event.bookingFee;
 
   // --- Theft (dishonest bartenders skim; draws last, only for thieves) ---
   const theftOutcome = resolveTheft(crew.showedBartenders, barRevenue, rng);
@@ -96,7 +101,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
 
   // --- Costs ---
   const wages = wagesForOnDuty(club.staff, config.staffOnDuty);
-  const costs = wages + fines + theft;
+  const costs = wages + fines + theft + event.cost;
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
@@ -109,13 +114,21 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const satisfaction =
     w.vibe * vibe + w.loyalty * regularLoyalty + w.service * serviceQuality + w.vip * vipComponent;
 
-  const repDelta = Math.round(
+  // Spotlight events amplify the WHOLE swing (wins and losses), plus a flat nudge.
+  // Quiet Night has repAmplify 1 / repMod 0, so this collapses to the 2A formula.
+  const baseRepSwing =
     (satisfaction - B.REP_ANCHOR) * B.REP_GAIN_K -
-      incidents * B.INCIDENT_REP_HIT -
-      (complianceFines > 0 ? B.COMPLIANCE_REP_HIT : 0)
-  );
+    incidents * B.INCIDENT_REP_HIT -
+    (complianceFines > 0 ? B.COMPLIANCE_REP_HIT : 0);
+  const repDelta = Math.round(baseRepSwing * event.repAmplify + event.repMod);
   const reputationBefore = club.reputation;
   const reputationAfter = clamp(reputationBefore + repDelta, 0, 100);
+
+  const eventNotes = eventResultNotes(config.eventId, {
+    serviceRatio,
+    incidents,
+    repDelta: reputationAfter - reputationBefore,
+  });
 
   const notes = buildNotes({
     guests,
@@ -128,8 +141,8 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     vipFocus: config.vipFocus,
     priceLevel,
     net,
-    // Staff-driven reveals (no-shows, theft) come pre-built from the domain.
-    staffNotes: [...crew.notes, ...theftOutcome.notes],
+    // Event line first, then staff-driven reveals (no-shows, theft).
+    staffNotes: [...eventNotes, ...crew.notes, ...theftOutcome.notes],
   });
 
   const result: NightResult = {
@@ -148,6 +161,8 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     incidents,
     noShows: crew.noShows,
     eventId: config.eventId,
+    eventCost: event.cost,
+    bookingFee: event.bookingFee,
     reputationBefore,
     reputationAfter,
     reputationDelta: reputationAfter - reputationBefore,

@@ -218,6 +218,30 @@ export function canFireStaff(roster: StaffMember[], id: string): boolean {
 
 // --- Night aggregation -------------------------------------------------------
 
+/**
+ * Deterministic best-case crew strength (assumes everyone shows; no RNG). Used
+ * by the event readiness advisory — never by the resolver. Mirrors the per-role
+ * math in aggregateOnDuty minus the no-show roll.
+ */
+export function crewPotential(
+  roster: StaffMember[],
+  onDutyIds: string[]
+): { service: number; bouncerUnits: number } {
+  let service = 0;
+  let bouncerUnits = 0;
+  for (const m of roster.filter((x) => onDutyIds.includes(x.id))) {
+    if (m.role === 'bartender') {
+      const fast = hasTrait(m, 'fast-pour') ? 1.1 : 1;
+      service += B.SERVICE_PER_BARTENDER * (m.skill / B.BASELINE_SKILL) * fast;
+    } else {
+      const honestyFactor = B.BOUNCER_HONESTY_FLOOR + (1 - B.BOUNCER_HONESTY_FLOOR) * (m.honesty / 100);
+      const intimidating = hasTrait(m, 'intimidating') ? B.INTIMIDATING_UNIT_BONUS : 0;
+      bouncerUnits += (m.skill / B.BASELINE_SKILL) * honestyFactor + intimidating;
+    }
+  }
+  return { service, bouncerUnits };
+}
+
 export interface OnDutyAggregate {
   /** Bartender service capacity (excludes upgrade bonuses, applied by the sim). */
   service: number;

@@ -5,6 +5,46 @@ context → decision → why → consequences.
 
 ---
 
+## 0011 — Grand Opening tuning pass (2026-06-02)
+- **Context:** Harness flagged Grand Opening as a near-repeatable cash machine on
+  established clubs (strongly net-positive, small rep cost) rather than a
+  high-stakes bet (#0010 open note).
+- **Decision:** Focused single-event tuning — cost **$600 → $850**, riskMod
+  **+0.06 → +0.10**. No other event, the resolver, unlocks, UI, or save schema
+  changed.
+- **Result (harness, vs Quiet):** balanced +333→**+76**, aggressive +313→**+63**,
+  hot +606→**+352** (prepared clubs still profit), weak +93→**−158**, fresh
+  −254→**−512** (clear downside when unprepared). Other events' rows unchanged.
+  All invariants hold: every event has a Quiet-better state, none beats Quiet on
+  both net and reputation, no soft-lock, Quiet stays bit-identical to Phase 2A.
+- **Status:** Grand Opening now reads as a high-stakes spotlight. DJs / Phase 3
+  not started.
+
+## 0010 — Phase 2B implementation complete: events (2026-06-02)
+- **Context:** Implemented the events-only slice (#0008 plan), built on Phase 2A.
+  Corrected invariant locked at the owner's request: **Quiet-Night-only play must
+  preserve the Phase 2A baseline exactly**; *event* play may move the curve but
+  must pass no-dominance, survivability, requirement-bites, and no-soft-lock.
+- **Decision:** Shipped a static catalog (`src/domain/events.ts`) of five events —
+  Quiet Night (`regular`, identity), Private Party, Student Night, Grand Opening,
+  Industry Night (Happy Hour deferred; **no DJ** — still behind the baseline-neutral
+  gate). An event is a modifier vector (draw/spend/risk/cost/bookingFee/repMod/
+  repAmplify) applied in `night.ts` with **no new RNG draws**. Three gates:
+  Unlock (reputation tier OR milestone), Requirement (reserve-aware affordability —
+  the only hard block), Readiness (advisory, never blocks). Spotlight events use
+  **symmetric** reputation amplification.
+- **Save:** **No migration** — `SCHEMA_VERSION` stays 2 (gates derive from
+  `ClubState`; `eventId` default stays `regular`; the union only widens; locked
+  saved events fall back to Quiet at runtime).
+- **Verification:** 56 tests pass, `tsc --noEmit` clean, web bundle exports. The
+  throwaway telemetry harness ({balanced, weak, aggressive, fresh, hot} × 60 seeds)
+  confirmed every event has a Quiet-better state, none dominates on both net and
+  reputation, paid events can't soft-lock, and Private Party's niche is the fresh
+  small club. Quiet Night = `regular` no-op preserves the 2A baseline bit-for-bit.
+- **Open tuning note:** Grand Opening behaves more like a cash machine than a
+  high-variance bet on established clubs (passes all hard rules; revisit later).
+- **Status:** Phase 2B done. DJs / Phase 3 not started.
+
 ## 0009 — Phase 2A implementation complete (2026-06-02)
 - **Context:** Implemented the named-staff slice planned in #0008, holding the
   early-game economy locked in #0007.

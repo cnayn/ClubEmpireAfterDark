@@ -36,11 +36,14 @@ Split into two slices to avoid overloading implementation. See
 - Save migration v1 → v2; `eventId: "regular"` kept as an identity-neutral
   placeholder. **Preserve the Phase 0/1 early-game balance (non-negotiable).**
 
-### Phase 2B — Events (second slice, after 2A is stable)
-- Tiny static event catalog (Regular, Student, Hip-Hop, Techno, VIP Birthday,
-  Local Influencer) + event picker, modifiers, result lines, tests.
-- **DJ role** ships here (its vibe/music-match hooks need events to matter).
-- Widens `eventId` to a union — no new save migration (field exists from 2A).
+### Phase 2B — Events ✅ done
+- Static catalog of 5 events (Quiet Night, Private Party, Student Night, Grand
+  Opening / Re-Launch, Industry Night) + Day Prep picker, resolver modifier
+  vector, result lines, tests. Happy Hour deferred. Three-gate model
+  (unlock / requirement / readiness). Symmetric reputation amplification.
+- **DJ role NOT shipped** — deferred behind the baseline-neutral gate (below).
+- Widened `eventId` to a union — **no save migration needed** (gates derive from
+  state; default stays `regular`). See decision-log #0010.
 
 ### Later in Phase 2 (future)
 - Staff morale; more roles (host, etc.); day-of-week rhythm; crowd archetypes;
@@ -72,8 +75,8 @@ Each layer depends only on layers above it — *depend only on what exists*.
 1. **WMT / telemetry** — the legibility layer (results notes, result tags, "why"
    feedback). Everything later leans on the player understanding cause→effect.
 2. **Phase 2A — named staff swap** (bartenders + bouncers). ✅ done.
-3. **Phase 2B — events + DJs** — DJs only if they pass the baseline-neutral gate
-   (see note below); otherwise the DJ slips to Phase 3.
+3. **Phase 2B — events** ✅ done (5 events). **DJs not shipped** — still behind the
+   baseline-neutral gate below; otherwise the DJ slips to Phase 3.
 4. **Phase 3 — VIP vs regulars, interior slots, door stance, compliance,
    equipment, staff trust.**
 5. **Phase 4 — city heat, rivals, Clean vs Wild / Club Policy, referrals,

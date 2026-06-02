@@ -188,3 +188,33 @@ current curve — service 180, securityMod 1.0, wages ≈ today's $340 — so al
 #0007 invariants still hold. Exact salaries (esp. bouncer tiers, open risk R1)
 are set during the balance re-verification step before 2A sign-off. DJ and event
 modifiers are **Phase 2B** and excluded from this baseline.
+
+## Phase 2B Economy Notes — Events (implemented)
+An event is a **modifier vector** applied to the night in `src/sim/night.ts`
+(no new RNG draws). Quiet Night is the all-neutral identity, so **Quiet-Night-only
+play reproduces the Phase 2A baseline exactly**. The corrected invariant: *event*
+play may move the first-10-night curve, but must pass no-dominance, survivability,
+requirement-bites, and no-soft-lock.
+
+```
+attendance *= drawMod ; barRevenue *= spendMod ; incidentChance += riskMod
+revenue    += bookingFee ; costs += cost
+repDelta    = round( baseSwing * repAmplify + repMod )   // spotlight amplifies both ways
+```
+| Event | cost | draw | spend | risk | rep | role (verified by harness) |
+|---|---|---|---|---|---|---|
+| Quiet Night | 0 | ×1.0 | ×1.0 | +0 | flat0/amp1 | identity baseline; valid forever |
+| Private Party | 0 (+$400 fee) | ×0.6 | ×0.7 | −0.05 | amp0.5 | cash floor — beats Quiet only on a fresh small club |
+| Student Night | $80 | ×1.35 | ×0.65 | +0.08 | amp1 | volume↑/margin↓ — wins staffed, loses understaffed |
+| Grand Opening | $850 | ×1.5 | ×1.1 | +0.10 | amp **1.8** | high-stakes spotlight; profits only on a prepared established/hot club, loses on weak/fresh |
+| Industry Night | $250 | ×0.7 | ×1.2 | +0.0 | +2/amp1.6 | reputation buy — cash-negative, rep-positive |
+
+**No event dominates Quiet:** verified by the throwaway telemetry harness across
+{balanced, weak roster, aggressive pricing, fresh/recovery, hot club} × 60 seeds —
+every event has ≥1 scenario where Quiet wins, none beats Quiet on both net and
+reputation. **Anti-soft-lock:** a paid event is requirement-blocked unless
+`cash ≥ cost + minViableNightCost`; the bankruptcy guard covers wages + event cost.
+Grand Opening tuned (decision-log #0011): cost $600→$850 and risk +0.06→+0.10 so
+it is a high-stakes bet, not a repeatable cash printer — established/prepared clubs
+still profit, weak/fresh clubs now clearly lose, and it never beats Quiet on both
+net and reputation.
