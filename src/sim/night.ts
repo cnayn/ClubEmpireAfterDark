@@ -141,6 +141,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     vipFocus: config.vipFocus,
     priceLevel,
     net,
+    repDelta: reputationAfter - reputationBefore,
     // Event line first, then staff-driven reveals (no-shows, theft).
     staffNotes: [...eventNotes, ...crew.notes, ...theftOutcome.notes],
   });
@@ -194,13 +195,46 @@ interface NoteInput {
   vipFocus: boolean;
   priceLevel: number;
   net: number;
+  repDelta: number;
   staffNotes: ResultNote[];
 }
 
-/** Generate a few flavorful, explanatory notes so the player sees *why*. */
+/**
+ * Generate a few explanatory notes so the player sees *why*. Ordering matters:
+ * the decision-relevant lines (event outcome, theft/no-show reveals, why
+ * reputation moved, incidents) come first so they survive the cap; generic
+ * crowd/service texture follows.
+ */
 function buildNotes(i: NoteInput): ResultNote[] {
   const notes: ResultNote[] = [];
 
+  // 1. Event outcome + staff-caused reveals (no-shows, theft) — most important.
+  notes.push(...i.staffNotes);
+
+  // 2. Why reputation moved. Incident/compliance drops are explained by their own
+  //    lines below; here we cover clean growth and non-obvious slips.
+  if (i.repDelta >= 2) {
+    notes.push({ tone: 'good', text: 'Regulars left happy — your name grew around the neighborhood.' });
+  } else if (i.repDelta <= -2 && i.incidents === 0 && i.complianceFines === 0) {
+    notes.push({ tone: 'bad', text: 'The crowd left underwhelmed — your reputation slipped tonight.' });
+  }
+
+  // 3. Incidents / compliance (cost + reputation hit).
+  if (i.incidents > 0) {
+    notes.push({
+      tone: 'bad',
+      text:
+        i.incidents === 1
+          ? 'A scuffle at the bar — security handled it, but it cost you.'
+          : `${i.incidents} incidents tonight. The crowd got away from security.`,
+    });
+  }
+
+  if (i.complianceFines > 0) {
+    notes.push({ tone: 'warn', text: 'An inspector dropped by. The relaxed policy earned you a fine.' });
+  }
+
+  // 4. Crowd + service texture.
   if (i.guests >= i.capacity) {
     notes.push({ tone: 'warn', text: 'Packed to the rafters — you turned people away at the door.' });
   } else if (i.crowdPressure < 0.3) {
@@ -216,23 +250,7 @@ function buildNotes(i: NoteInput): ResultNote[] {
     notes.push({ tone: 'good', text: 'Bar service was smooth all night.' });
   }
 
-  if (i.incidents > 0) {
-    notes.push({
-      tone: 'bad',
-      text:
-        i.incidents === 1
-          ? 'A scuffle at the bar — security handled it, but it cost you.'
-          : `${i.incidents} incidents tonight. The crowd got away from security.`,
-    });
-  }
-
-  if (i.complianceFines > 0) {
-    notes.push({ tone: 'warn', text: 'An inspector dropped by. The relaxed policy earned you a fine.' });
-  }
-
-  // Staff reveals (no-shows, theft) are surfaced prominently.
-  notes.push(...i.staffNotes);
-
+  // 5. VIP / pricing / loss colour.
   if (i.vipFocus && i.vipEligible) {
     notes.push({ tone: 'info', text: 'VIP tables were busy — the big spenders showed up.' });
   } else if (i.vipFocus && !i.vipEligible) {

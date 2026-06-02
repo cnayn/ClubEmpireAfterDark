@@ -80,7 +80,9 @@ export default function ResultsScreen() {
         <ResultRow label="Cover charge" value={money(result.coverRevenue)} />
         <ResultRow label="Bar" value={money(result.barRevenue)} />
         {result.vipBonus > 0 ? <ResultRow label="VIP spend" value={money(result.vipBonus)} /> : null}
-        {result.bookingFee > 0 ? <ResultRow label="Booking fee" value={money(result.bookingFee)} /> : null}
+        {result.bookingFee > 0 ? (
+          <ResultRow label="Guaranteed booking fee" value={money(result.bookingFee)} valueColor={colors.success} />
+        ) : null}
         <ResultRow label="Revenue" value={money(result.revenue)} strong valueColor={colors.success} />
         <View style={styles.divider} />
         <ResultRow label="Wages" value={`-${money(result.wages)}`} />

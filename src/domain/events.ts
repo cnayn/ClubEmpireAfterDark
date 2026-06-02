@@ -38,7 +38,7 @@ export const EVENTS: Record<EventId, EventDef> = {
   'private-party': {
     id: 'private-party',
     name: 'Private Party',
-    description: 'Rent the room out. A guaranteed fee and a calm, capped night.',
+    description: 'A guaranteed fee for a calm, capped night — a safety net when the crowd would be thin, not a way to grow.',
     cost: 0,
     bookingFee: 400,
     drawMod: 0.6,
@@ -74,7 +74,7 @@ export const EVENTS: Record<EventId, EventDef> = {
   'industry-night': {
     id: 'industry-night',
     name: 'Industry Night',
-    description: "Host the scene's insiders. Reputation more than revenue — if you deliver.",
+    description: "Host the scene's insiders — a reputation investment, not a cash night. You pay to grow your name, if you deliver.",
     cost: 250,
     bookingFee: 0,
     drawMod: 0.7,
@@ -165,6 +165,14 @@ export function eventReadiness(club: ClubState, config: DayConfig): ReadinessAdv
   const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
   const pressure = capacity > 0 ? guests / capacity : 0;
 
+  // Always tell the player roughly what to expect, plus each niche event's nature.
+  messages.push({ tone: 'info', text: `Expect roughly ${guests} guests tonight.` });
+  if (config.eventId === 'private-party') {
+    messages.push({ tone: 'info', text: 'A safe floor — best when your organic crowd would be thin.' });
+  } else if (config.eventId === 'industry-night') {
+    messages.push({ tone: 'info', text: "You'll likely spend more than you earn — this buys reputation, not cash." });
+  }
+
   if (guests > service * 1.05) {
     weak = true;
     messages.push({ tone: 'warn', text: `The bar may not keep up with ~${guests} guests — add a bartender.` });
@@ -219,7 +227,7 @@ export function eventResultNotes(id: EventId, o: EventOutcome): ResultNote[] {
         : [{ tone: 'bad', text: 'A very public stumble — the spotlight stung.' }];
     case 'industry-night':
       return o.repDelta >= 0
-        ? [{ tone: 'good', text: 'Insiders approved — your name travelled tonight.' }]
+        ? [{ tone: 'good', text: 'The industry crowd noticed the polish — reputation rose more than cash tonight.' }]
         : [{ tone: 'warn', text: 'The industry crowd judged you and left unimpressed.' }];
     default:
       return [];

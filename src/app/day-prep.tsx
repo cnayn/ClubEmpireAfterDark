@@ -76,7 +76,7 @@ export default function DayPrepScreen() {
             <ResultRow label={`${event.name} cost`} value={`-${money(event.cost)}`} valueColor={colors.warning} />
           ) : null}
           {event.bookingFee > 0 ? (
-            <ResultRow label="Booking fee" value={`+${money(event.bookingFee)}`} valueColor={colors.success} />
+            <ResultRow label="Guaranteed booking fee" value={`+${money(event.bookingFee)}`} valueColor={colors.success} />
           ) : null}
           {!validSchedule ? (
             <Text variant="label" color={colors.danger}>
