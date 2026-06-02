@@ -1,0 +1,216 @@
+/**
+ * The heart of the game: resolving one night.
+ *
+ * PURE — no React, no I/O, no Math.random. Given the current club state, the
+ * player's day config, and a seed, it returns a NightResult plus the next
+ * persisted ClubState. Fully unit-testable. See docs/economy.md for the model.
+ */
+
+import * as B from '@/domain/balance';
+import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
+import { aggregateEffects } from '@/domain/upgrades';
+import { createRng } from './rng';
+
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+export interface NightOutcome {
+  result: NightResult;
+  nextClub: ClubState;
+}
+
+export function resolveNight(club: ClubState, config: DayConfig, seed: number): NightOutcome {
+  const rng = createRng(seed);
+  const fx = aggregateEffects(club.ownedUpgradeIds);
+
+  const capacity = club.baseCapacity + fx.capacity;
+  const repFactor = B.REP_FLOOR + (1 - B.REP_FLOOR) * (club.reputation / 100);
+
+  // --- Attendance (demand curve) ---
+  const coverV = B.LEVEL_VALUE[config.coverLevel];
+  const drinkV = B.LEVEL_VALUE[config.drinkLevel];
+  const priceLevel = (coverV + drinkV) / 2;
+  const priceMod = lerp(1.15, 0.55, priceLevel);
+  const musicFit = clamp(B.MUSIC_FIT[config.music] + fx.musicFitBonus, 0.5, 1.3);
+  const smokingDraw = config.smoking === 'relaxed' ? B.SMOKING_RELAXED_DRAW : 0;
+  const noise = rng.range(0.9, 1.1);
+
+  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * noise;
+  const guests = clamp(Math.round(expected), 0, capacity);
+
+  // --- Service capacity (bartenders gate bar revenue) ---
+  const effectiveBartenders = config.bartenders + fx.serviceBartenders;
+  const serviceCapacity = effectiveBartenders * B.SERVICE_PER_BARTENDER;
+  const serviceRatio = guests > 0 ? clamp(serviceCapacity / guests, 0, 1) : 1;
+
+  // --- Revenue ---
+  const coverPrice = B.COVER_PRICE[config.coverLevel];
+  const drinkMult = B.DRINK_MULT[config.drinkLevel];
+  // high drink prices slightly suppress drinks ordered
+  const avgDrinks = B.AVG_DRINKS_PER_GUEST * lerp(1.1, 0.85, drinkV);
+
+  const coverRevenue = Math.round(guests * coverPrice);
+  const barRevenue = Math.round(guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio);
+
+  // --- Incidents & risk ---
+  const crowdPressure = capacity > 0 ? guests / capacity : 0;
+  const securityMod = B.SECURITY_MOD[config.securityLevel] * (fx.securityDiscount ? 0.8 : 1);
+  const riskFromSmoking = config.smoking === 'relaxed' ? B.RELAXED_SMOKING_RISK : 0;
+  const incidentChance = clamp(crowdPressure * 0.5 * securityMod + riskFromSmoking, 0, 0.9);
+
+  let incidents = 0;
+  if (rng.chance(incidentChance)) {
+    incidents = rng.int(1, 1 + Math.round(crowdPressure * 2));
+  }
+  const incidentFines = incidents * B.INCIDENT_FINE;
+  const complianceFines =
+    config.smoking === 'relaxed' && rng.chance(B.COMPLIANCE_FINE_CHANCE) ? B.COMPLIANCE_FINE : 0;
+  const fines = incidentFines + complianceFines;
+
+  // --- VIP ---
+  const vipEligible = config.vipFocus && club.reputation >= B.VIP_MIN_REPUTATION;
+  const vipSatisfaction = config.vipFocus
+    ? clamp(50 + club.reputation * 0.4 - crowdPressure * 20, 0, 100)
+    : clamp(40 - (club.reputation >= B.VIP_MIN_REPUTATION ? 15 : 0), 0, 100);
+  const vipBonus = vipEligible
+    ? Math.round(guests * B.VIP_SPEND_PER_GUEST * (vipSatisfaction / 100) * (fx.vipBonus ? 1.6 : 1))
+    : 0;
+
+  const revenue = coverRevenue + barRevenue + vipBonus;
+
+  // --- Costs ---
+  const wages = config.bartenders * B.WAGE_PER_BARTENDER;
+  const securityCost = B.SECURITY_COST[config.securityLevel];
+  const costs = wages + securityCost + fines;
+  const net = revenue - costs;
+
+  // --- Satisfaction → reputation ---
+  // Blend the night's quality signals into a 0-100 satisfaction index S, then
+  // drift reputation toward/away from it. VIP only counts when courted; service
+  // quality is how well the bar kept up. See docs/economy.md.
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus, 0, 100);
+  const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
+  const serviceQuality = serviceRatio * 100;
+  const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;
+
+  const w = B.SAT_WEIGHTS;
+  const satisfaction =
+    w.vibe * vibe + w.loyalty * regularLoyalty + w.service * serviceQuality + w.vip * vipComponent;
+
+  const repDelta = Math.round(
+    (satisfaction - B.REP_ANCHOR) * B.REP_GAIN_K -
+      incidents * B.INCIDENT_REP_HIT -
+      (complianceFines > 0 ? B.COMPLIANCE_REP_HIT : 0)
+  );
+  const reputationBefore = club.reputation;
+  const reputationAfter = clamp(reputationBefore + repDelta, 0, 100);
+
+  const notes = buildNotes({
+    guests,
+    capacity,
+    crowdPressure,
+    serviceRatio,
+    incidents,
+    complianceFines,
+    vipEligible,
+    vipFocus: config.vipFocus,
+    priceLevel,
+    net,
+  });
+
+  const result: NightResult = {
+    day: club.day,
+    guests,
+    capacity,
+    revenue,
+    costs,
+    net,
+    coverRevenue,
+    barRevenue,
+    vipBonus,
+    wages,
+    securityCost,
+    fines,
+    incidents,
+    reputationBefore,
+    reputationAfter,
+    reputationDelta: reputationAfter - reputationBefore,
+    vipSatisfaction: Math.round(vipSatisfaction),
+    regularLoyalty: Math.round(regularLoyalty),
+    serviceRatio,
+    notes,
+  };
+
+  const nextClub: ClubState = {
+    ...club,
+    day: club.day + 1,
+    cash: club.cash + net,
+    reputation: reputationAfter,
+    lastConfig: config,
+  };
+
+  return { result, nextClub };
+}
+
+interface NoteInput {
+  guests: number;
+  capacity: number;
+  crowdPressure: number;
+  serviceRatio: number;
+  incidents: number;
+  complianceFines: number;
+  vipEligible: boolean;
+  vipFocus: boolean;
+  priceLevel: number;
+  net: number;
+}
+
+/** Generate 2-4 flavorful, explanatory notes so the player sees *why*. */
+function buildNotes(i: NoteInput): ResultNote[] {
+  const notes: ResultNote[] = [];
+
+  if (i.guests >= i.capacity) {
+    notes.push({ tone: 'warn', text: 'Packed to the rafters — you turned people away at the door.' });
+  } else if (i.crowdPressure < 0.3) {
+    notes.push({ tone: 'bad', text: 'The floor felt empty tonight. Word still needs to spread.' });
+  }
+
+  if (i.serviceRatio < 0.85) {
+    notes.push({
+      tone: 'bad',
+      text: 'The bar couldn\'t keep up — drinks (and money) were left on the table.',
+    });
+  } else if (i.serviceRatio >= 1 && i.guests > 0) {
+    notes.push({ tone: 'good', text: 'Bar service was smooth all night.' });
+  }
+
+  if (i.incidents > 0) {
+    notes.push({
+      tone: 'bad',
+      text:
+        i.incidents === 1
+          ? 'A scuffle at the bar — security handled it, but it cost you.'
+          : `${i.incidents} incidents tonight. The crowd got away from security.`,
+    });
+  }
+
+  if (i.complianceFines > 0) {
+    notes.push({ tone: 'warn', text: 'An inspector dropped by. The relaxed policy earned you a fine.' });
+  }
+
+  if (i.vipFocus && i.vipEligible) {
+    notes.push({ tone: 'info', text: 'VIP tables were busy — the big spenders showed up.' });
+  } else if (i.vipFocus && !i.vipEligible) {
+    notes.push({ tone: 'warn', text: 'You courted VIPs, but the club isn\'t prestigious enough yet.' });
+  }
+
+  if (i.priceLevel >= 0.75) {
+    notes.push({ tone: 'info', text: 'Premium pricing thinned the crowd but fattened each tab.' });
+  }
+
+  if (i.net < 0) {
+    notes.push({ tone: 'bad', text: 'You ran at a loss tonight. Rethink staffing or pricing.' });
+  }
+
+  return notes.slice(0, 4);
+}

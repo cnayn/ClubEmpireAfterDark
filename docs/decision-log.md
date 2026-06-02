@@ -5,6 +5,30 @@ context → decision → why → consequences.
 
 ---
 
+## 0007 — Early-game balance pass (2026-06-02)
+- **Context:** Simulating the first 10 nights through the real `resolveNight`
+  exposed serious problems: the default config *lost* money on opening night,
+  sensible ("Balanced") play death-spiralled to −$1,200, reputation crept
+  +1–2/night (tiers unreachable), upgrades were front-loaded then starved, and
+  relaxed smoking was pure downside (no reward).
+- **Decision:** Five tuning changes + an anti-soft-lock guard:
+  1. **Attendance floor** `REP_FLOOR = 0.30` so small clubs are viable from
+     night 1 while reputation still drives absolute numbers.
+  2. **Reputation rework** to an anchored satisfaction index (anchor 55, gain
+     0.20): solid night +3, great +5, bad −5. Reaches "Rising Name" by ~night 8.
+  3. **Start cash $2,000 → $600** so the first upgrade is earned, not gifted.
+  4. **Relaxed smoking gains a +10% attendance draw** — a genuine risk/reward
+     dial against its fine + reputation risk.
+  5. **Kept fixed costs** (wages/security) to preserve the staffing tradeoff.
+  Plus: **bankruptcy guard** (can't open a night you can't pay for) and a
+  **shop reserve** (`MIN_NIGHT_COST`) so a purchase can never soft-lock the
+  player — the cheapest night is always affordable and always profitable.
+- **Why:** Make the first 10 nights fun, fair, and dead-end-free before adding
+  systems. No single strategy dominates: aggressive earns more cash but stalls
+  reputation; balanced climbs tiers; risk is real but punishing when stacked.
+- **Consequences:** Verified by sim + 9 new tests (`early-game balance`,
+  store guards). Phase 2 (named staff + events) builds on this baseline.
+
 ## 0006 — Centralize balancing in `balance.ts`
 - **Decision:** All economy constants and curves live in `src/domain/balance.ts`;
   the sim and UI read from it.
