@@ -31,6 +31,7 @@ export default function RootLayout() {
         <Stack.Screen name="day-prep" options={{ title: 'Tonight' }} />
         <Stack.Screen name="results" options={{ title: 'Last Night', headerBackVisible: false }} />
         <Stack.Screen name="shop" options={{ title: 'Upgrades' }} />
+        <Stack.Screen name="staff" options={{ title: 'Staff' }} />
       </Stack>
     </GestureHandlerRootView>
   );

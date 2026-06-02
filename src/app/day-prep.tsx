@@ -4,11 +4,18 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
-import { ResultRow, SegmentedControl, Stepper, Toggle } from '@/components/Controls';
+import { ResultRow, SegmentedControl, Toggle } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
-import { MAX_BARTENDERS, MUSIC_LABEL, nightFixedCosts } from '@/domain/balance';
-import type { DayConfig, Level, MusicStyle, SecurityLevel, SmokingPolicy } from '@/domain/types';
+import { MUSIC_LABEL } from '@/domain/balance';
+import {
+  isValidSchedule,
+  ROLE_LABEL,
+  strengthLabel,
+  TRAIT_LABEL,
+  wagesForOnDuty,
+} from '@/domain/staff';
+import type { DayConfig, Level, MusicStyle, SmokingPolicy } from '@/domain/types';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors } from '@/theme/tokens';
@@ -23,16 +30,10 @@ const MUSIC: { value: MusicStyle; label: string }[] = (
   Object.keys(MUSIC_LABEL) as MusicStyle[]
 ).map((m) => ({ value: m, label: MUSIC_LABEL[m] }));
 
-const SECURITY: { value: SecurityLevel; label: string }[] = [
-  { value: 1, label: 'Light' },
-  { value: 2, label: 'Standard' },
-  { value: 3, label: 'Heavy' },
-];
-
 export default function DayPrepScreen() {
   const club = useGameStore((s) => s.club);
   const runNight = useGameStore((s) => s.runNight);
-  const [config, setConfig] = useState<DayConfig>(() => ({ ...(club?.lastConfig ?? defaultConfig()) }));
+  const [config, setConfig] = useState<DayConfig>(() => ({ ...club!.lastConfig }));
 
   if (!club) {
     router.replace('/');
@@ -42,11 +43,18 @@ export default function DayPrepScreen() {
   const set = <K extends keyof DayConfig>(key: K, value: DayConfig[K]) =>
     setConfig((c) => ({ ...c, [key]: value }));
 
-  const fixedCosts = nightFixedCosts(config);
+  // Drop any scheduled ids that are no longer employed (e.g. fired since last night).
+  const onDuty = config.staffOnDuty.filter((id) => club.staff.some((m) => m.id === id));
+  const toggleStaff = (id: string) =>
+    set('staffOnDuty', onDuty.includes(id) ? onDuty.filter((x) => x !== id) : [...onDuty, id]);
+
+  const fixedCosts = wagesForOnDuty(club.staff, onDuty);
+  const validSchedule = isValidSchedule(club.staff, onDuty);
   const canAfford = club.cash >= fixedCosts;
+  const canOpen = validSchedule && canAfford;
 
   const onOpen = () => {
-    if (runNight(config)) router.replace('/results');
+    if (runNight({ ...config, staffOnDuty: onDuty })) router.replace('/results');
   };
 
   return (
@@ -54,17 +62,21 @@ export default function DayPrepScreen() {
       footer={
         <View style={{ gap: 8 }}>
           <ResultRow
-            label="Tonight's fixed costs"
+            label="Tonight's wages"
             value={money(fixedCosts)}
             valueColor={canAfford ? colors.warning : colors.danger}
           />
-          {!canAfford ? (
+          {!validSchedule ? (
             <Text variant="label" color={colors.danger}>
-              You can't cover tonight's staff ({money(club.cash)} in the bank).
-              Cut bartenders or security to open the doors.
+              You need at least one bartender on duty to open.
+            </Text>
+          ) : !canAfford ? (
+            <Text variant="label" color={colors.danger}>
+              You can't cover tonight's wages ({money(club.cash)} in the bank).
+              Send someone home to open the doors.
             </Text>
           ) : null}
-          <Button label="Open the Doors" onPress={onOpen} disabled={!canAfford} />
+          <Button label="Open the Doors" onPress={onOpen} disabled={!canOpen} />
         </View>
       }
     >
@@ -94,20 +106,20 @@ export default function DayPrepScreen() {
         </Text>
       </Card>
 
-      <Card title="Staffing">
-        <Stepper
-          label="Bartenders"
-          value={config.bartenders}
-          min={1}
-          max={MAX_BARTENDERS}
-          onChange={(v) => set('bartenders', v)}
-        />
-        <SegmentedControl
-          label="Security level"
-          value={config.securityLevel}
-          options={SECURITY}
-          onChange={(v) => set('securityLevel', v)}
-        />
+      <Card title="Tonight's Crew">
+        {club.staff.map((m) => (
+          <Toggle
+            key={m.id}
+            label={`${m.name} · ${ROLE_LABEL[m.role]}`}
+            description={`${money(m.salary)}/night · ${strengthLabel(m.skill)}${
+              m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : ''
+            }`}
+            value={onDuty.includes(m.id)}
+            onChange={() => toggleStaff(m.id)}
+            accent={m.role === 'bouncer' ? colors.neonCyan : colors.neonViolet}
+          />
+        ))}
+        <Button label="Manage Staff" variant="secondary" onPress={() => router.push('/staff')} />
       </Card>
 
       <Card title="Policy">
@@ -127,16 +139,4 @@ export default function DayPrepScreen() {
       </Card>
     </Screen>
   );
-}
-
-function defaultConfig(): DayConfig {
-  return {
-    music: 'house',
-    coverLevel: 'low',
-    drinkLevel: 'med',
-    bartenders: 2,
-    securityLevel: 1,
-    vipFocus: false,
-    smoking: 'strict',
-  };
 }

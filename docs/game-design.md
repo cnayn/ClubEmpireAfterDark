@@ -58,6 +58,12 @@ the way a satirical tycoon game frames it.
 
 ## 4. Systems (full design target — not all in MVP)
 
+> **Phased rollout.** This section is the long-term north star. Implementation
+> is incremental: MVP shipped abstract staffing + pricing + policies; **Phase 2A**
+> adds named bartenders & bouncers (replacing the abstract levers); **Phase 2B**
+> adds events + the DJ role. See [roadmap.md](roadmap.md) and the locked
+> [phase2-scope.md](phase2-scope.md) for exact per-slice boundaries.
+
 ### 4.1 Staff
 Roles: **Bartenders, Security, DJ/Host, Cleaners, Promoters.**
 Each staff member has skill, wage, and morale. Understaffing slows service

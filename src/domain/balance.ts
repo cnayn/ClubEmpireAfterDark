@@ -4,7 +4,9 @@
  * game math. See docs/economy.md for the model and rationale.
  */
 
-import type { DayConfig, Level, MusicStyle, SecurityLevel } from './types';
+import type { Level, MusicStyle, SecurityLevel } from './types';
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export const START_CASH = 600;
 export const START_REPUTATION = 20;
@@ -42,23 +44,56 @@ export const DRINK_MULT: Record<Level, number> = {
 export const DRINK_BASE = 8; // $ per drink at mult 1.0
 export const AVG_DRINKS_PER_GUEST = 2.0;
 
-/** Service: each bartender can fully serve this many guests per night. */
+/** Service: a baseline-skill bartender fully serves this many guests per night. */
 export const SERVICE_PER_BARTENDER = 90;
-export const WAGE_PER_BARTENDER = 120;
-export const MAX_BARTENDERS = 6;
 
-export const SECURITY_COST: Record<SecurityLevel, number> = {
-  1: 100,
-  2: 220,
-  3: 380,
-};
-
-/** Lower = fewer/softer incidents. */
+/** Reference incident multipliers by old security tier; reused by the bouncer
+ *  mapping so 1/2/3 effective bouncer units reproduce the old levels. */
 export const SECURITY_MOD: Record<SecurityLevel, number> = {
   1: 1.0,
   2: 0.6,
   3: 0.35,
 };
+
+// --- Phase 2A: named staff scaling -------------------------------------------
+/** A staff member at this skill equals exactly "one unit" of the old abstraction
+ *  (one bartender = 90 service; one bouncer = security level 1). */
+export const BASELINE_SKILL = 50;
+
+/** Starting-crew salaries, calibrated so the default roster reproduces the old
+ *  fixed cost (2 bartenders + 1 bouncer ≈ $340). See docs/phase2-scope.md §D. */
+export const STARTING_BARTENDER_SALARY = 120;
+export const STARTING_BOUNCER_SALARY = 100;
+
+/** Theft — dishonest bartenders skim a slice of bar revenue (shrinkage). */
+export const THEFT_CHANCE_FACTOR = 0.6; // chance = (1 - honesty/100) * factor
+export const STICKY_FINGERS_CHANCE_BONUS = 0.2; // extra chance for the hidden trait
+export const THEFT_SKIM = 0.15; // fraction of a thief's revenue share taken
+
+/** No-shows — unreliable staff sometimes don't turn up (paid anyway). */
+export const NOSHOW_CHANCE_FACTOR = 0.5; // chance = (1 - reliability/100) * factor
+export const STEADY_RELIABILITY_BONUS = 10;
+export const FLAKY_RELIABILITY_PENALTY = 15;
+
+/** Bouncer effectiveness. Honesty scales a bouncer's effective units; the
+ *  Intimidating trait adds a little; no door staff is worse than level 1. */
+export const BOUNCER_HONESTY_FLOOR = 0.6; // honesty 0 → 0.6×, honesty 100 → 1.0×
+export const INTIMIDATING_UNIT_BONUS = 0.15;
+export const NO_BOUNCER_SECURITY_MOD = 1.2; // riskier than the old forced level 1
+export const BY_THE_BOOK_COMPLIANCE_MULT = 0.5; // trait halves compliance fine chance
+
+/** Upfront fee to hire from the candidate pool (salary is paid per on-duty night). */
+export const HIRE_COST_MULT = 2; // hire fee = round(salary * mult)
+
+/** Map effective bouncer units → incident multiplier, reproducing the old tiers
+ *  at integer units (1→1.0, 2→0.6, 3→0.35) and interpolating for skill. */
+export function bouncerSecurityMod(units: number): number {
+  if (units <= 0) return NO_BOUNCER_SECURITY_MOD;
+  if (units <= 1) return lerp(NO_BOUNCER_SECURITY_MOD, SECURITY_MOD[1], units);
+  if (units <= 2) return lerp(SECURITY_MOD[1], SECURITY_MOD[2], units - 1);
+  if (units <= 3) return lerp(SECURITY_MOD[2], SECURITY_MOD[3], units - 2);
+  return SECURITY_MOD[3];
+}
 
 /** How well each music style fits the generic incoming crowd (vibe baseline). */
 export const MUSIC_FIT: Record<MusicStyle, number> = {
@@ -117,24 +152,6 @@ export function reputationTier(reputation: number): string {
   return REPUTATION_TIERS.find((t) => reputation >= t.min)?.label ?? "Nobody's Club";
 }
 
-/** The guaranteed costs of opening tonight (wages + security), independent of
- *  how the night goes. Used to pay staff and to gate against bankruptcy. */
-export function nightFixedCosts(config: Pick<DayConfig, 'bartenders' | 'securityLevel'>): number {
-  return config.bartenders * WAGE_PER_BARTENDER + SECURITY_COST[config.securityLevel];
-}
-
-/** The cheapest possible night (1 bartender, light security). The shop reserves
- *  at least this much so a purchase can never soft-lock the player out of
- *  opening — a minimum night is always affordable and always profitable. */
-export const MIN_NIGHT_COST = nightFixedCosts({ bartenders: 1, securityLevel: 1 });
-
-/** Default day config used for a brand-new club. */
-export const DEFAULT_DAY_CONFIG: DayConfig = {
-  music: 'house',
-  coverLevel: 'low',
-  drinkLevel: 'med',
-  bartenders: 2,
-  securityLevel: 1,
-  vipFocus: false,
-  smoking: 'strict',
-};
+// Wages, fixed-cost gating, and the default day config now derive from the
+// staff roster — see src/domain/staff.ts (wagesForOnDuty, minViableNightCost,
+// defaultDayConfig).

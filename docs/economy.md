@@ -162,3 +162,29 @@ always possible. No economic dead-ends.
 - All constants live in `src/domain/balance.ts`; the sim reads from there so we
   can retune without touching logic or UI. Early-game guarantees are locked by
   tests in `src/sim/night.test.ts` (`early-game balance`).
+
+## Phase 2A Economy Notes (planned — not implemented)
+Named staff **replace** the abstract bartender-count and security-level levers.
+The economy stays intact by mapping staff onto the **same internal quantities**
+the resolver already uses (see [phase2-scope.md](phase2-scope.md) §C–D):
+
+```
+BASELINE_SKILL = 50
+service        = Σ over on-duty bartenders of SERVICE_PER_BARTENDER * (skill/50) * availability
+securityMod    = f(Σ on-duty bouncer units),  units = skill/50
+                 calibrated so 1 unit→1.0, 2→0.6, 3→0.35 (== old SECURITY_MOD tiers)
+wages          = Σ on-duty staff salaries        // replaces bartenders*WAGE + SECURITY_COST[level]
+MIN_NIGHT_COST = cheapest viable roster (one bartender)   // shop reserve / soft-lock guard
+```
+New per-night effects (kept small): low-`honesty` bartenders skim a slice of bar
+revenue (**theft / shrinkage**); low-`reliability` staff have a seeded chance of a
+**no-show**; low-`honesty` bouncers add incident/compliance risk. All are framed
+as fictional business/compliance risk (tone, see scope §H), use the existing
+seeded RNG, and are surfaced as result lines.
+
+**Identity point (non-negotiable):** Regular Night + the starting roster
+(2 skill-50 bartenders + 1 skill-50 bouncer, all on duty) must reproduce the
+current curve — service 180, securityMod 1.0, wages ≈ today's $340 — so all
+#0007 invariants still hold. Exact salaries (esp. bouncer tiers, open risk R1)
+are set during the balance re-verification step before 2A sign-off. DJ and event
+modifiers are **Phase 2B** and excluded from this baseline.

@@ -4,9 +4,17 @@
  * PURE — no React, no I/O, no Math.random. Given the current club state, the
  * player's day config, and a seed, it returns a NightResult plus the next
  * persisted ClubState. Fully unit-testable. See docs/economy.md for the model.
+ *
+ * Phase 2A: staffing comes from the named roster (config.staffOnDuty) instead of
+ * abstract bartender/security levers. RNG ORDER (R3, determinism): staff no-shows
+ * are resolved first but consume RNG only for unreliable staff; theft is resolved
+ * last and consumes RNG only for dishonest bartenders. So Regular Night + the
+ * honest/reliable starting roster produces a stream identical to the pre-Phase-2
+ * resolver, keeping the early-game balance bit-exact.
  */
 
 import * as B from '@/domain/balance';
+import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
 import { aggregateEffects } from '@/domain/upgrades';
 import { createRng } from './rng';
@@ -22,6 +30,9 @@ export interface NightOutcome {
 export function resolveNight(club: ClubState, config: DayConfig, seed: number): NightOutcome {
   const rng = createRng(seed);
   const fx = aggregateEffects(club.ownedUpgradeIds);
+
+  // --- Staff: who showed, and what the crew is worth (no-show draws first) ---
+  const crew = aggregateOnDuty(club.staff, config.staffOnDuty, rng);
 
   const capacity = club.baseCapacity + fx.capacity;
   const repFactor = B.REP_FLOOR + (1 - B.REP_FLOOR) * (club.reputation / 100);
@@ -39,8 +50,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const guests = clamp(Math.round(expected), 0, capacity);
 
   // --- Service capacity (bartenders gate bar revenue) ---
-  const effectiveBartenders = config.bartenders + fx.serviceBartenders;
-  const serviceCapacity = effectiveBartenders * B.SERVICE_PER_BARTENDER;
+  const serviceCapacity = crew.service + fx.serviceBartenders * B.SERVICE_PER_BARTENDER;
   const serviceRatio = guests > 0 ? clamp(serviceCapacity / guests, 0, 1) : 1;
 
   // --- Revenue ---
@@ -52,9 +62,9 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const coverRevenue = Math.round(guests * coverPrice);
   const barRevenue = Math.round(guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio);
 
-  // --- Incidents & risk ---
+  // --- Incidents & risk (security mod derives from on-duty bouncers) ---
   const crowdPressure = capacity > 0 ? guests / capacity : 0;
-  const securityMod = B.SECURITY_MOD[config.securityLevel] * (fx.securityDiscount ? 0.8 : 1);
+  const securityMod = B.bouncerSecurityMod(crew.bouncerUnits) * (fx.securityDiscount ? 0.8 : 1);
   const riskFromSmoking = config.smoking === 'relaxed' ? B.RELAXED_SMOKING_RISK : 0;
   const incidentChance = clamp(crowdPressure * 0.5 * securityMod + riskFromSmoking, 0, 0.9);
 
@@ -64,7 +74,9 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   }
   const incidentFines = incidents * B.INCIDENT_FINE;
   const complianceFines =
-    config.smoking === 'relaxed' && rng.chance(B.COMPLIANCE_FINE_CHANCE) ? B.COMPLIANCE_FINE : 0;
+    config.smoking === 'relaxed' && rng.chance(B.COMPLIANCE_FINE_CHANCE * crew.complianceMult)
+      ? B.COMPLIANCE_FINE
+      : 0;
   const fines = incidentFines + complianceFines;
 
   // --- VIP ---
@@ -78,16 +90,16 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
 
   const revenue = coverRevenue + barRevenue + vipBonus;
 
+  // --- Theft (dishonest bartenders skim; draws last, only for thieves) ---
+  const theftOutcome = resolveTheft(crew.showedBartenders, barRevenue, rng);
+  const theft = theftOutcome.theft;
+
   // --- Costs ---
-  const wages = config.bartenders * B.WAGE_PER_BARTENDER;
-  const securityCost = B.SECURITY_COST[config.securityLevel];
-  const costs = wages + securityCost + fines;
+  const wages = wagesForOnDuty(club.staff, config.staffOnDuty);
+  const costs = wages + fines + theft;
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  // Blend the night's quality signals into a 0-100 satisfaction index S, then
-  // drift reputation toward/away from it. VIP only counts when courted; service
-  // quality is how well the bar kept up. See docs/economy.md.
   const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
@@ -116,6 +128,8 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     vipFocus: config.vipFocus,
     priceLevel,
     net,
+    // Staff-driven reveals (no-shows, theft) come pre-built from the domain.
+    staffNotes: [...crew.notes, ...theftOutcome.notes],
   });
 
   const result: NightResult = {
@@ -129,9 +143,11 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     barRevenue,
     vipBonus,
     wages,
-    securityCost,
+    theft,
     fines,
     incidents,
+    noShows: crew.noShows,
+    eventId: config.eventId,
     reputationBefore,
     reputationAfter,
     reputationDelta: reputationAfter - reputationBefore,
@@ -163,9 +179,10 @@ interface NoteInput {
   vipFocus: boolean;
   priceLevel: number;
   net: number;
+  staffNotes: ResultNote[];
 }
 
-/** Generate 2-4 flavorful, explanatory notes so the player sees *why*. */
+/** Generate a few flavorful, explanatory notes so the player sees *why*. */
 function buildNotes(i: NoteInput): ResultNote[] {
   const notes: ResultNote[] = [];
 
@@ -198,6 +215,9 @@ function buildNotes(i: NoteInput): ResultNote[] {
     notes.push({ tone: 'warn', text: 'An inspector dropped by. The relaxed policy earned you a fine.' });
   }
 
+  // Staff reveals (no-shows, theft) are surfaced prominently.
+  notes.push(...i.staffNotes);
+
   if (i.vipFocus && i.vipEligible) {
     notes.push({ tone: 'info', text: 'VIP tables were busy — the big spenders showed up.' });
   } else if (i.vipFocus && !i.vipEligible) {
@@ -212,5 +232,5 @@ function buildNotes(i: NoteInput): ResultNote[] {
     notes.push({ tone: 'bad', text: 'You ran at a loss tonight. Rethink staffing or pricing.' });
   }
 
-  return notes.slice(0, 4);
+  return notes.slice(0, 5);
 }

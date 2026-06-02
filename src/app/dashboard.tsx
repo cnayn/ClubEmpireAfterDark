@@ -31,7 +31,20 @@ export default function DashboardScreen() {
       footer={
         <View style={{ gap: spacing.sm }}>
           <Button label="Prepare Tonight" onPress={() => router.push('/day-prep')} />
-          <Button label="Upgrade Shop" variant="secondary" onPress={() => router.push('/shop')} />
+          <View style={styles.row}>
+            <Button
+              label="Staff"
+              variant="secondary"
+              onPress={() => router.push('/staff')}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Upgrades"
+              variant="secondary"
+              onPress={() => router.push('/shop')}
+              style={{ flex: 1 }}
+            />
+          </View>
         </View>
       }
     >
@@ -51,7 +64,7 @@ export default function DashboardScreen() {
       </View>
       <View style={styles.row}>
         <StatCard label="Capacity" value={`${capacity}`} />
-        <StatCard label="Upgrades" value={`${club.ownedUpgradeIds.length}`} />
+        <StatCard label="Crew" value={`${club.staff.length}`} accent={colors.neonViolet} />
       </View>
 
       <Card title="The Plan">

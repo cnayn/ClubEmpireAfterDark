@@ -5,6 +5,54 @@ context → decision → why → consequences.
 
 ---
 
+## 0009 — Phase 2A implementation complete (2026-06-02)
+- **Context:** Implemented the named-staff slice planned in #0008, holding the
+  early-game economy locked in #0007.
+- **Decision:** Shipped bartenders + bouncers as a named roster replacing the
+  abstract levers; `/staff` screen with a static candidate pool; `staffOnDuty` +
+  frozen `eventId: "regular"` in `DayConfig`; save migration v1 → v2; wages,
+  bankruptcy guard, and shop reserve recompute from staff salaries.
+- **Why:** Add depth (hiring tradeoffs, honesty/reliability/theft/no-show gambles)
+  without disturbing the balanced first 10 nights.
+- **Verification:** 39 tests pass, `tsc --noEmit` clean, web bundle exports.
+  Identity point held bit-exact where staffing maps 1:1 (conservative/aggressive
+  match the MVP per-night); balanced reaches "Rising Name" by ~night 7–8; no
+  meaningful balance drift (only seed-shift variance + a slightly cheaper second
+  bouncer, open risk R1).
+- **Status:** Phase 2B (events + DJ) **not started** — awaiting approval.
+
+## 0008 — Phase 2 planning: staff-first split, DJ/events deferred (2026-06-02)
+- **Context:** Phase 2 (named staff + events) risked overloading one
+  implementation. We need to add depth without breaking the locked early-game
+  economy (decision-log #0007). Planning only; no code yet. See
+  [phase2-scope.md](phase2-scope.md).
+- **Decision:**
+  1. **Split Phase 2** into **2A (named staff)** then **2B (events)**; 2B starts
+     only after 2A is stable and approved.
+  2. **Named staff replace** the abstract `bartenders` count + `securityLevel`
+     lever (not layered on top) — cleaner and matches the fantasy.
+  3. **2A roles = bartender + bouncer only. DJ deferred to 2B** — a DJ's only
+     hooks (vibe, music-match) are inert or curve-disturbing without events.
+  4. **Events deferred to 2B**, but keep `eventId: "regular"` as a frozen,
+     identity-neutral placeholder in `DayConfig` from 2A so the **save schema
+     (v2) is stable** and 2B needs no further migration.
+  5. **New `/staff` screen** with a **fixed static candidate pool** (no refresh
+     timers); per-night scheduling stays in Day Prep.
+  6. **StaffMember** fields: id, name, role, salary, skill, honesty, reliability,
+     **visibleTrait**, **hiddenTrait**, description. Hidden trait = satirical
+     "you don't fully know your hire" gamble. Deeper attributes deferred.
+  7. **Identity point is non-negotiable:** Regular Night + starting roster
+     (2 skill-50 bartenders + 1 skill-50 bouncer) reproduces the current curve;
+     all #0007 invariants must still pass, re-verified via the sim harness.
+  8. **Save migration v1 → v2** must never break existing saves; bankruptcy
+     guard + shop reserve keep working off staff salaries.
+- **Why:** Smallest stable increments; protect the balanced first-10 nights;
+  avoid a second save migration later; keep Day Prep uncluttered.
+- **Consequences:** `DayConfig` and `ClubState` shapes change in 2A;
+  `nightFixedCosts` / `MIN_NIGHT_COST` recompute from salaries. Open risks
+  tracked in phase2-scope.md §I (bouncer salary calibration, zero-bouncer
+  freedom, RNG determinism, roster UI, hidden-trait reveal).
+
 ## 0007 — Early-game balance pass (2026-06-02)
 - **Context:** Simulating the first 10 nights through the real `resolveNight`
   exposed serious problems: the default config *lost* money on opening night,

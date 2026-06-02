@@ -6,7 +6,7 @@ import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
-import { MIN_NIGHT_COST } from '@/domain/balance';
+import { minViableNightCost } from '@/domain/staff';
 import { UPGRADES } from '@/domain/upgrades';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -35,7 +35,7 @@ export default function ShopScreen() {
       {UPGRADES.map((u) => {
         const owned = club.ownedUpgradeIds.includes(u.id);
         // Keep one minimum night in reserve so the player can always reopen.
-        const affordable = club.cash - u.cost >= MIN_NIGHT_COST;
+        const affordable = club.cash - u.cost >= minViableNightCost(club.staff);
         return (
           <Card key={u.id} title={undefined} accent={owned ? colors.success : undefined}>
             <View style={styles.cardHead}>

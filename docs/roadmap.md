@@ -22,10 +22,26 @@ everything at once.
 - **Exit:** full day/night/shop loop, decisions matter, saves survive restart.
 
 ## Phase 2 — Depth: Staff & Events
-- Named staff (skill/wage/morale), more roles (DJ, host, cleaners, promoters).
-- Events / themed nights with gates and payoffs.
-- Day-of-week rhythm and crowd archetypes.
-- Richer vibe model.
+Split into two slices to avoid overloading implementation. See
+[phase2-scope.md](phase2-scope.md) for the locked boundaries.
+
+### Phase 2A — Named Staff (first slice) ← current planning target
+- Named staff **replace** the abstract bartender-count + security-level levers.
+- Roles: **bartender, bouncer** only (DJ deferred to 2B).
+- New `/staff` screen: roster + hire/fire from a fixed static candidate pool.
+- Day Prep schedules `staffOnDuty`; wages = sum of on-duty salaries.
+- Save migration v1 → v2; `eventId: "regular"` kept as an identity-neutral
+  placeholder. **Preserve the Phase 0/1 early-game balance (non-negotiable).**
+
+### Phase 2B — Events (second slice, after 2A is stable)
+- Tiny static event catalog (Regular, Student, Hip-Hop, Techno, VIP Birthday,
+  Local Influencer) + event picker, modifiers, result lines, tests.
+- **DJ role** ships here (its vibe/music-match hooks need events to matter).
+- Widens `eventId` to a union — no new save migration (field exists from 2A).
+
+### Later in Phase 2 (future)
+- Staff morale; more roles (host, etc.); day-of-week rhythm; crowd archetypes;
+  richer vibe model.
 
 ## Phase 3 — Risk, Compliance & Progression
 - Expanded satirical risk dials with clear odds/consequences.

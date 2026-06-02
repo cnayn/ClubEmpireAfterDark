@@ -79,9 +79,11 @@ export default function ResultsScreen() {
         <ResultRow label="Revenue" value={money(result.revenue)} strong valueColor={colors.success} />
         <View style={styles.divider} />
         <ResultRow label="Wages" value={`-${money(result.wages)}`} />
-        <ResultRow label="Security" value={`-${money(result.securityCost)}`} />
         {result.fines > 0 ? (
           <ResultRow label="Fines" value={`-${money(result.fines)}`} valueColor={colors.danger} />
+        ) : null}
+        {result.theft > 0 ? (
+          <ResultRow label="Theft" value={`-${money(result.theft)}`} valueColor={colors.danger} />
         ) : null}
         <ResultRow label="Costs" value={`-${money(result.costs)}`} strong valueColor={colors.danger} />
         <View style={styles.divider} />
