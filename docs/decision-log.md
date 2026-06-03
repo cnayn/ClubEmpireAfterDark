@@ -165,4 +165,9 @@ context → decision → why → consequences.
   only. No backend, multiplayer, 3D, ads, or IAP.
 - **Why:** Matches product brief and fastest path to a mobile prototype.
 - **Consequences:** All persistence is on-device; design around offline play.
+- **Clarification (2026-06-02, does not amend the original decision):** "no 3D"
+  here meant *not in the build then*, not *never*. 3D/isometric is now framed as
+  a long-term presentation goal that reads from sim outputs and must not affect
+  current scope or the tested economy. Backend/multiplayer/ads/IAP remain out.
+  See docs/roadmap.md → "Visual presentation & 3D".
 ```

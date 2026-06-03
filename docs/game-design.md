@@ -1,7 +1,8 @@
 # Club Empire: After Dark — Game Design
 
 > Offline-first mobile management/tycoon game. React Native + Expo + TypeScript.
-> Single-player, no backend, no multiplayer, no 3D, no ads, no IAP (yet).
+> Single-player, no backend, no multiplayer, no ads, no IAP (yet). A 3D/isometric
+> club view is a long-term presentation goal, not part of the current build.
 
 ## 1. Vision
 
@@ -145,5 +146,11 @@ The night resolves these (MVP computes a subset; see mvp-scope.md):
 
 ## 8. Out of Scope (forever, per brief)
 
-Backend, multiplayer, 3D, ads, in-app purchases (for now), online accounts.
+Backend, multiplayer, ads, in-app purchases (for now), online accounts.
+
+**3D / isometric club view — not "never", just not now.** It's a long-term
+*presentation* goal, not part of the current build. It must not influence
+Phase 2 / near-term Phase 3 scope, must not replace the tested sim/economy, and
+future visuals should *read from* sim outputs rather than become a separate
+real-time economy. See docs/roadmap.md → "Visual presentation & 3D".
 ```

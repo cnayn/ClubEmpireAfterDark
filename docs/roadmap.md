@@ -65,8 +65,10 @@ Split into two slices to avoid overloading implementation. See
 - (Only if ever desired, and out of current scope: monetization, accounts.)
 
 ## Guardrails (all phases)
-Offline-only, no backend/multiplayer/3D/ads/IAP, no real celebrity names,
+Offline-only, no backend/multiplayer/ads/IAP, no real celebrity names,
 shady content stays satire/risk/compliance — never instructional.
+(3D is **not** a "never" — it's a long-term presentation goal; see Visual
+Presentation below.)
 
 ## Dependency map (strict build order)
 
@@ -99,3 +101,21 @@ else, or if the baseline-neutral version is too dull to ship, it becomes a
 - no glamorized violence
 
 See `.claude/skills/nightclub-safety-framing` for the working guardrail.
+
+## Visual presentation & 3D (long-term, future design notes)
+
+> 3D/isometric club view is a long-term presentation goal. It must not influence
+> near-term gameplay design or pull deferred systems forward. The current sim
+> remains the backend; future visuals should represent sim state, not replace it.
+
+- **Future target:** a Nightclub City-style isometric/3D club view.
+- **First visual steps should be low-scope:** 2D mood panels, isometric mockups,
+  club-state visuals — not a 3D engine.
+- **Sequencing:** 3D comes *after* a proven loop, interior slots, staff roles,
+  and club identity exist.
+- **Reads from existing sim outputs only:** staff on duty, guest count, event,
+  incidents, service pressure, reputation tier, upgrades. Visuals are a view over
+  the resolved night, never their own source of truth.
+- Do **not** build a full real-time NPC simulation.
+- Do **not** make 3D a separate economy.
+- Do **not** let 3D affect current Phase 2/3 scope.

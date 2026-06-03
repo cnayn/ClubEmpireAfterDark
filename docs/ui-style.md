@@ -57,7 +57,8 @@ Accents are for emphasis and one primary CTA per screen — avoid neon overload.
 
 ## Motion (light, later)
 Keep MVP mostly static. Reserve subtle fades and a "doors open" reveal on the
-night results for polish phase. No heavy animation, no 3D.
+night results for polish phase. No heavy animation, and no 3D in the current UI
+polish pass (3D/isometric is a long-term presentation goal — see docs/roadmap.md).
 
 ## Accessibility
 - Maintain contrast for text on dark surfaces (mute, don't dim to illegible).
