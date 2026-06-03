@@ -6,6 +6,11 @@ everything at once.
 > **North-star rule:** Legibility before depth; depend only on what exists; the
 > reckoning ships before the reward.
 
+> **Player-feedback lessons** (Nightclub City / Nightclub Story): see
+> [player-feedback-lessons.md](player-feedback-lessons.md). Captures what players
+> remembered/complained about so it guides design without pulling scope forward.
+> Validates the next pass — **Floor View + Next Goal only**; everything else is banked.
+
 ## Phase 0 — Foundations (scaffold)
 - Expo + TypeScript project, navigation, folder structure.
 - Design tokens + base components (`Screen`, `Card`, `StatCard`, buttons,

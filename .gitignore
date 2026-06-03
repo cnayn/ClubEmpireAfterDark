@@ -35,6 +35,9 @@ yarn-error.*
 .env.*
 .env*.local
 
+# local reference screenshots (kept out of the repo)
+Images/
+
 # typescript
 *.tsbuildinfo
 
