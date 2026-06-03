@@ -11,6 +11,11 @@ everything at once.
 > remembered/complained about so it guides design without pulling scope forward.
 > Validates the next pass — **Floor View + Next Goal only**; everything else is banked.
 
+> **Long-term vision** — the nightclub *life-management loop* (prepare → stock →
+> watch the room → a few timed calls → consequences → grow venues): see
+> [vision-life-management-loop.md](vision-life-management-loop.md). Direction only;
+> nothing there is approved to build. Current scope stays Floor View + Next Goal.
+
 ## Phase 0 — Foundations (scaffold)
 - Expo + TypeScript project, navigation, folder structure.
 - Design tokens + base components (`Screen`, `Card`, `StatCard`, buttons,
@@ -58,6 +63,11 @@ Split into two slices to avoid overloading implementation. See
 - Expanded satirical risk dials with clear odds/consequences.
 - Compliance/inspection events; reputation crises and recovery.
 - City ranking ladder + soft goals/milestones.
+- **Day Prep Supply & Drink Stock Loop** (future design note):
+  [phase3-supply-stock-loop.md](phase3-supply-stock-loop.md) — pre-night stock
+  ordering as a business-risk decision (over/under-order, supplier reliability,
+  abstract emergency restock). Sequenced *after* Floor View + Next Goal and the
+  night-intervention experiment; turn-based, not timer/gem-wall based.
 
 ## Phase 4 — Polish & Feel
 - Motion (doors-open reveal, deltas), sound/music optional, haptics.
