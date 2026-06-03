@@ -38,7 +38,7 @@ export const EVENTS: Record<EventId, EventDef> = {
   'private-party': {
     id: 'private-party',
     name: 'Private Party',
-    description: 'A guaranteed fee for a calm, capped night — a safety net when the crowd would be thin, not a way to grow.',
+    description: 'A booking fee for a calm, capped night — kept if you deliver. A safety net when the crowd would be thin, not a way to grow.',
     cost: 0,
     bookingFee: 400,
     drawMod: 0.6,
@@ -87,6 +87,30 @@ export const EVENTS: Record<EventId, EventDef> = {
 
 export function getEvent(id: EventId): EventDef {
   return EVENTS[id];
+}
+
+/**
+ * A booking fee (Private Party) is no longer guaranteed — the private client
+ * pays in full only for a well-run night. Poor service refunds proportionally;
+ * incidents, no-shows, and theft draw complaints. Bad execution can push the
+ * effective fee negative (a refund + damages). Returns 0 for events with no fee
+ * (so Quiet Night and the rest are completely unaffected). Pure, no RNG.
+ */
+export interface BookingContext {
+  serviceRatio: number;
+  incidents: number;
+  noShows: number;
+  theft: number;
+}
+export function effectiveBookingFee(event: EventDef, ctx: BookingContext): number {
+  if (event.bookingFee <= 0) return 0;
+  let quality = 1;
+  quality -= (1 - clamp(ctx.serviceRatio, 0, 1)) * 1.0; // slow service = partial refund
+  quality -= ctx.incidents * 0.3; // each incident is a complaint
+  quality -= ctx.noShows * 0.25; // under-delivered staffing
+  if (ctx.theft > 0) quality -= 0.25; // skimming the private tab gets noticed
+  quality = clamp(quality, -0.5, 1);
+  return Math.round(event.bookingFee * quality);
 }
 
 // --- Unlock (reputation tier OR tutorial milestone only) ---------------------
@@ -168,7 +192,7 @@ export function eventReadiness(club: ClubState, config: DayConfig): ReadinessAdv
   // Always tell the player roughly what to expect, plus each niche event's nature.
   messages.push({ tone: 'info', text: `Expect roughly ${guests} guests tonight.` });
   if (config.eventId === 'private-party') {
-    messages.push({ tone: 'info', text: 'A safe floor — best when your organic crowd would be thin.' });
+    messages.push({ tone: 'info', text: 'Best when your organic crowd would be thin — but a sloppy night refunds the fee.' });
   } else if (config.eventId === 'industry-night') {
     messages.push({ tone: 'info', text: "You'll likely spend more than you earn — this buys reputation, not cash." });
   }
@@ -210,13 +234,24 @@ export interface EventOutcome {
   serviceRatio: number;
   incidents: number;
   repDelta: number;
+  bookingFeePaid?: number; // effective fee kept (Private Party)
+  bookingFeeMax?: number; // the fee on offer
 }
 
 /** One in-world result line per event, chosen by what actually happened. */
 export function eventResultNotes(id: EventId, o: EventOutcome): ResultNote[] {
   switch (id) {
-    case 'private-party':
+    case 'private-party': {
+      const paid = o.bookingFeePaid ?? 0;
+      const max = o.bookingFeeMax ?? 0;
+      if (paid <= 0) {
+        return [{ tone: 'bad', text: 'The private night fell apart — you refunded the booking and then some.' }];
+      }
+      if (paid < max * 0.9) {
+        return [{ tone: 'warn', text: "The private client wasn't fully satisfied — part of the fee came back." }];
+      }
       return [{ tone: 'info', text: 'Private booking — the fee covered a calm night.' }];
+    }
     case 'student-night':
       return o.serviceRatio < 0.85
         ? [{ tone: 'bad', text: 'The student crowd swamped the bar — tabs went unpoured.' }]

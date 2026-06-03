@@ -5,6 +5,7 @@
  */
 
 import {
+  effectiveBookingFee,
   eventReadiness,
   eventRequirement,
   EVENTS,
@@ -95,6 +96,31 @@ describe('readiness (advisory only — never blocks)', () => {
   });
 });
 
+describe('effectiveBookingFee (Private Party is conditional, not guaranteed)', () => {
+  const pp = EVENTS['private-party'];
+  const clean = { serviceRatio: 1, incidents: 0, noShows: 0, theft: 0 };
+
+  it('pays the full fee for a clean, well-run night', () => {
+    expect(effectiveBookingFee(pp, clean)).toBe(pp.bookingFee);
+  });
+
+  it('is zero for events without a booking fee (Quiet et al. unaffected)', () => {
+    expect(effectiveBookingFee(EVENTS.regular, clean)).toBe(0);
+    expect(effectiveBookingFee(EVENTS['student-night'], { ...clean, incidents: 3 })).toBe(0);
+  });
+
+  it('docks the fee for incidents, no-shows, theft, and weak service', () => {
+    expect(effectiveBookingFee(pp, { ...clean, incidents: 1 })).toBeLessThan(pp.bookingFee);
+    expect(effectiveBookingFee(pp, { ...clean, noShows: 1 })).toBeLessThan(pp.bookingFee);
+    expect(effectiveBookingFee(pp, { ...clean, theft: 40 })).toBeLessThan(pp.bookingFee);
+    expect(effectiveBookingFee(pp, { ...clean, serviceRatio: 0.5 })).toBeLessThan(pp.bookingFee);
+  });
+
+  it('can go negative (refund + damages) on a badly executed night', () => {
+    expect(effectiveBookingFee(pp, { serviceRatio: 0.4, incidents: 2, noShows: 1, theft: 50 })).toBeLessThan(0);
+  });
+});
+
 describe('resolver applies the modifier vector directionally', () => {
   const c = club({ reputation: 60 });
   const run = (id: EventId, seed = 7) => resolveNight(c, cfg(c, id), seed).result;
@@ -102,9 +128,10 @@ describe('resolver applies the modifier vector directionally', () => {
   it('Student Night draws a bigger crowd than Quiet', () => {
     expect(run('student-night').guests).toBeGreaterThan(run('regular').guests);
   });
-  it('Private Party pays a booking fee and pulls a smaller crowd', () => {
+  it('Private Party pays a (conditional) booking fee and pulls a smaller crowd', () => {
     const p = run('private-party');
-    expect(p.bookingFee).toBe(400);
+    expect(p.bookingFee).toBeGreaterThan(0); // a clean night keeps the fee
+    expect(p.bookingFee).toBeLessThanOrEqual(EVENTS['private-party'].bookingFee);
     expect(p.guests).toBeLessThan(run('regular').guests);
   });
   it('Grand Opening charges a big upfront cost and packs the room', () => {

@@ -14,7 +14,7 @@
  */
 
 import * as B from '@/domain/balance';
-import { eventResultNotes, getEvent } from '@/domain/events';
+import { effectiveBookingFee, eventResultNotes, getEvent } from '@/domain/events';
 import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
 import { aggregateEffects } from '@/domain/upgrades';
@@ -93,11 +93,15 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     ? Math.round(guests * B.VIP_SPEND_PER_GUEST * (vipSatisfaction / 100) * (fx.vipBonus ? 1.6 : 1))
     : 0;
 
-  const revenue = coverRevenue + barRevenue + vipBonus + event.bookingFee;
-
   // --- Theft (dishonest bartenders skim; draws last, only for thieves) ---
   const theftOutcome = resolveTheft(crew.showedBartenders, barRevenue, rng);
   const theft = theftOutcome.theft;
+
+  // A booking fee (Private Party) is conditional on execution — see events.ts.
+  // Zero for events without a fee, so Quiet Night et al. are unaffected.
+  const bookingFee = effectiveBookingFee(event, { serviceRatio, incidents, noShows: crew.noShows, theft });
+
+  const revenue = coverRevenue + barRevenue + vipBonus + bookingFee;
 
   // --- Costs ---
   const wages = wagesForOnDuty(club.staff, config.staffOnDuty);
@@ -128,6 +132,8 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     serviceRatio,
     incidents,
     repDelta: reputationAfter - reputationBefore,
+    bookingFeePaid: bookingFee,
+    bookingFeeMax: event.bookingFee,
   });
 
   const notes = buildNotes({
@@ -163,7 +169,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
     noShows: crew.noShows,
     eventId: config.eventId,
     eventCost: event.cost,
-    bookingFee: event.bookingFee,
+    bookingFee,
     reputationBefore,
     reputationAfter,
     reputationDelta: reputationAfter - reputationBefore,

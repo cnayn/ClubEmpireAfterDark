@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card, StatCard } from '@/components/Card';
@@ -14,6 +14,14 @@ import { colors, spacing } from '@/theme/tokens';
 
 export default function DashboardScreen() {
   const club = useGameStore((s) => s.club);
+  const newClub = useGameStore((s) => s.newClub);
+
+  const onReset = () => {
+    Alert.alert('Reset Club?', 'This will erase your current save and start over.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reset Club', style: 'destructive', onPress: () => void newClub() },
+    ]);
+  };
 
   if (!club) {
     return (
@@ -55,7 +63,14 @@ export default function DashboardScreen() {
             Night {club.day}
           </Text>
         </View>
-        <Pill label={reputationTier(club.reputation)} color={colors.neonCyan} />
+        <View style={styles.headerRight}>
+          <Pill label={reputationTier(club.reputation)} color={colors.neonCyan} />
+          <Pressable onPress={onReset} hitSlop={8} accessibilityRole="button" accessibilityLabel="Reset club">
+            <Text variant="label" color={colors.danger}>
+              Reset Club
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.row}>
@@ -80,5 +95,6 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  headerRight: { alignItems: 'flex-end', gap: spacing.sm },
   row: { flexDirection: 'row', gap: spacing.md },
 });
