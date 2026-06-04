@@ -11,9 +11,11 @@ import {
   CANDIDATE_POOL,
   hireCost,
   minViableNightCost,
+  ROLE_LABEL,
   strengthLabel,
   TRAIT_LABEL,
 } from '@/domain/staff';
+import { getCharacter, hasHiddenTrait } from '@/domain/characters';
 import type { StaffMember, StaffRole } from '@/domain/types';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -22,8 +24,8 @@ import { colors, radius, spacing } from '@/theme/tokens';
 const ROLE_PLURAL: Record<StaffRole, string> = { bartender: 'Bartenders', bouncer: 'Bouncers' };
 const roleAccent = (role: StaffRole) => (role === 'bouncer' ? colors.neonCyan : colors.neonViolet);
 
-/** A short, safe one-liner from existing data — uses the staffer's own bio when
- *  present, else a generic role line. Never reveals hidden traits. */
+/** A short, safe one-liner — prefers the character profile, then the staffer's
+ *  own bio, then a generic role line. Never reveals hidden traits. */
 function flavorLine(m: StaffMember): string {
   if (m.description) return m.description;
   return m.role === 'bartender'
@@ -31,8 +33,14 @@ function flavorLine(m: StaffMember): string {
     : 'Holds the door and keeps the room calm.';
 }
 
-function strengthLine(m: StaffMember): string {
-  const trait = m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : '';
+/** Coarse skill read + the player-facing visible trait (flavor name if we have a
+ *  character profile, otherwise the mechanical trait label). */
+function strengthLine(m: StaffMember, visibleTrait?: string): string {
+  const trait = visibleTrait
+    ? ` · ${visibleTrait}`
+    : m.visibleTrait !== 'none'
+      ? ` · ${TRAIT_LABEL[m.visibleTrait]}`
+      : '';
   return `${strengthLabel(m.skill)}${trait}`;
 }
 
@@ -56,32 +64,56 @@ function CharacterCard({
   onAction: () => void;
 }) {
   const accent = roleAccent(member.role);
+  const profile = getCharacter(member.id);
+  const displayName = profile?.displayName ?? member.name;
+  const oneLiner = profile?.oneSentence ?? flavorLine(member);
+  const dialogue = profile?.dialogueLines[0];
+  const locked = hasHiddenTrait(profile);
   return (
     <Card accent={accent}>
       <View style={styles.cardTop}>
         <View style={[styles.avatar, { borderColor: accent }]}>
           <Text variant="heading" color={accent}>
-            {member.name.slice(0, 2).toUpperCase()}
+            {displayName.slice(0, 2).toUpperCase()}
           </Text>
         </View>
         <View style={styles.cardBody}>
           <View style={styles.cardHead}>
             <Text variant="heading" style={{ flex: 1 }} numberOfLines={1}>
-              {member.name}
+              {displayName}
+              {profile?.nickname ? <Text variant="heading" color={accent}>{` “${profile.nickname}”`}</Text> : null}
             </Text>
             <Pill label={statusLabel} color={statusColor} />
           </View>
-          <Text variant="label" color={accent}>
-            {strengthLine(member)}
+          {/* Role badge + archetype */}
+          <Text variant="label" color={accent} numberOfLines={1}>
+            {ROLE_LABEL[member.role]}
+            {profile?.archetype ? ` · ${profile.archetype}` : ''}
           </Text>
+          {/* Skill read + visible trait + wage */}
           <Text variant="label" muted>
-            {money(member.salary)}/night
+            {strengthLine(member, profile?.visibleTrait)} · {money(member.salary)}/night
           </Text>
           <Text variant="body" muted style={styles.flavor}>
-            {flavorLine(member)}
+            {oneLiner}
           </Text>
         </View>
       </View>
+
+      {dialogue ? (
+        <View style={[styles.bubble, { borderLeftColor: accent }]}>
+          <Text variant="label" muted style={styles.bubbleText}>
+            {dialogue}
+          </Text>
+        </View>
+      ) : null}
+
+      {locked ? (
+        <Text variant="label" muted style={styles.locked}>
+          🔒 Hidden side — locked (you’ll learn it on the floor)
+        </Text>
+      ) : null}
+
       <Button
         label={actionLabel}
         variant={actionVariant ?? 'secondary'}
@@ -225,4 +257,13 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, gap: 2 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   flavor: { lineHeight: 20, marginTop: 2 },
+  bubble: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    borderLeftWidth: 3,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  bubbleText: { fontStyle: 'italic', lineHeight: 18 },
+  locked: { marginTop: 2 },
 });

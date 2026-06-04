@@ -155,6 +155,34 @@ export const CANDIDATE_POOL: StaffMember[] = [
     hiddenTrait: 'none',
     description: 'Runs a tight, compliant door.',
   },
+  // Character-bible bouncers (current role). Flavor/identity lives in
+  // src/domain/characters.ts; mechanically they use the existing trait vocab and
+  // sit as peers in the pool. Their concealed bible traits are metadata only —
+  // no hidden-trait mechanic is wired up this pass (hiddenTrait stays 'none').
+  {
+    id: 'bnc-john',
+    name: 'John',
+    role: 'bouncer',
+    salary: 155,
+    skill: 72,
+    honesty: 85,
+    reliability: 95,
+    visibleTrait: 'intimidating',
+    hiddenTrait: 'none',
+    description: 'Fearless on the door — walks into anything.',
+  },
+  {
+    id: 'bnc-kareem',
+    name: 'Kareem',
+    role: 'bouncer',
+    salary: 140,
+    skill: 68,
+    honesty: 95,
+    reliability: 90,
+    visibleTrait: 'intimidating',
+    hiddenTrait: 'none',
+    description: 'Warm with regulars, immovable with troublemakers.',
+  },
 ];
 
 export function getCandidate(id: string): StaffMember | undefined {
