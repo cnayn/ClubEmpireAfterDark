@@ -3,9 +3,10 @@
  * Each choice is a deterministic `Intervention` modifier (src/sim/night.ts); same
  * prep + seed + choice ⇒ same result. No new systems, no real-time sim, no new RNG.
  *
- * Two moment TYPES exist and BOTH may fire in one night (different beats, different
- * problems): Bar Pressure (23:45, service/money) and Crowd Cooling (00:30, energy).
- * Their chosen modifiers are combined into one deterministic resolve.
+ * Two moment TYPES exist — Bar Pressure (23:45, service/money) and Crowd Cooling
+ * (00:30, energy) — but only ONE fires per night: Bar Pressure takes priority, else
+ * Crowd Cooling, else none. Both-fire (combined moments) is deferred until after
+ * playtesting. The chosen moment resolves with a single deterministic modifier.
  */
 
 import type { FloorBubble } from '@/lib/dashboard';
