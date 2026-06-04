@@ -15,6 +15,7 @@
 
 import * as B from '@/domain/balance';
 import { effectiveBookingFee, eventResultNotes, getEvent } from '@/domain/events';
+import { policyEffects } from '@/domain/policies';
 import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
 import { aggregateEffects } from '@/domain/upgrades';
@@ -53,6 +54,11 @@ export function resolveNight(
   // --- Staff: who showed, and what the crew is worth (no-show draws first) ---
   const crew = aggregateOnDuty(club.staff, config.staffOnDuty, rng);
 
+  // Club Policies v1: a bounded modifier vector applied to already-computed
+  // quantities below. Neutral (×1 / +0) for default/standard policies, so the
+  // baseline night is unchanged. No new RNG draws.
+  const pe = policyEffects(config.policies);
+
   // Tonight's event is a deterministic modifier vector (no new RNG draws).
   // Quiet Night (`regular`) is all-neutral, so its path is identical to Phase 2A.
   const event = getEvent(config.eventId);
@@ -69,7 +75,7 @@ export function resolveNight(
   const smokingDraw = config.smoking === 'relaxed' ? B.SMOKING_RELAXED_DRAW : 0;
   const noise = rng.range(0.9, 1.1);
 
-  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise;
+  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise * pe.drawMod;
   const guests = clamp(Math.round(expected), 0, capacity);
 
   // --- Service capacity (bartenders gate bar revenue) ---
@@ -98,14 +104,14 @@ export function resolveNight(
 
   const coverRevenue = Math.round(guests * coverPrice);
   const barRevenue = Math.round(
-    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * event.spendMod * intervention.revenueMod
+    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * pe.barRevenueMod * event.spendMod * intervention.revenueMod
   );
 
   // --- Incidents & risk (security mod derives from on-duty bouncers) ---
   const crowdPressure = capacity > 0 ? guests / capacity : 0;
   const securityMod = B.bouncerSecurityMod(crew.bouncerUnits) * (fx.securityDiscount ? 0.8 : 1);
   const riskFromSmoking = config.smoking === 'relaxed' ? B.RELAXED_SMOKING_RISK : 0;
-  const incidentChance = clamp(crowdPressure * 0.5 * securityMod + riskFromSmoking + event.riskMod, 0, 0.9);
+  const incidentChance = clamp((crowdPressure * 0.5 * securityMod + riskFromSmoking + event.riskMod) * pe.incidentMod, 0, 0.9);
 
   let incidents = 0;
   if (rng.chance(incidentChance)) {
@@ -143,7 +149,7 @@ export function resolveNight(
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;

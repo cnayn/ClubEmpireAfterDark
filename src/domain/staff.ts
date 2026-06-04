@@ -221,6 +221,8 @@ export function defaultDayConfig(roster: StaffMember[]): DayConfig {
     eventId: 'regular',
     vipFocus: false,
     smoking: 'strict',
+    // Club Policies v1 — all neutral by default (identity-preserving).
+    policies: { smoking: 'restricted', idCheck: 'standard', security: 'balanced', barService: 'standard' },
   };
 }
 

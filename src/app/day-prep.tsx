@@ -9,8 +9,14 @@ import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { MUSIC_LABEL } from '@/domain/balance';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
+import {
+  DEFAULT_POLICIES,
+  legacySmoking,
+  POLICY_BLURB,
+  POLICY_OPTIONS,
+} from '@/domain/policies';
 import { isValidSchedule, ROLE_LABEL, strengthLabel, TRAIT_LABEL, wagesForOnDuty } from '@/domain/staff';
-import type { DayConfig, Level, MusicStyle, ResultNote, SmokingPolicy } from '@/domain/types';
+import type { DayConfig, Level, MusicStyle, PoliciesConfig, ResultNote, SmokingRule } from '@/domain/types';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -35,7 +41,10 @@ const NOTE_COLOR: Record<ResultNote['tone'], string> = {
 export default function DayPrepScreen() {
   const club = useGameStore((s) => s.club);
   const planNight = useGameStore((s) => s.planNight);
-  const [config, setConfig] = useState<DayConfig>(() => ({ ...club!.lastConfig }));
+  const [config, setConfig] = useState<DayConfig>(() => ({
+    ...club!.lastConfig,
+    policies: club!.lastConfig.policies ?? DEFAULT_POLICIES,
+  }));
 
   if (!club) {
     router.replace('/');
@@ -44,6 +53,15 @@ export default function DayPrepScreen() {
 
   const set = <K extends keyof DayConfig>(key: K, value: DayConfig[K]) =>
     setConfig((c) => ({ ...c, [key]: value }));
+
+  const policies = config.policies ?? DEFAULT_POLICIES;
+  const setPolicy = <K extends keyof PoliciesConfig>(key: K, value: PoliciesConfig[K]) =>
+    setConfig((c) => {
+      const nextPolicies = { ...(c.policies ?? DEFAULT_POLICIES), [key]: value };
+      // Keep the legacy smoking lever in sync so the resolver's smoking math runs.
+      const smoking = key === 'smoking' ? legacySmoking(value as SmokingRule) : c.smoking;
+      return { ...c, policies: nextPolicies, smoking };
+    });
 
   // Drop scheduled ids no longer employed (fired since last night).
   const onDuty = config.staffOnDuty.filter((id) => club.staff.some((m) => m.id === id));
@@ -180,19 +198,49 @@ export default function DayPrepScreen() {
         <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
       </Card>
 
-      <Card title="Policy">
+      <Card title="Club Policies">
+        <Text variant="label" muted>
+          Set the house rules. The middle option of each is the safe, balanced choice.
+        </Text>
+
+        <SegmentedControl
+          label="Smoking"
+          value={policies.smoking}
+          options={POLICY_OPTIONS.smoking}
+          onChange={(v) => setPolicy('smoking', v)}
+          accent={colors.warning}
+        />
+        <Text variant="label" muted>{POLICY_BLURB.smoking[policies.smoking]}</Text>
+
+        <SegmentedControl
+          label="ID Strictness"
+          value={policies.idCheck}
+          options={POLICY_OPTIONS.idCheck}
+          onChange={(v) => setPolicy('idCheck', v)}
+        />
+        <Text variant="label" muted>{POLICY_BLURB.idCheck[policies.idCheck]}</Text>
+
+        <SegmentedControl
+          label="Security Posture"
+          value={policies.security}
+          options={POLICY_OPTIONS.security}
+          onChange={(v) => setPolicy('security', v)}
+        />
+        <Text variant="label" muted>{POLICY_BLURB.security[policies.security]}</Text>
+
+        <SegmentedControl
+          label="Bar Service"
+          value={policies.barService}
+          options={POLICY_OPTIONS.barService}
+          onChange={(v) => setPolicy('barService', v)}
+        />
+        <Text variant="label" muted>{POLICY_BLURB.barService[policies.barService]}</Text>
+
         <Toggle
           label="VIP focus"
           description="Court the big spenders. Pays off once you have a name."
           value={config.vipFocus}
           onChange={(v) => set('vipFocus', v)}
-        />
-        <Toggle
-          label="Relaxed smoking policy"
-          description="Pleases part of the crowd, but raises compliance risk (fines)."
-          value={config.smoking === 'relaxed'}
-          onChange={(v) => set('smoking', (v ? 'relaxed' : 'strict') as SmokingPolicy)}
-          accent={colors.warning}
         />
       </Card>
     </Screen>

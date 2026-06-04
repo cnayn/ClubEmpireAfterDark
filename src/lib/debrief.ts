@@ -79,6 +79,34 @@ function crewFlavor(result: NightResult, club: ClubState | undefined): DebriefLi
   return null;
 }
 
+/** Up to 2 policy-related lines when a non-neutral policy actually mattered. */
+function policyLines(result: NightResult, club: ClubState | undefined): DebriefLine[] {
+  const p = club?.lastConfig.policies;
+  if (!p) return [];
+  const out: DebriefLine[] = [];
+  if (p.idCheck === 'strict' && result.incidents === 0) {
+    out.push({ key: 'pol-id', label: 'Policy', tone: 'good', text: 'Strict IDs slowed the line, but the door stayed clean.' });
+  } else if (p.idCheck === 'relaxed' && (result.incidents > 0 || result.fines > 0)) {
+    out.push({ key: 'pol-id', label: 'Policy', tone: 'warn', text: 'Relaxed IDs filled the room — and gave the door more to handle.' });
+  }
+  if (p.security === 'hardline') {
+    out.push({ key: 'pol-sec', label: 'Policy', tone: 'info', text: 'Hardline security kept trouble down, but the room felt tense.' });
+  } else if (p.security === 'friendly' && result.incidents > 0) {
+    out.push({ key: 'pol-sec', label: 'Policy', tone: 'warn', text: 'Friendly security kept the mood warm — but a few things slipped through.' });
+  }
+  if (p.barService === 'fast') {
+    out.push({ key: 'pol-bar', label: 'Policy', tone: 'warn', text: 'Fast Pour moved drinks quickly, but service felt rough around the edges.' });
+  } else if (p.barService === 'premium') {
+    out.push({ key: 'pol-bar', label: 'Policy', tone: 'good', text: "Premium Care lifted the room's mood, though the bar ran slower." });
+  }
+  if (p.smoking === 'banned') {
+    out.push({ key: 'pol-smoke', label: 'Policy', tone: 'info', text: 'Banned smoking kept the room cleaner, but part of the crowd lost energy.' });
+  } else if (p.smoking === 'allowed') {
+    out.push({ key: 'pol-smoke', label: 'Policy', tone: 'warn', text: 'Letting the room smoke lifted the vibe — mind the inspection risk.' });
+  }
+  return out.slice(0, 2); // keep it sharp — at most two policy lines
+}
+
 /** Build the boss-level debrief lines for a finished night. */
 export function buildDebrief(result: NightResult, club?: ClubState): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
@@ -150,6 +178,9 @@ export function buildDebrief(result: NightResult, club?: ClubState): DebriefLine
   } else {
     lines.push({ key: 'rep', label: 'Reputation', tone: 'neutral', text: 'Reputation held steady — no real movement.' });
   }
+
+  // --- Policy outcomes (optional, when a non-neutral policy mattered) ---
+  lines.push(...policyLines(result, club));
 
   // --- Crew relationship flavor (optional, presentation only) ---
   const crew = crewFlavor(result, club);

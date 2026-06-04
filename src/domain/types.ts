@@ -11,6 +11,21 @@ export type SecurityLevel = 1 | 2 | 3;
 
 export type SmokingPolicy = 'strict' | 'relaxed';
 
+// --- Club Policies v1 (rules the owner sets before the night) ----------------
+export type SmokingRule = 'allowed' | 'restricted' | 'banned';
+export type IdPolicy = 'relaxed' | 'standard' | 'strict';
+export type SecurityPosture = 'friendly' | 'balanced' | 'hardline';
+export type BarServiceStyle = 'fast' | 'standard' | 'premium';
+
+/** Four simple pre-night rules. Middle option of each is neutral (no effect),
+ *  so a default config reproduces the pre-policies night exactly. */
+export interface PoliciesConfig {
+  smoking: SmokingRule;
+  idCheck: IdPolicy;
+  security: SecurityPosture;
+  barService: BarServiceStyle;
+}
+
 // --- Phase 2A: named staff ---------------------------------------------------
 
 export type StaffRole = 'bartender' | 'bouncer';
@@ -99,6 +114,9 @@ export interface DayConfig {
   eventId: EventId;
   vipFocus: boolean;
   smoking: SmokingPolicy;
+  /** Club Policies v1. Optional for save back-compat: old saves without it load
+   *  fine and are treated as all-neutral. */
+  policies?: PoliciesConfig;
 }
 
 /** Persisted club + meta state (everything that survives between nights). */
