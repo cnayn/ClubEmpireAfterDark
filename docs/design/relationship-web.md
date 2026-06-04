@@ -63,6 +63,11 @@ and memory/affinity foundations are missing.
 10. Everything should eventually surface through **staff cards, bubbles, floor
     moments, debriefs, and event choices** — not menus of numbers.
 
+> **Crossover event canon:** the St. Patrick's Day "Important Guest" event (a
+> Phase 3 + Phase 4 special-guest / fairness-pressure moment with Ayan / Caramel /
+> Elfen / John / Janer reactions) lives in `event-bible.md` under "Future
+> Relationship / Special Guest Events." FUTURE SYSTEM / DO NOT BUILD YET.
+
 ---
 
 ## Future hidden system — Friendship / Affinity
