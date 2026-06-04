@@ -230,22 +230,35 @@ const PROFILES: CharacterProfile[] = [
     nickname: 'Caramel',
     role: 'bouncer',
     roleStatus: 'current',
-    archetype: 'The Trusted Protector',
-    oneSentence: 'Warm with the regulars, immovable with the troublemakers.',
+    archetype: 'Gym Bro Protector / Future Lieutenant',
+    oneSentence:
+      'A motorcycle-riding gym fanatic who talks like a bro, stands like a wall, and can become the owner’s most loyal right hand if treated with respect.',
     visibleTrait: 'Intimidating Presence',
-    visibleTraitEffect: 'Calms the door by sheer presence; fewer incidents.',
+    visibleTraitEffect: 'Reduces incidents, improves staff confidence, and makes risky guests think twice.',
     hiddenTrait: 'Ride or Die',
     hiddenTraitEffect:
-      'Deep loyalty to a boss who earns it; a future trusted-protector / security-lead arc. (Locked — future system.)',
-    goodTreatment: 'Becomes fiercely loyal when treated with respect.',
-    badTreatment: 'Stays professional, but the warmth cools fast.',
-    pressureBehavior: 'Unhurried and reassuring — defuses before it escalates.',
-    dialogueLines: ['“Relax. You’re good with me on the door.”', '“We keep our people safe. That’s the job.”'],
+      'If respected over time, Caramel becomes extremely loyal — warns the owner about staff problems, protects the club’s reputation, covers weak points, and can eventually train new security staff. (Locked — future system, not active.)',
+    goodTreatment:
+      'If respected, covers shifts when the club is short, defends the club’s reputation, warns the owner about bad staff behavior, helps train new bouncers, becomes the trusted security voice, and starts thinking like management, not just muscle.',
+    badTreatment:
+      'If disrespected, becomes distant — stops giving warnings, does only the job and nothing extra, refuses to help train weaker staff, and eventually leaves quietly instead of causing drama.',
+    pressureBehavior:
+      'Holds the door and keeps control without losing his head — loves a big night, but never at the cost of surviving tomorrow.',
+    dialogueLines: [
+      '“Bro, I love the madness too, but we still need to survive tomorrow.”',
+      '“Boss, this one smells like trouble.”',
+      '“I got the door. You fix the inside.”',
+      '“Big night is good bro, but we need control.”',
+      '“No bro, trust me.”',
+      '“Bro listen.”',
+      '“Bro.”',
+    ],
     gameplayHook:
-      'Strong bouncer now; the loyalty / security-lead progression is reserved for a future system, not active.',
-    visualNotes: 'Tall, warm-eyed, immaculate jacket.',
+      'A long-term investment. Early game: strong Senior Bouncer. Mid game: staff protector. Late game: potential Security Lead / Operations Right Hand. Useful immediately, but his real value appears if the player treats him with respect. (Progression reserved for a future system — not active.)',
+    visualNotes:
+      'Broad shoulders, gym physique, confident relaxed lean; motorcycle jacket off duty, arms loose (not stiff). Idle: neck crack, door scan, nod to staff, checks the line. FUTURE: when loyalty is high he should stand nearer the owner’s office / staff area, not just the door.',
     implementationNotes:
-      'Active as a normal bouncer using existing trait vocab (intimidating). Hidden "Ride or Die" is metadata only — no mechanic implemented this pass.',
+      'Current role: Senior Bouncer — mechanically a standard bouncer using existing trait vocab (intimidating); StaffMember stats unchanged. Future role potential: Security Lead / Operations Right Hand (NOT implemented). Owner relationship (flavor): the bridge between Ayan-chaos and Kerem-discipline — respects structure, not the angel on your shoulder. Personality reference (1–10 narrative scale, NOT the mechanical 0–100 stats): Skill 8, Reliability 9, Discipline 8, Temper 6, Charisma 8, Ambition 8, Loyalty Potential 10, Drama Risk 3. Hidden "Ride or Die" is inactive metadata only — loyalty, staff warnings, training bouncers, the security-lead/ops arc, and hidden-trait reveal are NOT implemented this pass. FUTURE SYSTEM (banked, not active): Friendship / Affinity should later track staff relationships and chemistry, kept separate from romance and from simple loyalty.',
   },
 ];
 
