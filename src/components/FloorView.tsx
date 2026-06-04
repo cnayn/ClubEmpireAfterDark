@@ -12,7 +12,7 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
 import { Text } from '@/components/Text';
-import type { BubbleTone, FloorBubble, FloorStaff, FloorView as FloorViewModel, Vibe } from '@/lib/dashboard';
+import type { BubbleTone, FloorBubble, FloorStaff, FloorView as FloorViewModel, Vibe, VenueFloorChips } from '@/lib/dashboard';
 import type { NightZones, ZoneKey, ZoneTone } from '@/lib/venue';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -91,6 +91,22 @@ function Bubble({ b }: { b: FloorBubble }) {
   );
 }
 
+/** Small muted chips naming equipped furniture in a zone. */
+function FurnitureChips({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <View style={styles.furnRow}>
+      {names.map((n) => (
+        <View key={n} style={styles.furnChip}>
+          <Text variant="label" muted>
+            {n}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function FloorView({
   floor,
   bubbles = [],
@@ -100,6 +116,7 @@ export function FloorView({
   pulse = false,
   zones,
   flashZone,
+  venueChips,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -112,6 +129,8 @@ export function FloorView({
   zones?: NightZones;
   /** A zone to briefly highlight after a boss action (door/bar/floor). */
   flashZone?: ZoneKey;
+  /** Equipped furniture names per visible zone (door/bar/floor). */
+  venueChips?: VenueFloorChips;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -193,8 +212,10 @@ export function FloorView({
         {inZone('door').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
+        {venueChips ? <FurnitureChips names={venueChips.door} /> : null}
 
         {/* CROWD (middle) + floor-level bubbles */}
+        {venueChips ? <FurnitureChips names={venueChips.floor} /> : null}
         <View style={styles.crowd}>{renderDots()}</View>
         {inZone('floor').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
@@ -223,6 +244,7 @@ export function FloorView({
             </Text>
           </View>
         </View>
+        {venueChips ? <FurnitureChips names={venueChips.bar} /> : null}
       </View>
 
       <Text variant="label" muted>
@@ -281,6 +303,15 @@ const styles = StyleSheet.create({
   },
   dot: { width: 10, height: 10, borderRadius: radius.pill },
   bubbleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
+  furnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
+  furnChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
   bubble: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,

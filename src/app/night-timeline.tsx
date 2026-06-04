@@ -14,7 +14,7 @@ import {
   type MoodTone,
   resolveBossAction,
 } from '@/lib/bossActions';
-import { buildFloorView, type FloorBubble, floorBubbles } from '@/lib/dashboard';
+import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { buildTimeline } from '@/lib/timeline';
 import { nightZones, type ZoneKey } from '@/lib/venue';
@@ -113,6 +113,7 @@ export default function NightTimelineScreen() {
         pulse={!finished}
         zones={zones}
         flashZone={committed ? undefined : flashZone}
+        venueChips={venueFloorChips(planClub)}
       />
 
       {/* Current beat — short, floor-supporting. Tap to move the night along. */}

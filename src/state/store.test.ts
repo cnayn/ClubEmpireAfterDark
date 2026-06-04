@@ -127,6 +127,35 @@ describe('shop reserve uses staff salaries', () => {
   });
 });
 
+describe('venue / furniture', () => {
+  it('buys an item (deducting cash) then equips it into its zone', () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, cash: 5000 } });
+    expect(useGameStore.getState().buyFurniture('neon-sign')).toBe(true);
+    const afterBuy = useGameStore.getState().club!;
+    expect(afterBuy.cash).toBe(5000 - 200);
+    expect(afterBuy.venue?.owned).toContain('neon-sign');
+
+    expect(useGameStore.getState().equipFurniture('neon-sign', 'entrance')).toBe(true);
+    expect(useGameStore.getState().club!.venue?.equipped.entrance).toContain('neon-sign');
+  });
+
+  it('cannot equip into the wrong zone, and cannot equip what you do not own', () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, cash: 5000 } });
+    expect(useGameStore.getState().equipFurniture('neon-sign', 'entrance')).toBe(false); // not owned
+    useGameStore.getState().buyFurniture('neon-sign');
+    expect(useGameStore.getState().equipFurniture('neon-sign', 'bar')).toBe(false); // wrong zone
+  });
+
+  it('refuses a purchase that would breach the night reserve', () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, cash: 200 + minViableNightCost(club.staff) - 1 } });
+    expect(useGameStore.getState().buyFurniture('neon-sign')).toBe(false);
+    expect(useGameStore.getState().club!.venue?.owned ?? []).not.toContain('neon-sign');
+  });
+});
+
 describe('hire / fire', () => {
   it('hires a candidate for an upfront fee and adds them to the roster', () => {
     const club = useGameStore.getState().club!;

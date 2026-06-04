@@ -17,6 +17,7 @@ import * as B from '@/domain/balance';
 import { effectiveBookingFee, eventResultNotes, getEvent } from '@/domain/events';
 import { drinkPrepEffects, stockCost } from '@/domain/drinks';
 import { policyEffects } from '@/domain/policies';
+import { venueEffects, venueStats } from '@/domain/furniture';
 import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
 import { aggregateEffects } from '@/domain/upgrades';
@@ -59,6 +60,9 @@ export function resolveNight(
   // quantities below. Neutral (×1 / +0) for default/standard policies, so the
   // baseline night is unchanged. No new RNG draws.
   const pe = policyEffects(config.policies);
+  // Venue / Furniture v1: gentle bounded draw + vibe from equipped furniture.
+  // Empty venue ⇒ neutral (×1 / +0), so a bare club is unchanged.
+  const ve = venueEffects(venueStats(club.venue));
 
   // Tonight's event is a deterministic modifier vector (no new RNG draws).
   // Quiet Night (`regular`) is all-neutral, so its path is identical to Phase 2A.
@@ -76,7 +80,7 @@ export function resolveNight(
   const smokingDraw = config.smoking === 'relaxed' ? B.SMOKING_RELAXED_DRAW : 0;
   const noise = rng.range(0.9, 1.1);
 
-  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise * pe.drawMod;
+  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise * pe.drawMod * ve.drawMod;
   const guests = clamp(Math.round(expected), 0, capacity);
 
   // --- Service capacity (bartenders gate bar revenue) ---
@@ -156,7 +160,7 @@ export function resolveNight(
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;

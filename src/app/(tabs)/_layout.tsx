@@ -34,6 +34,10 @@ export default function TabsLayout() {
         options={{ title: 'Crew', tabBarIcon: () => <TabIcon glyph="👥" /> }}
       />
       <Tabs.Screen
+        name="venue"
+        options={{ title: 'Venue', tabBarIcon: () => <TabIcon glyph="🛋️" /> }}
+      />
+      <Tabs.Screen
         name="shop"
         options={{ title: 'Shop', tabBarIcon: () => <TabIcon glyph="🛠️" /> }}
       />

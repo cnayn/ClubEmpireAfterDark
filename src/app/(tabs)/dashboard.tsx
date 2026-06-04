@@ -9,7 +9,7 @@ import { GoalBoardList } from '@/components/GoalBoard';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { reputationTier } from '@/domain/balance';
-import { buildFloorView, floorBubbles, goalBoard } from '@/lib/dashboard';
+import { buildFloorView, floorBubbles, goalBoard, venueFloorChips } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -126,7 +126,7 @@ export default function DashboardScreen() {
       </Card>
 
       {/* The living venue — the home screen's centerpiece */}
-      <FloorView floor={floor} bubbles={bubbles} />
+      <FloorView floor={floor} bubbles={bubbles} venueChips={venueFloorChips(club)} />
     </Screen>
   );
 }

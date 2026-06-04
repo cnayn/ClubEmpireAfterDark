@@ -6,6 +6,7 @@
 
 import { REPUTATION_TIERS, START_CAPACITY } from '@/domain/balance';
 import { getEvent } from '@/domain/events';
+import { equippedIn, getFurniture, getVenue } from '@/domain/furniture';
 import { CANDIDATE_POOL, hireCost, minViableNightCost } from '@/domain/staff';
 import type { ClubState, EventId, NightResult } from '@/domain/types';
 import { aggregateEffects, UPGRADES } from '@/domain/upgrades';
@@ -88,6 +89,22 @@ export function buildFloorView(club: ClubState, lastResult: NightResult | null):
     hasPlayedNight,
     lastGuests: hasPlayedNight ? guests : null,
   };
+}
+
+/** Equipped furniture names mapped onto the floor's visible zones, so the room
+ *  reflects what the owner has set up. Presentation only. */
+export interface VenueFloorChips {
+  door: string[];
+  bar: string[];
+  floor: string[];
+}
+export function venueFloorChips(club: ClubState): VenueFloorChips {
+  const v = getVenue(club.venue);
+  const names = (zone: 'entrance' | 'bar' | 'dancefloor') =>
+    equippedIn(v, zone)
+      .map((id) => getFurniture(id)?.name ?? '')
+      .filter(Boolean);
+  return { door: names('entrance'), bar: names('bar'), floor: names('dancefloor') };
 }
 
 // --- Floor bubbles (interpretations of EXISTING aggregate signals) ------------
@@ -433,6 +450,14 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
   };
 
   // --- Venue -----------------------------------------------------------------
+  const venue = getVenue(club.venue);
+  const buyFirstFurniture: BoardGoal = {
+    id: 'buy-first-furniture', category: 'venue',
+    title: 'Make the place yours',
+    instruction: 'Buy and equip your first furniture in the Venue tab — make the room feel like a real club.',
+    progress: venue.owned.length >= 1 ? 1 : 0, status: done(venue.owned.length >= 1),
+    benefit: 'Style and comfort lift the room.',
+  };
   const buyProLighting: BoardGoal = {
     id: 'buy-pro-lighting', category: 'venue',
     title: 'Buy Pro Lighting',
@@ -511,6 +536,7 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     late: [
       reachCash,            // business
       repTier,              // reputation
+      buyFirstFurniture,    // venue
       buyProLighting,       // venue
       hireAnotherBartender, // staff
       bigNight,             // business

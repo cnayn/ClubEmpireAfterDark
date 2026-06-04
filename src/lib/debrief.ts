@@ -11,6 +11,7 @@
  */
 
 import type { BossActionId } from '@/lib/bossActions';
+import { venueStats } from '@/domain/furniture';
 import type { ClubState, NightResult } from '@/domain/types';
 import { signed, signedMoney } from './format';
 
@@ -162,6 +163,22 @@ function drinkPrepLines(result: NightResult, club: ClubState | undefined): Debri
   return out.slice(0, 2);
 }
 
+/** One venue line when the room's look/hygiene is doing something. */
+function venueLine(club: ClubState | undefined): DebriefLine | null {
+  if (!club?.venue) return null;
+  const v = venueStats(club.venue);
+  if (v.hygiene >= 4) {
+    return { key: 'venue', label: 'Venue', tone: 'good', text: 'Bathroom upgrades never make headlines — but they quietly prevent complaints.' };
+  }
+  if (v.style + v.doorAppeal >= 6) {
+    return { key: 'venue', label: 'Venue', tone: 'good', text: 'The room is starting to look like a real club — guests noticed.' };
+  }
+  if (v.style + v.comfort + v.sound + v.hygiene + v.doorAppeal > 0) {
+    return { key: 'venue', label: 'Venue', tone: 'info', text: 'The new touches around the room are starting to show.' };
+  }
+  return null;
+}
+
 /** Build the boss-level debrief lines for a finished night. */
 export function buildDebrief(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
@@ -236,6 +253,10 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
 
   // --- What the boss did tonight (optional) ---
   lines.push(...bossActionLines(result, bossActions));
+
+  // --- Venue look (optional) ---
+  const venue = venueLine(club);
+  if (venue) lines.push(venue);
 
   // --- Drink prep outcomes (optional, when stock/quality mattered) ---
   lines.push(...drinkPrepLines(result, club));

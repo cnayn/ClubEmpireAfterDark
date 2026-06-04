@@ -15,9 +15,10 @@ import {
   minViableNightCost,
 } from '@/domain/staff';
 import type { BossActionId } from '@/lib/bossActions';
-import type { ClubState, DayConfig, NightResult } from '@/domain/types';
+import type { ClubState, DayConfig, NightResult, VenueZone } from '@/domain/types';
 import { aggregateEffects, getUpgrade } from '@/domain/upgrades';
 import { stockCost } from '@/domain/drinks';
+import { canEquip, getFurniture, getVenue } from '@/domain/furniture';
 import { clearSave, createNewClub, loadClub, saveClub } from '@/save/persistence';
 import { type Intervention, resolveNight } from '@/sim/night';
 
@@ -50,6 +51,12 @@ interface GameStore {
   hireStaff: (candidateId: string) => boolean;
   /** Fire a roster member; refuses to fire the last bartender. Returns success. */
   fireStaff: (id: string) => boolean;
+  /** Buy a furniture item if affordable (reserve-aware) and not already owned. */
+  buyFurniture: (id: string) => boolean;
+  /** Equip an owned item into a compatible, free zone slot. Returns success. */
+  equipFurniture: (id: string, zone: VenueZone) => boolean;
+  /** Remove an equipped item from a zone (stays owned). */
+  unequipFurniture: (id: string, zone: VenueZone) => boolean;
 }
 
 /**
@@ -162,6 +169,55 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...club.lastConfig,
         staffOnDuty: club.lastConfig.staffOnDuty.filter((x) => x !== id),
       },
+    };
+    set({ club: nextClub });
+    void saveClub(nextClub);
+    return true;
+  },
+
+  buyFurniture: (id) => {
+    const club = get().club;
+    if (!club) return false;
+    const item = getFurniture(id);
+    if (!item) return false;
+    const venue = getVenue(club.venue);
+    if (venue.owned.includes(id)) return false; // one copy is enough in v1
+    // Keep a minimum night in reserve so furniture can never soft-lock the player.
+    if (club.cash - item.cost < minViableNightCost(club.staff)) return false;
+
+    const nextClub: ClubState = {
+      ...club,
+      cash: club.cash - item.cost,
+      venue: { owned: [...venue.owned, id], equipped: { ...venue.equipped } },
+    };
+    set({ club: nextClub });
+    void saveClub(nextClub);
+    return true;
+  },
+
+  equipFurniture: (id, zone) => {
+    const club = get().club;
+    if (!club) return false;
+    if (!canEquip(club.venue, id, zone)) return false;
+    const venue = getVenue(club.venue);
+    const nextClub: ClubState = {
+      ...club,
+      venue: { owned: venue.owned, equipped: { ...venue.equipped, [zone]: [...(venue.equipped[zone] ?? []), id] } },
+    };
+    set({ club: nextClub });
+    void saveClub(nextClub);
+    return true;
+  },
+
+  unequipFurniture: (id, zone) => {
+    const club = get().club;
+    if (!club) return false;
+    const venue = getVenue(club.venue);
+    const inZone = venue.equipped[zone] ?? [];
+    if (!inZone.includes(id)) return false;
+    const nextClub: ClubState = {
+      ...club,
+      venue: { owned: venue.owned, equipped: { ...venue.equipped, [zone]: inZone.filter((x) => x !== id) } },
     };
     set({ club: nextClub });
     void saveClub(nextClub);

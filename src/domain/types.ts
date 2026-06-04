@@ -133,6 +133,33 @@ export interface DayConfig {
   drinkPrep?: DrinkPrep;
 }
 
+// --- Venue / Furniture v1 ----------------------------------------------------
+export type VenueZone = 'entrance' | 'bar' | 'dancefloor' | 'toilets' | 'vip';
+
+/** Aggregate venue character from equipped furniture. All optional/additive. */
+export interface FurnitureStats {
+  style?: number;
+  comfort?: number;
+  sound?: number;
+  hygiene?: number;
+  doorAppeal?: number;
+}
+
+export interface FurnitureDef {
+  id: string;
+  name: string;
+  zone: VenueZone;
+  cost: number;
+  stats: FurnitureStats;
+  description: string;
+}
+
+/** Persisted venue customization: items owned + equipped per zone slot. */
+export interface VenueState {
+  owned: string[];
+  equipped: Partial<Record<VenueZone, string[]>>;
+}
+
 /** Persisted club + meta state (everything that survives between nights). */
 export interface ClubState {
   name: string;
@@ -145,6 +172,9 @@ export interface ClubState {
   staff: StaffMember[];
   /** Player's last-used day config, restored as defaults on the prep screen. */
   lastConfig: DayConfig;
+  /** Venue / Furniture v1. Optional for save back-compat: old saves without it
+   *  load fine and are treated as an empty (neutral) venue. */
+  venue?: VenueState;
 }
 
 /** A single line in the night results breakdown. */
