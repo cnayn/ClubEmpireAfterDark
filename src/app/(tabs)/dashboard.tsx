@@ -4,12 +4,12 @@ import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card, StatCard } from '@/components/Card';
-import { Pill } from '@/components/Controls';
 import { FloorView } from '@/components/FloorView';
+import { GoalBoardList } from '@/components/GoalBoard';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { reputationTier } from '@/domain/balance';
-import { type BoardGoal, type BoardGoalCategory, buildFloorView, floorBubbles, goalBoard } from '@/lib/dashboard';
+import { buildFloorView, floorBubbles, goalBoard } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -17,54 +17,6 @@ import { colors, radius, spacing } from '@/theme/tokens';
 const RESET_TITLE = 'Reset Club?';
 const RESET_BODY =
   'This wipes your current club and all progress, and starts a brand-new club from Night 1. This can’t be undone.';
-
-const CATEGORY_ACCENT: Record<BoardGoalCategory, string> = {
-  tutorial: colors.neonCyan,
-  business: colors.success,
-  reputation: colors.neonMagenta,
-  staff: colors.neonViolet,
-  venue: colors.warning,
-};
-const CATEGORY_LABEL: Record<BoardGoalCategory, string> = {
-  tutorial: 'Tutorial',
-  business: 'Business',
-  reputation: 'Reputation',
-  staff: 'Staff',
-  venue: 'Venue',
-};
-
-function GoalRow({ goal }: { goal: BoardGoal }) {
-  const accent = CATEGORY_ACCENT[goal.category];
-  const completed = goal.status === 'completed';
-  return (
-    <View style={[styles.goalRow, { borderLeftColor: completed ? colors.success : accent }]}>
-      <View style={styles.goalHead}>
-        <Text variant="label" color={completed ? colors.success : accent}>
-          {CATEGORY_LABEL[goal.category]}
-        </Text>
-        <Pill
-          label={completed ? 'Done' : 'Active'}
-          color={completed ? colors.success : accent}
-        />
-      </View>
-      <Text variant="heading">{goal.title}</Text>
-      <Text variant="label" muted>
-        {goal.instruction}
-      </Text>
-      {!completed ? (
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${Math.round(goal.progress * 100)}%`, backgroundColor: accent }]} />
-        </View>
-      ) : null}
-      {goal.benefit ? (
-        <Text variant="label" color={completed ? colors.success : colors.textMuted}>
-          {completed ? '✓ ' : '★ '}
-          {goal.benefit}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
 
 export default function DashboardScreen() {
   const club = useGameStore((s) => s.club);
@@ -81,7 +33,8 @@ export default function DashboardScreen() {
     );
   }
 
-  const goals = goalBoard(club, lastResult);
+  // Compact board on the dashboard; the full board lives on the Goals tab.
+  const goals = goalBoard(club, lastResult).slice(0, 3);
   const floor = buildFloorView(club, lastResult);
   const bubbles = floorBubbles(lastResult);
 
@@ -107,17 +60,7 @@ export default function DashboardScreen() {
   };
 
   return (
-    <Screen
-      footer={
-        <View style={{ gap: spacing.sm }}>
-          <Button label="Prepare Tonight" onPress={() => router.push('/day-prep')} />
-          <View style={styles.row}>
-            <Button label="Crew" variant="secondary" onPress={() => router.push('/staff')} style={{ flex: 1 }} />
-            <Button label="Upgrades" variant="secondary" onPress={() => router.push('/shop')} style={{ flex: 1 }} />
-          </View>
-        </View>
-      }
-    >
+    <Screen footer={<Button label="Prepare Tonight" onPress={() => router.push('/day-prep')} />}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text variant="title">{club.name}</Text>
@@ -172,13 +115,14 @@ export default function DashboardScreen() {
         <StatCard label="Reputation" value={`${club.reputation}`} accent={colors.neonMagenta} />
       </View>
 
-      {/* Goal Board — several active goals the player can choose to chase */}
-      <Card title="Goal Board">
-        <View style={styles.board}>
-          {goals.map((g) => (
-            <GoalRow key={g.id} goal={g} />
-          ))}
-        </View>
+      {/* Compact Goal Board — full board is on the Goals tab. */}
+      <Card title="Goals">
+        <GoalBoardList goals={goals} />
+        <Pressable onPress={() => router.push('/goals')} accessibilityRole="button" hitSlop={8}>
+          <Text variant="label" color={colors.neonCyan} style={styles.seeAll}>
+            See all goals →
+          </Text>
+        </Pressable>
       </Card>
 
       {/* The living venue — the home screen's centerpiece */}
@@ -208,15 +152,5 @@ const styles = StyleSheet.create({
   },
   modalText: { lineHeight: 21 },
   row: { flexDirection: 'row', gap: spacing.md },
-  board: { gap: spacing.sm },
-  goalRow: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
-    borderLeftWidth: 3,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  goalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  progressTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surface, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.neonMagenta },
+  seeAll: { marginTop: spacing.sm, textAlign: 'right' },
 });

@@ -27,12 +27,12 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="dashboard" options={{ title: 'Club Dashboard', headerBackVisible: false }} />
+        {/* Main app lives in the bottom-tab group (Club / Goals / Crew / Shop / More). */}
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* The night sequence runs full-screen, above the tabs. */}
         <Stack.Screen name="day-prep" options={{ title: 'Tonight' }} />
         <Stack.Screen name="night-timeline" options={{ title: 'The Night', headerBackVisible: false }} />
         <Stack.Screen name="results" options={{ title: 'Last Night', headerBackVisible: false }} />
-        <Stack.Screen name="shop" options={{ title: 'Upgrades' }} />
-        <Stack.Screen name="staff" options={{ title: 'Staff' }} />
       </Stack>
     </GestureHandlerRootView>
   );
