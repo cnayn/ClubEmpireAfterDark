@@ -13,7 +13,6 @@ import {
   hireCost,
   isValidSchedule,
   minViableNightCost,
-  wagesForOnDuty,
 } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
 import { getUpgrade } from '@/domain/upgrades';
@@ -91,9 +90,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Event must be unlocked and its fee must respect the minimum-night reserve.
     if (!isUnlocked(club, config.eventId)) return null;
     if (!eventRequirement(club, config.eventId).met) return null;
-    // Bankruptcy guard: cover tonight's on-duty wages AND the event's upfront cost.
+    // Upfront guard: only genuine upfront costs (tonight: the event fee; future:
+    // stock / DJ booking). Crew WAGES are settled AFTER the night via `net`, so a
+    // low (even negative) cash balance must never block scheduled crew. A free
+    // night (e.g. Quiet Night) stays openable from negative cash, so the player
+    // can always run a lean recovery night.
     const eventCost = getEvent(config.eventId).cost;
-    if (club.cash < wagesForOnDuty(club.staff, config.staffOnDuty) + eventCost) return null;
+    if (eventCost > 0 && club.cash < eventCost) return null;
     const { result, nextClub } = resolveNight(club, config, nightSeed(club), intervention);
     set({ club: nextClub, lastResult: result, plannedConfig: null });
     void saveClub(nextClub);

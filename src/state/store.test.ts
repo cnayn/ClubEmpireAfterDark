@@ -30,13 +30,22 @@ describe('runNight guards', () => {
     expect(useGameStore.getState().club!.day).toBe(1);
   });
 
-  it('refuses to open when cash cannot cover on-duty wages', () => {
+  it('opens even when cash is below the full wage bill (wages settle post-night)', () => {
     const club = useGameStore.getState().club!;
     const cfg = configFromRoster();
-    useGameStore.setState({
-      club: { ...club, cash: wagesForOnDuty(club.staff, cfg.staffOnDuty) - 1 },
-    });
-    expect(useGameStore.getState().runNight(cfg)).toBeNull();
+    // Cash far below the on-duty wage bill — crew should still work (no upfront block).
+    useGameStore.setState({ club: { ...club, cash: wagesForOnDuty(club.staff, cfg.staffOnDuty) - 1 } });
+    const result = useGameStore.getState().runNight(cfg);
+    expect(result).not.toBeNull();
+    expect(useGameStore.getState().club!.day).toBe(2);
+  });
+
+  it('a free Quiet Night is still openable from negative cash (recovery path)', () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, cash: -200 } }); // in the red
+    const result = useGameStore.getState().runNight(configFromRoster()); // Quiet Night, eventCost 0
+    expect(result).not.toBeNull();
+    expect(useGameStore.getState().club!.day).toBe(2);
   });
 
   it('opens and advances the day when affordable and valid', () => {

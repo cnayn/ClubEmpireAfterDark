@@ -21,6 +21,7 @@ const NOTE_COLOR: Record<ResultNote['tone'], string> = {
 
 export default function ResultsScreen() {
   const result = useGameStore((s) => s.lastResult);
+  const club = useGameStore((s) => s.club);
 
   if (!result) {
     return (
@@ -52,6 +53,17 @@ export default function ResultsScreen() {
         </Text>
         <Pill label={getEvent(result.eventId).name} color={colors.neonViolet} />
       </View>
+
+      {club && club.cash < 0 ? (
+        <Card title="In the red" accent={colors.danger}>
+          <Text variant="body" color={colors.danger}>
+            Wages outran the till — you're {money(club.cash)} in the bank.
+          </Text>
+          <Text variant="label" muted>
+            Run a lean Quiet Night (cut the crew back) to earn your way out — you can always open the doors.
+          </Text>
+        </Card>
+      ) : null}
 
       <View style={styles.row}>
         <StatCard

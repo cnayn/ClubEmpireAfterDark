@@ -57,11 +57,12 @@ export default function DayPrepScreen() {
   const requirement = eventRequirement(club, eventId);
   const readiness = eventReadiness(club, { ...config, eventId, staffOnDuty: onDuty });
 
-  const wages = wagesForOnDuty(club.staff, onDuty);
-  const outlay = wages + event.cost;
+  const wages = wagesForOnDuty(club.staff, onDuty); // post-night estimate, not upfront
   const validSchedule = isValidSchedule(club.staff, onDuty);
-  const canAfford = club.cash >= outlay;
-  const canOpen = validSchedule && canAfford && requirement.met;
+  // Only the event fee is an upfront cost; crew wages settle after the night. A
+  // free night stays openable even from negative cash (lean recovery night).
+  const canAffordUpfront = event.cost === 0 || club.cash >= event.cost;
+  const canOpen = validSchedule && canAffordUpfront && requirement.met;
 
   const onOpen = () => {
     // Defer resolution: the night resolves during playback (after the live
@@ -74,13 +75,13 @@ export default function DayPrepScreen() {
     <Screen
       footer={
         <View style={{ gap: 8 }}>
-          <ResultRow label="Tonight's wages" value={money(wages)} valueColor={colors.warning} />
           {event.cost > 0 ? (
-            <ResultRow label={`${event.name} cost`} value={`-${money(event.cost)}`} valueColor={colors.warning} />
+            <ResultRow label={`${event.name} cost (upfront)`} value={`-${money(event.cost)}`} valueColor={colors.warning} />
           ) : null}
           {event.bookingFee > 0 ? (
             <ResultRow label="Booking fee (up to, if you deliver)" value={`+${money(event.bookingFee)}`} valueColor={colors.success} />
           ) : null}
+          <ResultRow label="Crew wages (paid after the night)" value={`~${money(wages)}`} valueColor={colors.textMuted} />
           {!validSchedule ? (
             <Text variant="label" color={colors.danger}>
               You need at least one bartender on duty to open.
@@ -89,9 +90,9 @@ export default function DayPrepScreen() {
             <Text variant="label" color={colors.danger}>
               {requirement.reason}
             </Text>
-          ) : !canAfford ? (
+          ) : !canAffordUpfront ? (
             <Text variant="label" color={colors.danger}>
-              You can't cover tonight's outlay ({money(club.cash)} in the bank).
+              You can't cover the {event.name} cost ({money(club.cash)} in the bank).
             </Text>
           ) : null}
           <Button label="Open the Doors" onPress={onOpen} disabled={!canOpen} />

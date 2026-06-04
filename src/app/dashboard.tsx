@@ -87,7 +87,7 @@ export default function DashboardScreen() {
 
       {/* HUD overlays */}
       <View style={styles.row}>
-        <StatCard label="Cash" value={money(club.cash)} accent={colors.success} />
+        <StatCard label="Cash" value={money(club.cash)} accent={club.cash < 0 ? colors.danger : colors.success} />
         <StatCard label="Reputation" value={`${club.reputation}`} accent={colors.neonMagenta} />
       </View>
 
