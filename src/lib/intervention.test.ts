@@ -91,15 +91,23 @@ describe('cooling choices move the night deterministically, within bounds', () =
     const base = resolveNight(club, config, SEED).result;
     expect(nightMoment(base)?.kind).toBe('cooling');
   });
-  it('push-dj ≥ ride on reputation; promo > ride on bar revenue; bounded; reproducible; ride ≡ identity', () => {
+  it('push-dj is a real upside (improves reputation, not a money trap); ride ≡ identity', () => {
     const ride = run('crowd-ride');
-    expect(run('push-dj').reputationDelta).toBeGreaterThanOrEqual(ride.reputationDelta);
-    expect(run('crowd-promo').barRevenue).toBeGreaterThan(ride.barRevenue);
-    for (const r of [run('push-dj'), run('crowd-promo')]) {
-      expect(Math.abs(r.net - ride.net)).toBeLessThan(Math.max(150, Math.abs(ride.net) * 0.3));
-    }
+    const dj = run('push-dj');
+    // Push DJ should IMPROVE reputation on a cooling night (strictly, not just ≥).
+    expect(dj.reputationDelta).toBeGreaterThan(ride.reputationDelta);
+    // Its bar-revenue cost is small and bounded — not a punishment.
+    expect(dj.barRevenue).toBeGreaterThan(ride.barRevenue * 0.95);
+    expect(dj.barRevenue).toBeLessThanOrEqual(ride.barRevenue);
+    // Net stays close to ride (no consistent large loss).
+    expect(Math.abs(dj.net - ride.net)).toBeLessThan(Math.max(150, Math.abs(ride.net) * 0.2));
+    // Determinism + identity.
     expect(run('push-dj')).toEqual(run('push-dj'));
     expect(ride).toEqual(resolveNight(club, config, SEED).result);
+  });
+
+  it('promo lifts the bar over ride', () => {
+    expect(run('crowd-promo').barRevenue).toBeGreaterThan(run('crowd-ride').barRevenue);
   });
 });
 

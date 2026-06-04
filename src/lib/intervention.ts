@@ -58,8 +58,12 @@ export const INTERVENTION_CHOICES: InterventionChoice[] = [
   {
     id: 'push-dj',
     label: 'Push the DJ',
-    blurb: 'Lift the energy — the room dances and your name grows, but a few drift off the bar.',
-    intervention: { vibeBonus: 12, revenueMod: 0.97 },
+    blurb: 'Lift the energy — the room dances and your name grows, with only a few drifting off the bar.',
+    // A real upside on a cooling night: a clear vibe/reputation lift for a small,
+    // bounded bar-revenue cost (the floor fills, a few leave the bar). Was
+    // {vibe 12, rev 0.97}, where the rounded rep gain often vanished while the
+    // revenue cut always landed — so it read as a trap.
+    intervention: { vibeBonus: 18, revenueMod: 0.99 },
     mood: { label: 'Energy lifting', tone: 'good' },
   },
   {

@@ -44,8 +44,26 @@ export const DRINK_MULT: Record<Level, number> = {
 export const DRINK_BASE = 8; // $ per drink at mult 1.0
 export const AVG_DRINKS_PER_GUEST = 2.0;
 
-/** Service: a baseline-skill bartender fully serves this many guests per night. */
-export const SERVICE_PER_BARTENDER = 90;
+/**
+ * Service: a baseline-skill bartender fully serves this many guests per night.
+ * Tuned so crew decisions actually bite: at 35, the two starting bartenders (70)
+ * comfortably serve a typical or packed STARTING_CAPACITY (60) house — so the
+ * early game is unchanged — but a grown venue (Bigger Floor → capacity 90) or a
+ * lean crew strains the bar, making more/better bartenders (and the Extra Bar
+ * upgrade) visibly improve serviceRatio and bar revenue. (Was 90, which fully
+ * served the game's maximum house with a single bartender, so crew never mattered.)
+ */
+export const SERVICE_PER_BARTENDER = 35;
+
+/**
+ * Bartender QUALITY → bar revenue, on top of raw service capacity. Centered on
+ * BASELINE_SKILL so the starting roster (skill 50) is exactly neutral (×1.0,
+ * identity-preserving): a sharper crew pours a little more value per guest, a
+ * green crew a little less, even when the bar isn't capacity-bound. Bounded.
+ */
+export const BARTENDER_QUALITY_WEIGHT = 0.2; // how much avg skill-vs-baseline tilts bar revenue
+export const BARTENDER_QUALITY_MIN = 0.85;
+export const BARTENDER_QUALITY_MAX = 1.2;
 
 /** Reference incident multipliers by old security tier; reused by the bouncer
  *  mapping so 1/2/3 effective bouncer units reproduce the old levels. */

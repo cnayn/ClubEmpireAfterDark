@@ -76,6 +76,20 @@ export function resolveNight(
   const serviceCapacity = crew.service + fx.serviceBartenders * B.SERVICE_PER_BARTENDER;
   const serviceRatio = guests > 0 ? clamp(serviceCapacity / guests, 0, 1) : 1;
 
+  // Bartender QUALITY lifts (or dents) bar revenue beyond raw throughput — a
+  // sharper crew gets more value per guest even when service isn't the cap.
+  // Centered on BASELINE_SKILL, so the starting roster (skill 50) is exactly
+  // neutral (×1.0); bounded by BARTENDER_QUALITY_MIN/MAX.
+  const showedBar = crew.showedBartenders;
+  const avgBarSkill = showedBar.length
+    ? showedBar.reduce((sum, m) => sum + m.skill, 0) / showedBar.length
+    : B.BASELINE_SKILL;
+  const barQualityMod = clamp(
+    1 + (avgBarSkill / B.BASELINE_SKILL - 1) * B.BARTENDER_QUALITY_WEIGHT,
+    B.BARTENDER_QUALITY_MIN,
+    B.BARTENDER_QUALITY_MAX
+  );
+
   // --- Revenue ---
   const coverPrice = B.COVER_PRICE[config.coverLevel];
   const drinkMult = B.DRINK_MULT[config.drinkLevel];
@@ -84,7 +98,7 @@ export function resolveNight(
 
   const coverRevenue = Math.round(guests * coverPrice);
   const barRevenue = Math.round(
-    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * event.spendMod * intervention.revenueMod
+    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * event.spendMod * intervention.revenueMod
   );
 
   // --- Incidents & risk (security mod derives from on-duty bouncers) ---

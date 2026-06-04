@@ -111,6 +111,87 @@ describe('resolveNight', () => {
 });
 
 /**
+ * Crew impact (A): staff quantity AND quality must move night outcomes in the
+ * intended direction, deterministically, and within bounds.
+ */
+describe('crew impact', () => {
+  const bartender = (id: string, skill: number): StaffMember => ({
+    id, name: id, role: 'bartender', salary: 120, skill,
+    honesty: 100, reliability: 100, visibleTrait: 'none', hiddenTrait: 'none', description: '',
+  });
+  const bouncer = (id: string, skill: number): StaffMember => ({
+    id, name: id, role: 'bouncer', salary: 100, skill,
+    honesty: 100, reliability: 100, visibleTrait: 'none', hiddenTrait: 'none', description: '',
+  });
+
+  // A busy, bar-bound room (big venue, packed, cheap) so service is the constraint.
+  const packed: DayConfig = { ...baseConfig, coverLevel: 'low', drinkLevel: 'low' };
+  const bigClub = (staff: StaffMember[]): ClubState =>
+    makeClub({ reputation: 100, baseCapacity: 200, staff, lastConfig: { ...baseConfig, staffOnDuty: staff.map((m) => m.id) } });
+
+  it('a stronger bartender serves better and earns more than a weak one (same seed/config)', () => {
+    const pro = bigClub([bartender('pro', 80)]);
+    const weak = bigClub([bartender('weak', 30)]);
+    const cfg = (c: ClubState): DayConfig => ({ ...packed, staffOnDuty: [c.staff[0].id] });
+    for (const seed of [1, 7, 21]) {
+      const p = resolveNight(pro, cfg(pro), seed).result;
+      const w = resolveNight(weak, cfg(weak), seed).result;
+      expect(p.serviceRatio).toBeGreaterThan(w.serviceRatio);
+      expect(p.barRevenue).toBeGreaterThan(w.barRevenue);
+    }
+  });
+
+  it('more bartenders raise service ratio and bar revenue (same seed/config)', () => {
+    const one = bigClub([bartender('b1', 50)]);
+    const three = bigClub([bartender('b1', 50), bartender('b2', 50), bartender('b3', 50)]);
+    for (const seed of [2, 9, 33]) {
+      const a = resolveNight(one, { ...packed, staffOnDuty: ['b1'] }, seed).result;
+      const b = resolveNight(three, { ...packed, staffOnDuty: ['b1', 'b2', 'b3'] }, seed).result;
+      expect(b.serviceRatio).toBeGreaterThan(a.serviceRatio);
+      expect(b.barRevenue).toBeGreaterThan(a.barRevenue);
+    }
+  });
+
+  it('better bartender quality lifts bar revenue even when not capacity-bound', () => {
+    // Two bartenders at a base-capacity house: service (70) always covers the
+    // room (≤60 guests), so serviceRatio is 1.0 for both and the only difference
+    // is the bounded quality channel.
+    const pro = makeClub({ reputation: 60, baseCapacity: 60, staff: [bartender('p1', 80), bartender('p2', 80)] });
+    const base = makeClub({ reputation: 60, baseCapacity: 60, staff: [bartender('q1', 50), bartender('q2', 50)] });
+    const p = resolveNight(pro, { ...baseConfig, staffOnDuty: ['p1', 'p2'] }, 4).result;
+    const b = resolveNight(base, { ...baseConfig, staffOnDuty: ['q1', 'q2'] }, 4).result;
+    expect(p.serviceRatio).toBe(1);
+    expect(b.serviceRatio).toBe(1);
+    expect(p.barRevenue).toBeGreaterThan(b.barRevenue);
+  });
+
+  it('more/better bouncers reduce incidents across many seeds (security is modeled)', () => {
+    const weakDoor = bigClub([bartender('bk', 50), bouncer('w', 40)]);
+    const strongDoor = bigClub([bartender('bk', 50), bouncer('s1', 70), bouncer('s2', 70)]);
+    let weakInc = 0;
+    let strongInc = 0;
+    for (let seed = 0; seed < 120; seed++) {
+      weakInc += resolveNight(weakDoor, { ...packed, staffOnDuty: ['bk', 'w'] }, seed).result.incidents;
+      strongInc += resolveNight(strongDoor, { ...packed, staffOnDuty: ['bk', 's1', 's2'] }, seed).result.incidents;
+    }
+    expect(strongInc).toBeLessThan(weakInc);
+  });
+
+  it('the crew effect is bounded (no runaway revenue or negative service)', () => {
+    const pro = bigClub([bartender('pro', 100)]);
+    const weak = bigClub([bartender('weak', 30)]);
+    for (const seed of [5, 50]) {
+      const p = resolveNight(pro, { ...packed, staffOnDuty: ['pro'] }, seed).result;
+      const w = resolveNight(weak, { ...packed, staffOnDuty: ['weak'] }, seed).result;
+      expect(p.serviceRatio).toBeLessThanOrEqual(1);
+      expect(w.serviceRatio).toBeGreaterThanOrEqual(0);
+      // Quality + throughput together stay within a sane multiple, not unbounded.
+      expect(p.barRevenue).toBeLessThan(w.barRevenue * 6);
+    }
+  });
+});
+
+/**
  * Early-game balance guarantees (Phase 2A). Rewritten to the staff roster but
  * asserting the SAME outcomes locked in decision-log #0007 — the identity point.
  */

@@ -23,7 +23,7 @@ const ids = (r: StaffMember[]) => r.map((m) => m.id);
 const find = (id: string) => CANDIDATE_POOL.find((m) => m.id === id)!;
 
 describe('staff aggregation — identity point', () => {
-  it('two skill-50 bartenders == old service capacity (180)', () => {
+  it('two skill-50 bartenders == two baseline service units', () => {
     const agg = aggregateOnDuty(STARTING_ROSTER, ids(STARTING_ROSTER), createRng(1));
     expect(agg.service).toBe(2 * B.SERVICE_PER_BARTENDER);
   });
