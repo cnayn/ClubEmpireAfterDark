@@ -223,6 +223,8 @@ export function defaultDayConfig(roster: StaffMember[]): DayConfig {
     smoking: 'strict',
     // Club Policies v1 — all neutral by default (identity-preserving).
     policies: { smoking: 'restricted', idCheck: 'standard', security: 'balanced', barService: 'standard' },
+    // Drink Prep v1 — Standard + House is neutral ($0 upfront, no effect).
+    drinkPrep: { stock: 'standard', quality: 'house' },
   };
 }
 

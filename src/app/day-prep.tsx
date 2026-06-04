@@ -8,7 +8,16 @@ import { Pill, ResultRow, SegmentedControl, Toggle } from '@/components/Controls
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { MUSIC_LABEL } from '@/domain/balance';
+import {
+  DEFAULT_DRINK_PREP,
+  QUALITY_BLURB,
+  QUALITY_OPTIONS,
+  STOCK_BLURB,
+  STOCK_OPTIONS,
+  stockCost,
+} from '@/domain/drinks';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
+import { aggregateEffects } from '@/domain/upgrades';
 import {
   DEFAULT_POLICIES,
   legacySmoking,
@@ -16,7 +25,7 @@ import {
   POLICY_OPTIONS,
 } from '@/domain/policies';
 import { isValidSchedule, ROLE_LABEL, strengthLabel, TRAIT_LABEL, wagesForOnDuty } from '@/domain/staff';
-import type { DayConfig, Level, MusicStyle, PoliciesConfig, ResultNote, SmokingRule } from '@/domain/types';
+import type { DayConfig, DrinkPrep, Level, MusicStyle, PoliciesConfig, ResultNote, SmokingRule } from '@/domain/types';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -44,6 +53,7 @@ export default function DayPrepScreen() {
   const [config, setConfig] = useState<DayConfig>(() => ({
     ...club!.lastConfig,
     policies: club!.lastConfig.policies ?? DEFAULT_POLICIES,
+    drinkPrep: club!.lastConfig.drinkPrep ?? DEFAULT_DRINK_PREP,
   }));
 
   if (!club) {
@@ -75,11 +85,18 @@ export default function DayPrepScreen() {
   const requirement = eventRequirement(club, eventId);
   const readiness = eventReadiness(club, { ...config, eventId, staffOnDuty: onDuty });
 
+  const drink = config.drinkPrep ?? DEFAULT_DRINK_PREP;
+  const setDrink = <K extends keyof DrinkPrep>(key: K, value: DrinkPrep[K]) =>
+    setConfig((c) => ({ ...c, drinkPrep: { ...(c.drinkPrep ?? DEFAULT_DRINK_PREP), [key]: value } }));
+
   const wages = wagesForOnDuty(club.staff, onDuty); // post-night estimate, not upfront
+  const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
+  const stock = stockCost(config.drinkPrep, capacity); // upfront, like the event fee
+  const upfront = event.cost + stock;
   const validSchedule = isValidSchedule(club.staff, onDuty);
-  // Only the event fee is an upfront cost; crew wages settle after the night. A
-  // free night stays openable even from negative cash (lean recovery night).
-  const canAffordUpfront = event.cost === 0 || club.cash >= event.cost;
+  // Upfront = event fee + stock order; crew wages settle after the night. A free
+  // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
+  const canAffordUpfront = upfront === 0 || club.cash >= upfront;
   const canOpen = validSchedule && canAffordUpfront && requirement.met;
 
   const onOpen = () => {
@@ -96,6 +113,9 @@ export default function DayPrepScreen() {
           {event.cost > 0 ? (
             <ResultRow label={`${event.name} cost (upfront)`} value={`-${money(event.cost)}`} valueColor={colors.warning} />
           ) : null}
+          {stock > 0 ? (
+            <ResultRow label="Stock order (upfront)" value={`-${money(stock)}`} valueColor={colors.warning} />
+          ) : null}
           {event.bookingFee > 0 ? (
             <ResultRow label="Booking fee (up to, if you deliver)" value={`+${money(event.bookingFee)}`} valueColor={colors.success} />
           ) : null}
@@ -110,7 +130,8 @@ export default function DayPrepScreen() {
             </Text>
           ) : !canAffordUpfront ? (
             <Text variant="label" color={colors.danger}>
-              You can't cover the {event.name} cost ({money(club.cash)} in the bank).
+              You can't cover tonight's upfront {money(upfront)} ({money(club.cash)} in the bank). Try
+              Lean stock or a Quiet Night.
             </Text>
           ) : null}
           <Button label="Open the Doors" onPress={onOpen} disabled={!canOpen} />
@@ -163,13 +184,37 @@ export default function DayPrepScreen() {
           onChange={(v) => set('coverLevel', v)}
         />
         <SegmentedControl
-          label="Drink prices"
+          label="Menu price"
           value={config.drinkLevel}
           options={LEVELS}
           onChange={(v) => set('drinkLevel', v)}
         />
         <Text variant="label" muted>
-          Higher prices mean fewer guests but fatter tabs — and grumpier regulars.
+          Low = accessible · Med = house pricing · High = premium margin, fewer guests.
+        </Text>
+      </Card>
+
+      <Card title="Drink Prep">
+        <Text variant="label" muted>
+          Order the bar for tonight. Standard + House is the safe, free middle.
+        </Text>
+        <SegmentedControl
+          label="Stock level"
+          value={drink.stock}
+          options={STOCK_OPTIONS}
+          onChange={(v) => setDrink('stock', v)}
+          accent={colors.warning}
+        />
+        <Text variant="label" muted>{STOCK_BLURB[drink.stock]}</Text>
+        <SegmentedControl
+          label="Drink quality"
+          value={drink.quality}
+          options={QUALITY_OPTIONS}
+          onChange={(v) => setDrink('quality', v)}
+        />
+        <Text variant="label" muted>{QUALITY_BLURB[drink.quality]}</Text>
+        <Text variant="label" color={stock > 0 ? colors.warning : colors.textMuted}>
+          {stock > 0 ? `Stock order: ${money(stock)} upfront` : 'No stock order cost tonight.'}
         </Text>
       </Card>
 

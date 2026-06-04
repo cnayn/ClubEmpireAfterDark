@@ -15,6 +15,7 @@
 
 import * as B from '@/domain/balance';
 import { effectiveBookingFee, eventResultNotes, getEvent } from '@/domain/events';
+import { drinkPrepEffects, stockCost } from '@/domain/drinks';
 import { policyEffects } from '@/domain/policies';
 import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult, ResultNote } from '@/domain/types';
@@ -82,6 +83,12 @@ export function resolveNight(
   const serviceCapacity = crew.service + fx.serviceBartenders * B.SERVICE_PER_BARTENDER;
   const serviceRatio = guests > 0 ? clamp(serviceCapacity / guests, 0, 1) : 1;
 
+  // Drink Prep v1: stock + quality. Neutral at Standard + House (and absent), so
+  // the baseline night is unchanged. `fill` decides lean/heavy stock pressure.
+  const fillForStock = capacity > 0 ? guests / capacity : 0;
+  const dp = drinkPrepEffects(config.drinkPrep, fillForStock);
+  const stock = stockCost(config.drinkPrep, capacity); // upfront, like an event fee
+
   // Bartender QUALITY lifts (or dents) bar revenue beyond raw throughput — a
   // sharper crew gets more value per guest even when service isn't the cap.
   // Centered on BASELINE_SKILL, so the starting roster (skill 50) is exactly
@@ -104,7 +111,7 @@ export function resolveNight(
 
   const coverRevenue = Math.round(guests * coverPrice);
   const barRevenue = Math.round(
-    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * pe.barRevenueMod * event.spendMod * intervention.revenueMod
+    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * pe.barRevenueMod * dp.barRevenueMod * event.spendMod * intervention.revenueMod
   );
 
   // --- Incidents & risk (security mod derives from on-duty bouncers) ---
@@ -145,11 +152,11 @@ export function resolveNight(
 
   // --- Costs ---
   const wages = wagesForOnDuty(club.staff, config.staffOnDuty);
-  const costs = wages + fines + theft + event.cost;
+  const costs = wages + fines + theft + event.cost + stock;
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;

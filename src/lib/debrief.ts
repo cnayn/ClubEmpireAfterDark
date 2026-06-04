@@ -143,6 +143,25 @@ function bossActionLines(result: NightResult, bossActions: BossActionId[] | unde
   return out.slice(0, 2); // at most two, keep it sharp
 }
 
+/** Up to 2 drink-prep lines when the night's stock/quality choice mattered. */
+function drinkPrepLines(result: NightResult, club: ClubState | undefined): DebriefLine[] {
+  const dp = club?.lastConfig.drinkPrep;
+  if (!dp) return [];
+  const out: DebriefLine[] = [];
+  const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
+  if (dp.stock === 'lean' && fill >= 0.7) {
+    out.push({ key: 'dp-stock', label: 'Bar prep', tone: 'warn', text: 'Lean stock saved cash up front, but the bar ran thin when the room filled.' });
+  } else if (dp.stock === 'heavy' && fill >= 0.7) {
+    out.push({ key: 'dp-stock', label: 'Bar prep', tone: 'good', text: 'Heavy stock kept drinks moving through the rush.' });
+  }
+  if (dp.quality === 'cheap') {
+    out.push({ key: 'dp-quality', label: 'Bar prep', tone: 'warn', text: 'Cheap spirits protected the margin, but the room felt it.' });
+  } else if (dp.quality === 'premium') {
+    out.push({ key: 'dp-quality', label: 'Bar prep', tone: 'good', text: 'Premium quality helped your name — the till paid for it.' });
+  }
+  return out.slice(0, 2);
+}
+
 /** Build the boss-level debrief lines for a finished night. */
 export function buildDebrief(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
@@ -217,6 +236,9 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
 
   // --- What the boss did tonight (optional) ---
   lines.push(...bossActionLines(result, bossActions));
+
+  // --- Drink prep outcomes (optional, when stock/quality mattered) ---
+  lines.push(...drinkPrepLines(result, club));
 
   // --- Policy outcomes (optional, when a non-neutral policy mattered) ---
   lines.push(...policyLines(result, club));

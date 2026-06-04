@@ -16,7 +16,8 @@ import {
 } from '@/domain/staff';
 import type { BossActionId } from '@/lib/bossActions';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
-import { getUpgrade } from '@/domain/upgrades';
+import { aggregateEffects, getUpgrade } from '@/domain/upgrades';
+import { stockCost } from '@/domain/drinks';
 import { clearSave, createNewClub, loadClub, saveClub } from '@/save/persistence';
 import { type Intervention, resolveNight } from '@/sim/night';
 
@@ -101,8 +102,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // low (even negative) cash balance must never block scheduled crew. A free
     // night (e.g. Quiet Night) stays openable from negative cash, so the player
     // can always run a lean recovery night.
-    const eventCost = getEvent(config.eventId).cost;
-    if (eventCost > 0 && club.cash < eventCost) return null;
+    const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
+    const upfront = getEvent(config.eventId).cost + stockCost(config.drinkPrep, capacity);
+    if (upfront > 0 && club.cash < upfront) return null;
     const { result, nextClub } = resolveNight(club, config, nightSeed(club), intervention);
     set({ club: nextClub, lastResult: result, plannedConfig: null, lastBossActions: bossActions ?? [] });
     void saveClub(nextClub);

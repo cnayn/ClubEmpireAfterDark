@@ -6,6 +6,7 @@ import { Card, StatCard } from '@/components/Card';
 import { Pill, ResultRow } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
+import { stockCost } from '@/domain/drinks';
 import { getEvent } from '@/domain/events';
 import { buildDebrief, type DebriefTone } from '@/lib/debrief';
 import { money, moneyColor, signed, signedMoney } from '@/lib/format';
@@ -111,6 +112,12 @@ export default function ResultsScreen() {
             valueColor={colors.warning}
           />
         ) : null}
+        {(() => {
+          const stock = stockCost(club?.lastConfig.drinkPrep, result.capacity);
+          return stock > 0 ? (
+            <ResultRow label="Stock order" value={`-${money(stock)}`} valueColor={colors.warning} />
+          ) : null;
+        })()}
         {result.fines > 0 ? (
           <ResultRow label="Fines" value={`-${money(result.fines)}`} valueColor={colors.danger} />
         ) : null}

@@ -311,6 +311,13 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
     benefit: 'Let the debrief pick your next move.',
   };
+  const prepareTheBar: BoardGoal = {
+    id: 'prepare-the-bar', category: 'tutorial',
+    title: 'Prepare the bar',
+    instruction: 'In Day Prep, set a stock plan and drink quality before you open — too lean and the bar runs dry.',
+    progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
+    benefit: 'Stock and quality shape the night.',
+  };
   const eventChosen = club.lastConfig.eventId !== 'regular' || (!!lastResult && lastResult.eventId !== 'regular');
   const chooseEvent: BoardGoal = {
     id: 'choose-event', category: 'tutorial',
@@ -495,7 +502,7 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     // read the debrief → try an event → grow → buy an upgrade last (once the
     // player understands why), never "buy a random upgrade" first.
     early: [
-      learnCrew, scheduleFullCrew, openFirstNight, readTheNight, chooseEvent,
+      learnCrew, scheduleFullCrew, prepareTheBar, openFirstNight, readTheNight, chooseEvent,
       haveBartender, haveBouncer, reachCash, repTier, buyFirstUpgrade,
     ],
     // Interleaved by category so the top few span business / reputation / venue /

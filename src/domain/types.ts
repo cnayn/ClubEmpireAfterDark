@@ -26,6 +26,17 @@ export interface PoliciesConfig {
   barService: BarServiceStyle;
 }
 
+// --- Drink Prep v1 (bar stock + quality the owner prepares before the night) -
+export type StockLevel = 'lean' | 'standard' | 'heavy';
+export type DrinkQuality = 'cheap' | 'house' | 'premium';
+
+/** Bar prep for the night. Standard + House is neutral (no upfront cost, no
+ *  effect), so a default night is unchanged. */
+export interface DrinkPrep {
+  stock: StockLevel;
+  quality: DrinkQuality;
+}
+
 // --- Phase 2A: named staff ---------------------------------------------------
 
 export type StaffRole = 'bartender' | 'bouncer';
@@ -117,6 +128,9 @@ export interface DayConfig {
   /** Club Policies v1. Optional for save back-compat: old saves without it load
    *  fine and are treated as all-neutral. */
   policies?: PoliciesConfig;
+  /** Drink Prep v1. Optional for save back-compat: absent = neutral (Standard +
+   *  House, no upfront cost). */
+  drinkPrep?: DrinkPrep;
 }
 
 /** Persisted club + meta state (everything that survives between nights). */
