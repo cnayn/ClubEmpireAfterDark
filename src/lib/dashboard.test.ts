@@ -5,7 +5,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, NightResult } from '@/domain/types';
-import { buildFloorView, floorBubbles, nextGoal } from './dashboard';
+import { buildBoardGoals, buildFloorView, floorBubbles, goalBoard, nextGoal } from './dashboard';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -119,5 +119,120 @@ describe('nextGoal — one primary goal by precedence', () => {
     const owned = ['bigger-floor', 'better-sound', 'extra-bar', 'pro-lighting', 'security-office', 'vip-lounge'];
     const g = nextGoal(club({ cash: 9000, reputation: 90, ownedUpgradeIds: owned }));
     expect(g.kind).toBe('growth');
+  });
+});
+
+describe('goalBoard — multiple active goals from real state', () => {
+  const fresh = () => club({ day: 1, cash: 600, reputation: 20, ownedUpgradeIds: [] });
+
+  it('always returns between 3 and 5 goals, with valid progress and status', () => {
+    const states = [
+      fresh(),
+      club({ day: 10, cash: 5000, reputation: 50, ownedUpgradeIds: ['pro-lighting'] }),
+      club({ day: 8, cash: -100, reputation: 30 }),
+      club({ day: 30, cash: 12000, reputation: 90, ownedUpgradeIds: ['bigger-floor', 'extra-bar', 'pro-lighting'] }),
+    ];
+    for (const c of states) {
+      const board = goalBoard(c, null);
+      expect(board.length).toBeGreaterThanOrEqual(3);
+      expect(board.length).toBeLessThanOrEqual(5);
+      const ids = board.map((g) => g.id);
+      expect(new Set(ids).size).toBe(ids.length); // no duplicates
+      for (const g of board) {
+        expect(g.progress).toBeGreaterThanOrEqual(0);
+        expect(g.progress).toBeLessThanOrEqual(1);
+        expect(['active', 'completed']).toContain(g.status);
+        expect(g.title.length).toBeGreaterThan(0);
+        expect(g.instruction.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('a fresh club gets tutorial-style onboarding goals', () => {
+    const board = goalBoard(fresh(), null);
+    expect(board.some((g) => g.category === 'tutorial')).toBe(true);
+    expect(board.some((g) => g.id === 'open-first-night' && g.status === 'active')).toBe(true);
+  });
+
+  it('a mid-game club gets business / reputation / venue goals, not onboarding', () => {
+    const board = goalBoard(
+      club({ day: 12, cash: 4000, reputation: 50, ownedUpgradeIds: ['pro-lighting'] }),
+      result({ net: 200, incidents: 0 })
+    );
+    const cats = new Set(board.map((g) => g.category));
+    expect(cats.has('business')).toBe(true);
+    expect(cats.has('reputation')).toBe(true);
+    // onboarding-only goals shouldn't dominate an established club
+    expect(board.some((g) => g.id === 'open-first-night')).toBe(false);
+  });
+
+  it('negative cash surfaces a recovery goal first', () => {
+    const board = goalBoard(club({ day: 9, cash: -150, reputation: 30 }), null);
+    expect(board.some((g) => g.id === 'recover-cash')).toBe(true);
+    expect(board[0].id).toBe('recover-cash');
+  });
+
+  it('a reputation drop last night surfaces a win-the-room-back goal', () => {
+    const board = goalBoard(club({ day: 9, cash: 3000, reputation: 45 }), result({ reputationDelta: -4 }));
+    expect(board.some((g) => g.id === 'recover-rep')).toBe(true);
+  });
+
+  it('reflects real completion: owning an upgrade marks its venue goal complete', () => {
+    const board = goalBoard(
+      club({ day: 12, cash: 4000, reputation: 50, ownedUpgradeIds: ['pro-lighting'] }),
+      null
+    );
+    const lighting = board.find((g) => g.id === 'buy-pro-lighting');
+    // It may or may not be shown (active goals are preferred), but if shown it must be completed.
+    if (lighting) expect(lighting.status).toBe('completed');
+    // The cash goal target must be a real milestone strictly above current cash.
+    const cashGoal = board.find((g) => g.id === 'reach-cash');
+    expect(cashGoal?.title).toMatch(/Reach \$5,000/);
+  });
+
+  it('the top goals span several categories (not five of one kind)', () => {
+    const board = goalBoard(club({ day: 12, cash: 2000, reputation: 30, ownedUpgradeIds: [] }), null);
+    const cats = new Set(board.map((g) => g.category));
+    expect(cats.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('buildBoardGoals — the full goal catalog reflects state', () => {
+  const all = (c: ClubState, r: NightResult | null) => {
+    const { interrupts, early, late } = buildBoardGoals(c, r);
+    return [...interrupts, ...early, ...late];
+  };
+  const find = (c: ClubState, r: NightResult | null, id: string) => all(c, r).find((g) => g.id === id);
+
+  it('big-night completes only when a single night nets the target', () => {
+    expect(find(club(), result({ net: 200 }), 'big-night')?.status).toBe('active');
+    expect(find(club(), result({ net: 600 }), 'big-night')?.status).toBe('completed');
+    expect(find(club(), result({ net: 200 }), 'big-night')?.progress).toBeCloseTo(0.4);
+  });
+
+  it('no-no-shows reflects last night crew turnout (when data exists)', () => {
+    expect(find(club(), null, 'no-no-shows')?.status).toBe('active'); // no data yet
+    expect(find(club(), result({ noShows: 0 }), 'no-no-shows')?.status).toBe('completed');
+    expect(find(club(), result({ noShows: 2 }), 'no-no-shows')?.status).toBe('active');
+  });
+
+  it('next-upgrade points at the cheapest un-named, unowned upgrade; completed when all owned', () => {
+    const fresh = find(club({ ownedUpgradeIds: [] }), null, 'next-upgrade');
+    expect(fresh?.title).toMatch(/Buy Better Sound System/); // cheapest non-named upgrade ($1,200)
+    expect(fresh?.status).toBe('active');
+    const allOwned = ['bigger-floor', 'better-sound', 'extra-bar', 'pro-lighting', 'security-office', 'vip-lounge'];
+    expect(find(club({ ownedUpgradeIds: allOwned }), null, 'next-upgrade')?.status).toBe('completed');
+  });
+
+  it('have-bouncer becomes active only when the door has no bouncer', () => {
+    expect(find(club(), null, 'have-bouncer')?.status).toBe('completed'); // starting roster has one
+    const noBouncer = club();
+    noBouncer.staff = noBouncer.staff.filter((m) => m.role !== 'bouncer');
+    expect(find(noBouncer, null, 'have-bouncer')?.status).toBe('active');
+  });
+
+  it('buy-bigger-floor completes once capacity has grown', () => {
+    expect(find(club({ ownedUpgradeIds: [] }), null, 'buy-bigger-floor')?.status).toBe('active');
+    expect(find(club({ ownedUpgradeIds: ['bigger-floor'] }), null, 'buy-bigger-floor')?.status).toBe('completed');
   });
 });

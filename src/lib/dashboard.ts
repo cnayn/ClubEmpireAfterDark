@@ -4,7 +4,7 @@
  * and no resolver/economy involvement. Safe to unit-test in isolation.
  */
 
-import { REPUTATION_TIERS } from '@/domain/balance';
+import { REPUTATION_TIERS, START_CAPACITY } from '@/domain/balance';
 import { getEvent } from '@/domain/events';
 import { CANDIDATE_POOL, hireCost, minViableNightCost } from '@/domain/staff';
 import type { ClubState, EventId, NightResult } from '@/domain/types';
@@ -237,4 +237,290 @@ export function nextGoal(club: ClubState): Goal {
     title: 'Grow reputation to unlock stronger opportunities',
     detail: 'Run strong nights to keep your name climbing.',
   };
+}
+
+// --- Goal Board (multiple active goals) ---------------------------------------
+//
+// A compact board of 3–5 goals chosen for the club's CURRENT state. Every goal
+// is derived purely from existing state (ClubState + last NightResult) — no new
+// saved fields, no RNG, nothing the player can't actually complete with the
+// systems that ship today. "Benefit" is descriptive only (the natural upside of
+// finishing the goal); there are NO claimable cash/rep payouts, so no claim
+// bookkeeping and no save-schema change is needed for this prototype.
+
+export type BoardGoalCategory = 'tutorial' | 'business' | 'reputation' | 'staff' | 'venue';
+export type BoardGoalStatus = 'active' | 'completed';
+
+export interface BoardGoal {
+  id: string;
+  category: BoardGoalCategory;
+  title: string;
+  /** One short, actionable instruction ("how to make progress"). */
+  instruction: string;
+  /** 0..1 for the progress bar. */
+  progress: number;
+  status: BoardGoalStatus;
+  /** Optional descriptive upside (not a claimable reward). */
+  benefit?: string;
+}
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+const CASH_MILESTONES = [1000, 2500, 5000, 10000];
+const BIG_NIGHT_TARGET = 500; // a strong single-night net
+/** Upgrades that have their own named venue goal — excluded from "next upgrade". */
+const NAMED_UPGRADE_IDS = new Set(['pro-lighting', 'extra-bar', 'bigger-floor']);
+
+/** Build every applicable goal for this state, grouped by selection priority.
+ *  Recovery goals are only included when their triggering condition holds (so the
+ *  board never shows a fake one). Exported for testing the full catalog directly. */
+export function buildBoardGoals(club: ClubState, lastResult: NightResult | null) {
+  const owned = club.ownedUpgradeIds;
+  const owns = (id: string) => owned.includes(id);
+  const capacity = club.baseCapacity + aggregateEffects(owned).capacity;
+  const bartenders = club.staff.filter((m) => m.role === 'bartender').length;
+  const bouncers = club.staff.filter((m) => m.role === 'bouncer').length;
+  const onDuty = club.staff.filter((m) => club.lastConfig.staffOnDuty.includes(m.id)).length;
+  const total = club.staff.length;
+  const hasPlayed = club.day > 1;
+
+  const done = (b: boolean): BoardGoalStatus => (b ? 'completed' : 'active');
+
+  // --- Tutorial / onboarding -------------------------------------------------
+  const openFirstNight: BoardGoal = {
+    id: 'open-first-night', category: 'tutorial',
+    title: 'Open your first night',
+    instruction: 'Tap Prepare Tonight and run a night.',
+    progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
+    benefit: 'Learn the night loop.',
+  };
+  const eventChosen = club.lastConfig.eventId !== 'regular' || (!!lastResult && lastResult.eventId !== 'regular');
+  const chooseEvent: BoardGoal = {
+    id: 'choose-event', category: 'tutorial',
+    title: 'Choose an event',
+    instruction: 'Pick an event in Day Prep instead of a Quiet Night.',
+    progress: eventChosen ? 1 : 0, status: done(eventChosen),
+    benefit: 'Events reshape the crowd.',
+  };
+  const buyFirstUpgrade: BoardGoal = {
+    id: 'buy-first-upgrade', category: 'tutorial',
+    title: 'Buy your first upgrade',
+    instruction: 'Visit Upgrades and buy anything you can afford.',
+    progress: owned.length >= 1 ? 1 : 0, status: done(owned.length >= 1),
+    benefit: 'Upgrades are permanent boosts.',
+  };
+  const haveBartender: BoardGoal = {
+    id: 'have-bartender', category: 'tutorial',
+    title: 'Have a bartender on the roster',
+    instruction: 'Your club needs someone behind the bar before the night starts.',
+    progress: bartenders >= 1 ? 1 : 0, status: done(bartenders >= 1),
+    benefit: 'No bar, no money.',
+  };
+  const haveBouncer: BoardGoal = {
+    id: 'have-bouncer', category: 'tutorial',
+    title: 'Have a bouncer on the door',
+    instruction: 'Hire a bouncer from Crew to keep the door calm.',
+    progress: bouncers >= 1 ? 1 : 0, status: done(bouncers >= 1),
+    benefit: 'Fewer incidents at the door.',
+  };
+
+  // --- Staff -----------------------------------------------------------------
+  const fullCrew = total > 0 && onDuty === total;
+  const scheduleFullCrew: BoardGoal = {
+    id: 'schedule-full-crew', category: 'staff',
+    title: 'Schedule a full crew',
+    instruction: 'Put every crew member on duty in Day Prep.',
+    progress: total > 0 ? clamp01(onDuty / total) : 0, status: done(fullCrew),
+    benefit: 'Fewer gaps at the bar and door.',
+  };
+  const hireAnotherBartender: BoardGoal = {
+    id: 'hire-bartender', category: 'staff',
+    title: 'Hire another bartender',
+    instruction: 'Add a third bartender from Crew.',
+    progress: clamp01(bartenders / 3), status: done(bartenders >= 3),
+    benefit: 'Faster service, more bar revenue.',
+  };
+  const hireAnotherBouncer: BoardGoal = {
+    id: 'hire-bouncer', category: 'staff',
+    title: 'Hire another bouncer',
+    instruction: 'Add a second bouncer from Crew.',
+    progress: clamp01(bouncers / 2), status: done(bouncers >= 2),
+    benefit: 'Calmer door, fewer incidents.',
+  };
+  const noNoShows: BoardGoal = {
+    id: 'no-no-shows', category: 'staff',
+    title: 'Run a night with a full turnout',
+    instruction: 'Get through a night with no crew no-shows.',
+    progress: lastResult && lastResult.noShows === 0 ? 1 : 0,
+    status: done(!!lastResult && lastResult.noShows === 0),
+    benefit: 'Reliable crew, smoother night.',
+  };
+
+  // --- Business --------------------------------------------------------------
+  const cashTarget = CASH_MILESTONES.find((m) => club.cash < m) ?? CASH_MILESTONES[CASH_MILESTONES.length - 1];
+  const reachCash: BoardGoal = {
+    id: 'reach-cash', category: 'business',
+    title: `Reach ${money(cashTarget)}`,
+    instruction: 'Bank steady profits over several nights.',
+    progress: clamp01(club.cash / cashTarget), status: done(club.cash >= cashTarget),
+    benefit: 'A buffer for bigger events and upgrades.',
+  };
+  const profitableNight: BoardGoal = {
+    id: 'profitable-night', category: 'business',
+    title: 'Earn a profitable night',
+    instruction: 'End a night with money left over (positive net).',
+    progress: lastResult && lastResult.net > 0 ? 1 : 0,
+    status: done(!!lastResult && lastResult.net > 0),
+    benefit: 'Profit funds your growth.',
+  };
+  const bigNight: BoardGoal = {
+    id: 'big-night', category: 'business',
+    title: `Earn ${money(BIG_NIGHT_TARGET)} in one night`,
+    instruction: 'Pull a big single-night profit.',
+    progress: lastResult ? clamp01(lastResult.net / BIG_NIGHT_TARGET) : 0,
+    status: done(!!lastResult && lastResult.net >= BIG_NIGHT_TARGET),
+    benefit: 'Big nights fund big upgrades.',
+  };
+
+  // --- Reputation ------------------------------------------------------------
+  const tier = nextTier(club.reputation);
+  const repTier: BoardGoal = tier
+    ? {
+        id: 'rep-tier', category: 'reputation',
+        title: `${tier.label}: ${club.reputation} / ${tier.min}`,
+        instruction: 'Run strong nights to climb the next tier.',
+        progress: clamp01(club.reputation / tier.min), status: 'active',
+        benefit: tier.unlock,
+      }
+    : {
+        id: 'rep-tier', category: 'reputation',
+        title: 'Best in the City',
+        instruction: 'Keep your name at the top.',
+        progress: 1, status: 'completed',
+        benefit: 'The best club in the city.',
+      };
+  const cleanNight: BoardGoal = {
+    id: 'clean-night', category: 'reputation',
+    title: 'Run a clean night',
+    instruction: 'Get through a night with zero incidents.',
+    progress: lastResult && lastResult.guests > 0 && lastResult.incidents === 0 ? 1 : 0,
+    status: done(!!lastResult && lastResult.guests > 0 && lastResult.incidents === 0),
+    benefit: 'A safe room keeps regulars coming back.',
+  };
+
+  // --- Venue -----------------------------------------------------------------
+  const buyProLighting: BoardGoal = {
+    id: 'buy-pro-lighting', category: 'venue',
+    title: 'Buy Pro Lighting',
+    instruction: 'Grab the Pro Lighting Rig in Upgrades.',
+    progress: owns('pro-lighting') ? 1 : 0, status: done(owns('pro-lighting')),
+    benefit: '+vibe every night.',
+  };
+  const buyExtraBar: BoardGoal = {
+    id: 'buy-extra-bar', category: 'venue',
+    title: 'Buy an Extra Bar Station',
+    instruction: 'Add the Extra Bar Station in Upgrades.',
+    progress: owns('extra-bar') ? 1 : 0, status: done(owns('extra-bar')),
+    benefit: '+1 effective bartender.',
+  };
+  const buyBiggerFloor: BoardGoal = {
+    id: 'buy-bigger-floor', category: 'venue',
+    title: 'Buy Bigger Floor',
+    instruction: 'Knock down a wall — more capacity for bigger crowds.',
+    progress: owns('bigger-floor') ? 1 : clamp01((capacity - START_CAPACITY) / 30),
+    status: done(owns('bigger-floor') || capacity > START_CAPACITY),
+    benefit: '+30 guest capacity.',
+  };
+  // Catch-all for the upgrades without their own named goal (sound/security/VIP).
+  const cheapestOther = UPGRADES
+    .filter((u) => !owns(u.id) && !NAMED_UPGRADE_IDS.has(u.id))
+    .sort((a, b) => a.cost - b.cost)[0];
+  const nextUpgrade: BoardGoal = cheapestOther
+    ? {
+        id: 'next-upgrade', category: 'venue',
+        title: `Buy ${cheapestOther.name}`,
+        instruction: `Upgrade cost ${money(cheapestOther.cost)}. ${cheapestOther.description}`,
+        progress: clamp01(club.cash / cheapestOther.cost), status: 'active',
+        benefit: 'Your next permanent boost.',
+      }
+    : {
+        id: 'next-upgrade', category: 'venue',
+        title: 'Fully upgraded',
+        instruction: 'You own every upgrade in the catalog.',
+        progress: 1, status: 'completed',
+        benefit: 'Venue maxed out.',
+      };
+
+  // --- Recovery interrupts (only when their condition holds) ------------------
+  const interrupts: BoardGoal[] = [];
+  if (club.cash < 0) {
+    interrupts.push({
+      id: 'recover-cash', category: 'business',
+      title: 'Climb back into the black',
+      instruction: 'Run a lean Quiet Night to recover positive cash.',
+      progress: 0, status: 'active',
+      benefit: 'Stay open and stable.',
+    });
+  }
+  if (lastResult && lastResult.reputationDelta < 0) {
+    interrupts.push({
+      id: 'recover-rep', category: 'reputation',
+      title: 'Win the room back',
+      instruction: 'Turn it around — end a night with reputation up.',
+      progress: 0, status: 'active',
+      benefit: 'Reverse a bad streak.',
+    });
+  }
+
+  return {
+    interrupts,
+    early: [
+      openFirstNight, chooseEvent, haveBartender, haveBouncer,
+      scheduleFullCrew, buyFirstUpgrade, reachCash, repTier,
+    ],
+    // Interleaved by category so the top few span business / reputation / venue /
+    // staff (the player should see several different things to chase, not five of
+    // one kind).
+    late: [
+      reachCash,            // business
+      repTier,              // reputation
+      buyProLighting,       // venue
+      hireAnotherBartender, // staff
+      bigNight,             // business
+      cleanNight,           // reputation
+      buyBiggerFloor,       // venue
+      hireAnotherBouncer,   // staff
+      profitableNight,      // business
+      buyExtraBar,          // venue
+      noNoShows,            // staff
+      nextUpgrade,          // venue (catch-all)
+      scheduleFullCrew,     // staff
+    ],
+  };
+}
+
+/**
+ * The Goal Board: 3–5 goals chosen for the club's current phase. Recovery
+ * interrupts surface first; a fresh club (early nights) gets onboarding goals;
+ * an established club gets business / reputation / venue / staff goals. Active
+ * goals are preferred; if fewer than three are active, completed goals are shown
+ * so the board never looks empty. Pure — safe to unit-test.
+ */
+export function goalBoard(club: ClubState, lastResult: NightResult | null): BoardGoal[] {
+  const { interrupts, early, late } = buildBoardGoals(club, lastResult);
+  const isEarly = club.day <= 3;
+  const ordered = [...interrupts, ...(isEarly ? early : late)];
+
+  // De-duplicate by id, keeping first (highest-priority) occurrence.
+  const seen = new Set<string>();
+  const unique = ordered.filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)));
+
+  const board = unique.filter((g) => g.status === 'active').slice(0, 5);
+  if (board.length < 3) {
+    for (const g of unique) {
+      if (board.length >= 3) break;
+      if (!board.includes(g)) board.push(g);
+    }
+  }
+  return board.slice(0, 5);
 }
