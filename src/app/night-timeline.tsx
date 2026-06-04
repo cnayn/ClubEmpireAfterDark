@@ -8,13 +8,7 @@ import { FloorView } from '@/components/FloorView';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { buildFloorView, floorBubbles } from '@/lib/dashboard';
-import {
-  getChoice,
-  INTERVENTION_CHOICES,
-  type InterventionChoice,
-  type MoodTone,
-  isCoolingNight,
-} from '@/lib/intervention';
+import { type InterventionChoice, type MoodTone, nightMoment } from '@/lib/intervention';
 import type { BeatTone } from '@/lib/timeline';
 import { buildTimeline } from '@/lib/timeline';
 import { NO_INTERVENTION } from '@/sim/night';
@@ -35,8 +29,6 @@ const MOOD_COLOR: Record<MoodTone, string> = {
   neutral: colors.textMuted,
 };
 
-const ROOM_BEAT_INDEX = 2; // Doors(0) → Bar(1) → The Room(2): the intervention beat
-
 export default function NightTimelineScreen() {
   const club = useGameStore((s) => s.club);
   const runNight = useGameStore((s) => s.runNight);
@@ -47,25 +39,28 @@ export default function NightTimelineScreen() {
   const [shown, setShown] = useState(1);
   const [phase, setPhase] = useState<'pre' | 'choosing' | 'post'>('pre');
   const [committed, setCommitted] = useState<ReturnType<typeof runNight>>(null);
-  const [choiceId, setChoiceId] = useState<InterventionChoice['id'] | null>(null);
+  const [choice, setChoice] = useState<InterventionChoice | null>(null);
 
   if (!club || !plan || !preview) {
     router.replace('/dashboard');
     return null;
   }
 
-  // Use the planned config for staff/event naming; reputation/day don't affect the floor or beats.
   const planClub = { ...club, lastConfig: plan };
-  const cooling = isCoolingNight(preview);
+  const moment = nightMoment(preview); // bar-pressure or cooling or null — one per night
   const shownResult = committed ?? preview;
   const beats = buildTimeline(shownResult, planClub);
   const finished = phase !== 'choosing' && shown >= beats.length;
+  const showPreviewMood = !!moment && phase !== 'post';
 
-  const choice = choiceId ? getChoice(choiceId) : null;
   const floor = buildFloorView(planClub, shownResult);
-  const moodAccent = choice ? MOOD_COLOR[choice.mood.tone] : cooling ? colors.textMuted : undefined;
-  const moodLabel = choice ? choice.mood.label : cooling && phase !== 'post' ? 'Cooling' : undefined;
-  const bubbles = committed ? floorBubbles(committed) : [];
+  const moodAccent = choice
+    ? MOOD_COLOR[choice.mood.tone]
+    : showPreviewMood
+      ? MOOD_COLOR[moment.previewMood.tone]
+      : undefined;
+  const moodLabel = choice ? choice.mood.label : showPreviewMood ? moment.previewMood.label : undefined;
+  const bubbles = committed ? floorBubbles(committed) : showPreviewMood ? moment.previewBubbles : [];
 
   const commit = (intervention = NO_INTERVENTION) => {
     if (committed) return committed;
@@ -75,7 +70,7 @@ export default function NightTimelineScreen() {
   };
 
   const advance = () => {
-    if (phase === 'pre' && cooling && shown >= ROOM_BEAT_INDEX + 1) {
+    if (phase === 'pre' && moment && shown >= moment.beatIndex + 1) {
       setPhase('choosing');
       return;
     }
@@ -88,12 +83,12 @@ export default function NightTimelineScreen() {
       router.replace('/dashboard');
       return;
     }
-    setChoiceId(c.id);
+    setChoice(c);
     setPhase('post');
   };
 
   const toResults = () => {
-    commit(NO_INTERVENTION); // commits a plain night if no choice was made (non-cooling / skipped)
+    commit(NO_INTERVENTION); // commits a plain night if no choice was made (no moment / skipped)
     router.replace('/results');
   };
 
@@ -111,18 +106,13 @@ export default function NightTimelineScreen() {
     >
       <FloorView floor={floor} bubbles={bubbles} moodAccent={moodAccent} moodLabel={moodLabel} title="Tonight" />
 
-      {phase === 'choosing' ? (
-        <Card title="The room is cooling" accent={colors.warning}>
+      {phase === 'choosing' && moment ? (
+        <Card title={moment.title} accent={colors.warning}>
           <Text variant="body" muted style={styles.prompt}>
-            The DJ isn&apos;t holding the crowd. One call —
+            {moment.prompt}
           </Text>
-          {INTERVENTION_CHOICES.map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => onChoose(c)}
-              accessibilityRole="button"
-              style={styles.choice}
-            >
+          {moment.choices.map((c) => (
+            <Pressable key={c.id} onPress={() => onChoose(c)} accessibilityRole="button" style={styles.choice}>
               <Text variant="heading" color={MOOD_COLOR[c.mood.tone]}>
                 {c.label}
               </Text>
