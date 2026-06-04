@@ -82,6 +82,12 @@ _(no future events promoted to code — all of the above are FUTURE / DO NOT BUI
 Implementation Status: Future system / do not build yet.  
 Required Systems: Loyalty, staff trust, relationship events, staff warnings, possible security lead upgrade.
 
+> **Single source for Caramel's arc.** His identity lives in
+> `character-bible.md` (current role: **Senior Bouncer**); the Owner + Caramel
+> relationship event lives in `relationship-web.md`. This chain is the canonical
+> home for his **future** progression (Senior Bouncer → Trusted Protector →
+> Security Lead / Operations Right Hand). Caramel is **one character**, not two.
+
 ### Event Chain Purpose
 
 Caramel’s future progression should turn him from a strong senior bouncer into a trusted protector and eventually a Security Lead / Operations Right Hand.
