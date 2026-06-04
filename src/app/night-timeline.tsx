@@ -52,6 +52,9 @@ export default function NightTimelineScreen() {
   const beats = buildTimeline(shownResult, planClub);
   const finished = phase !== 'choosing' && shown >= beats.length;
   const showPreviewMood = !!moment && phase !== 'post';
+  // Floor-first: show ONE current beat as the venue situation, not a growing list.
+  const beatIndex = Math.min(shown, beats.length) - 1;
+  const currentBeat = beats[beatIndex];
 
   const floor = buildFloorView(planClub, shownResult);
   const moodAccent = choice
@@ -104,7 +107,7 @@ export default function NightTimelineScreen() {
         </View>
       }
     >
-      <FloorView floor={floor} bubbles={bubbles} moodAccent={moodAccent} moodLabel={moodLabel} title="Tonight" />
+      <FloorView floor={floor} bubbles={bubbles} moodAccent={moodAccent} moodLabel={moodLabel} title="Tonight" pulse={!finished} />
 
       {phase === 'choosing' && moment ? (
         <Card title={moment.title} accent={colors.warning}>
@@ -124,25 +127,28 @@ export default function NightTimelineScreen() {
         </Card>
       ) : (
         <Pressable onPress={advance} disabled={finished} accessibilityRole="button" accessibilityLabel="Next moment">
-          <Card title="Tonight, as it happened">
-            {beats.slice(0, shown).map((b, i) => (
-              <View key={i} style={[styles.beat, { borderLeftColor: TONE_COLOR[b.tone] }]}>
+          <Card title="In the room">
+            {currentBeat ? (
+              <View style={[styles.beat, { borderLeftColor: TONE_COLOR[currentBeat.tone] }]}>
                 <View style={styles.beatHead}>
-                  <Text variant="label" color={TONE_COLOR[b.tone]}>
-                    {b.time}
+                  <Text variant="label" color={TONE_COLOR[currentBeat.tone]}>
+                    {currentBeat.time}
                   </Text>
-                  <Text variant="heading">{b.title}</Text>
+                  <Text variant="heading">{currentBeat.title}</Text>
                 </View>
                 <Text variant="body" muted style={styles.beatText}>
-                  {b.text}
+                  {currentBeat.text}
                 </Text>
               </View>
-            ))}
-            {!finished ? (
-              <Text variant="label" muted style={styles.tapHint}>
-                Tap to continue…
-              </Text>
             ) : null}
+            <View style={styles.progressRow}>
+              <Text variant="label" muted>
+                Moment {Math.min(shown, beats.length)} of {beats.length}
+              </Text>
+              <Text variant="label" muted>
+                {finished ? 'The night is over.' : 'Tap to continue…'}
+              </Text>
+            </View>
           </Card>
         </Pressable>
       )}
@@ -169,5 +175,10 @@ const styles = StyleSheet.create({
   },
   beatHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },
   beatText: { lineHeight: 22 },
-  tapHint: { textAlign: 'center', marginTop: spacing.sm },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
 });

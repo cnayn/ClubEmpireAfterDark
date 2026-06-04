@@ -7,16 +7,17 @@ import { Pill, ResultRow } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { getEvent } from '@/domain/events';
-import type { ResultNote } from '@/domain/types';
+import { buildDebrief, type DebriefTone } from '@/lib/debrief';
 import { money, moneyColor, signed, signedMoney } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
-const NOTE_COLOR: Record<ResultNote['tone'], string> = {
+const DEBRIEF_COLOR: Record<DebriefTone, string> = {
   good: colors.success,
   bad: colors.danger,
   warn: colors.warning,
   info: colors.neonCyan,
+  neutral: colors.textMuted,
 };
 
 export default function ResultsScreen() {
@@ -126,20 +127,17 @@ export default function ResultsScreen() {
       </View>
 
       <Card title="Manager's Debrief">
-        {result.notes.length === 0 ? (
-          <Text variant="body" muted>
-            A quiet, uneventful night.
-          </Text>
-        ) : (
-          result.notes.map((note, i) => (
-            <View key={i} style={styles.note}>
-              <View style={[styles.dot, { backgroundColor: NOTE_COLOR[note.tone] }]} />
-              <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
-                {note.text}
+        {buildDebrief(result, club ?? undefined).map((line) => (
+          <View key={line.key} style={styles.note}>
+            <View style={[styles.dot, { backgroundColor: DEBRIEF_COLOR[line.tone] }]} />
+            <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
+              <Text variant="body" color={DEBRIEF_COLOR[line.tone]}>
+                {line.label}:{' '}
               </Text>
-            </View>
-          ))
-        )}
+              {line.text}
+            </Text>
+          </View>
+        ))}
       </Card>
     </Screen>
   );

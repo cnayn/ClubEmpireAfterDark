@@ -286,40 +286,57 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
 
   const done = (b: boolean): BoardGoalStatus => (b ? 'completed' : 'active');
 
-  // --- Tutorial / onboarding -------------------------------------------------
+  // --- Tutorial / onboarding (teach the club loop, not "buy random things") ---
+  // These GUIDE goals walk a new owner through cause-and-effect: who your crew is,
+  // what they do, open a quiet night, read the debrief, THEN buy an upgrade.
+  const learnCrew: BoardGoal = {
+    id: 'learn-crew', category: 'tutorial',
+    title: 'Know what your crew does',
+    instruction:
+      'Bartenders keep drinks moving — that is your bar service and revenue. Bouncers protect the door — fewer incidents. Open a night and watch both.',
+    progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
+    benefit: 'Your staff decide how the night goes.',
+  };
   const openFirstNight: BoardGoal = {
     id: 'open-first-night', category: 'tutorial',
-    title: 'Open your first night',
-    instruction: 'Tap Prepare Tonight and run a night.',
+    title: 'Open a quiet first night',
+    instruction: 'Tap Prepare Tonight, keep it a Quiet Night, and see what your crew can handle.',
     progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
-    benefit: 'Learn the night loop.',
+    benefit: 'See what breaks before you spend.',
+  };
+  const readTheNight: BoardGoal = {
+    id: 'read-the-night', category: 'tutorial',
+    title: 'Read the morning-after debrief',
+    instruction: 'After the night, read what your crew tells you — money, crowd, bar, door. That is how you learn what to fix.',
+    progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
+    benefit: 'Let the debrief pick your next move.',
   };
   const eventChosen = club.lastConfig.eventId !== 'regular' || (!!lastResult && lastResult.eventId !== 'regular');
   const chooseEvent: BoardGoal = {
     id: 'choose-event', category: 'tutorial',
-    title: 'Choose an event',
-    instruction: 'Pick an event in Day Prep instead of a Quiet Night.',
+    title: 'Try an event when you are ready',
+    instruction: 'Once a quiet night feels easy, pick an event in Day Prep — each one reshapes the crowd and the pressure.',
     progress: eventChosen ? 1 : 0, status: done(eventChosen),
-    benefit: 'Events reshape the crowd.',
+    benefit: 'Events change the kind of night you run.',
   };
   const buyFirstUpgrade: BoardGoal = {
     id: 'buy-first-upgrade', category: 'tutorial',
-    title: 'Buy your first upgrade',
-    instruction: 'Visit Upgrades and buy anything you can afford.',
+    title: 'Buy an upgrade once you know why',
+    instruction: 'Felt the bar fall behind or the door get rough? Now buy an upgrade in the Shop that shores up that weak spot.',
     progress: owned.length >= 1 ? 1 : 0, status: done(owned.length >= 1),
-    benefit: 'Upgrades are permanent boosts.',
+    benefit: 'Fix a weakness you actually felt.',
   };
   const haveBartender: BoardGoal = {
     id: 'have-bartender', category: 'tutorial',
-    title: 'Have a bartender on the roster',
-    instruction: 'Your club needs someone behind the bar before the night starts.',
+    title: 'Keep a bartender behind the bar',
+    instruction: 'Bartenders set your bar service and revenue — more (or better) pours mean fuller tabs and shorter waits.',
     progress: bartenders >= 1 ? 1 : 0, status: done(bartenders >= 1),
     benefit: 'No bar, no money.',
   };
   const haveBouncer: BoardGoal = {
     id: 'have-bouncer', category: 'tutorial',
-    title: 'Have a bouncer on the door',
-    instruction: 'Hire a bouncer from Crew to keep the door calm.',
+    title: 'Keep a bouncer on the door',
+    instruction: 'Bouncers protect the door — more (or better) security means fewer incidents and a calmer room.',
     progress: bouncers >= 1 ? 1 : 0, status: done(bouncers >= 1),
     benefit: 'Fewer incidents at the door.',
   };
@@ -474,9 +491,12 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
 
   return {
     interrupts,
+    // Ordered to TEACH the loop: meet the crew → schedule → open a quiet night →
+    // read the debrief → try an event → grow → buy an upgrade last (once the
+    // player understands why), never "buy a random upgrade" first.
     early: [
-      openFirstNight, chooseEvent, haveBartender, haveBouncer,
-      scheduleFullCrew, buyFirstUpgrade, reachCash, repTier,
+      learnCrew, scheduleFullCrew, openFirstNight, readTheNight, chooseEvent,
+      haveBartender, haveBouncer, reachCash, repTier, buyFirstUpgrade,
     ],
     // Interleaved by category so the top few span business / reputation / venue /
     // staff (the player should see several different things to chase, not five of

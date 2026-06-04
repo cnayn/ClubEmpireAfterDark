@@ -35,10 +35,14 @@ export const EVENTS: Record<EventId, EventDef> = {
     repMod: 0,
     repAmplify: 1,
   },
+  // Private Party = an OUTSIDE GROUP'S BOOKING REQUEST you accept (someone wants
+  // the room): a guaranteed fee for a calm, capped night, kept only if you deliver.
+  // (A player-invented "Theme Party" — owner-hosted themed nights — is FUTURE; do
+  // not build it here. See docs/design/event-bible.md.) Copy only; math unchanged.
   'private-party': {
     id: 'private-party',
-    name: 'Private Party',
-    description: 'A booking fee for a calm, capped night — kept if you deliver. A safety net when the crowd would be thin, not a way to grow.',
+    name: 'Private Party (Booking)',
+    description: 'Someone wants to book the room tonight — a guaranteed fee for a calm, capped night, kept only if you deliver. Less public hype, more service pressure.',
     cost: 0,
     bookingFee: 400,
     drawMod: 0.6,
@@ -192,7 +196,7 @@ export function eventReadiness(club: ClubState, config: DayConfig): ReadinessAdv
   // Always tell the player roughly what to expect, plus each niche event's nature.
   messages.push({ tone: 'info', text: `Expect roughly ${guests} guests tonight.` });
   if (config.eventId === 'private-party') {
-    messages.push({ tone: 'info', text: 'Best when your organic crowd would be thin — but a sloppy night refunds the fee.' });
+    messages.push({ tone: 'info', text: "A group wants to book the room — you accept the booking. Guaranteed fee, but a sloppy night refunds it. Best when your own crowd would be thin." });
   } else if (config.eventId === 'industry-night') {
     messages.push({ tone: 'info', text: "You'll likely spend more than you earn — this buys reputation, not cash." });
   }
@@ -248,9 +252,9 @@ export function eventResultNotes(id: EventId, o: EventOutcome): ResultNote[] {
         return [{ tone: 'bad', text: 'The private night fell apart — you refunded the booking and then some.' }];
       }
       if (paid < max * 0.9) {
-        return [{ tone: 'warn', text: "The private client wasn't fully satisfied — part of the fee came back." }];
+        return [{ tone: 'warn', text: "The group that booked the room wasn't fully satisfied — part of the fee came back." }];
       }
-      return [{ tone: 'info', text: 'Private booking — the fee covered a calm night.' }];
+      return [{ tone: 'info', text: 'The booking went smoothly — the private group covered a calm, contained night.' }];
     }
     case 'student-night':
       return o.serviceRatio < 0.85

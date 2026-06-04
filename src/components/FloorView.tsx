@@ -6,7 +6,8 @@
  * no simulated guests.
  */
 
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
@@ -82,6 +83,7 @@ export function FloorView({
   moodAccent,
   moodLabel,
   title = 'The Floor',
+  pulse = false,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -90,10 +92,33 @@ export function FloorView({
   moodAccent?: string;
   moodLabel?: string;
   title?: string;
+  /** Subtle crowd shimmer during the live night — presentation only (no logic,
+   *  no simulated agents, no saved state). Off everywhere else. */
+  pulse?: boolean;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
   const inZone = (z: FloorBubble['zone']) => bubbles.filter((b) => b.zone === z);
+
+  // A gentle opacity breathe applied to crowd dots while the night plays. Pure
+  // animation — it never affects guests, outcomes, or any stored state.
+  const shimmer = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!pulse) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 0.5, duration: 900, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, shimmer]);
+  const dotColorStyle = { backgroundColor: accent };
+  const CrowdDot = pulse ? Animated.View : View;
+  const crowdDotStyle = pulse
+    ? [styles.dot, dotColorStyle, { opacity: Animated.multiply(shimmer, dotOpacity) }]
+    : [styles.dot, dotColorStyle, { opacity: dotOpacity }];
 
   return (
     <Card title={title}>
@@ -131,7 +156,7 @@ export function FloorView({
         <View style={styles.crowd}>
           {floor.dots > 0 ? (
             Array.from({ length: floor.dots }).map((_, i) => (
-              <View key={i} style={[styles.dot, { backgroundColor: accent, opacity: dotOpacity }]} />
+              <CrowdDot key={i} style={crowdDotStyle} />
             ))
           ) : (
             <Text variant="label" muted>
