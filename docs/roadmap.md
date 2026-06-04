@@ -68,6 +68,11 @@ Split into two slices to avoid overloading implementation. See
   ordering as a business-risk decision (over/under-order, supplier reliability,
   abstract emergency restock). Sequenced *after* Floor View + Next Goal and the
   night-intervention experiment; turn-based, not timer/gem-wall based.
+- **Realism systems & conduct boundaries** (future design note):
+  [phase3-realism-and-conduct.md](phase3-realism-and-conduct.md) — spirits
+  quality dial (Phase 3, w/ supply loop), delayed theft discovery / staff leakage
+  (Phase 3+), cleaners/maintenance (gated behind venue condition). Player power is
+  **managerial only** — violence against staff is **excluded permanently**.
 
 ## Phase 4 — Polish & Feel
 - Motion (doors-open reveal, deltas), sound/music optional, haptics.
