@@ -1,8 +1,9 @@
 /**
- * Dashboard Floor View — a flat, stylized top-down club panel that reflects
- * EXISTING state only (crowd density, on-duty staff at posts, event vibe).
- * Pure presentation: it renders a FloorView built by src/lib/dashboard.ts.
- * No real 3D, no simulated guest agents, no new systems.
+ * Floor-as-Home venue panel — a flat, stylized top-down club that re-presents
+ * EXISTING state only: crowd density, staff as character tokens at their posts,
+ * event vibe, and last-night outcomes as floor bubbles (derived from aggregate
+ * signals, never per-guest/located data). Pure presentation. No 3D, no real-time,
+ * no simulated guests.
  */
 
 import { StyleSheet, View } from 'react-native';
@@ -10,7 +11,7 @@ import { StyleSheet, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
 import { Text } from '@/components/Text';
-import type { FloorStaff, FloorView as FloorViewModel, Vibe } from '@/lib/dashboard';
+import type { BubbleTone, FloorBubble, FloorStaff, FloorView as FloorViewModel, Vibe } from '@/lib/dashboard';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 const VIBE_COLOR: Record<Vibe, string> = {
@@ -27,12 +28,24 @@ const VIBE_LABEL: Record<Vibe, string> = {
   spotlight: 'Spotlight',
   sharp: 'Industry',
 };
+const BUBBLE_COLOR: Record<BubbleTone, string> = {
+  bad: colors.danger,
+  warn: colors.warning,
+  info: colors.neonCyan,
+};
 
-function StaffChip({ s, color }: { s: FloorStaff; color: string }) {
+/** A placeholder character token: role-colored glyph with initials + name.
+ *  Layout/identity test only — not final art. */
+function StaffToken({ s, color }: { s: FloorStaff; color: string }) {
   return (
-    <View style={[styles.staffChip, { borderColor: color }]} accessibilityLabel={s.name}>
-      <Text variant="label" color={color}>
-        {s.initials}
+    <View style={styles.token} accessibilityLabel={s.name}>
+      <View style={[styles.avatar, { borderColor: color }]}>
+        <Text variant="label" color={color}>
+          {s.initials}
+        </Text>
+      </View>
+      <Text variant="label" muted numberOfLines={1} style={styles.tokenName}>
+        {s.name}
       </Text>
     </View>
   );
@@ -40,26 +53,55 @@ function StaffChip({ s, color }: { s: FloorStaff; color: string }) {
 
 function EmptyPost() {
   return (
-    <View style={[styles.staffChip, styles.emptyPost]}>
-      <Text variant="label" muted>
-        —
+    <View style={styles.token}>
+      <View style={[styles.avatar, styles.emptyAvatar]}>
+        <Text variant="label" muted>
+          —
+        </Text>
+      </View>
+      <Text variant="label" muted style={styles.tokenName}>
+        empty
       </Text>
     </View>
   );
 }
 
-export function FloorView({ floor }: { floor: FloorViewModel }) {
-  const accent = VIBE_COLOR[floor.vibe];
-  // Crowd intensity scales the dot opacity a touch by density.
+function Bubble({ b }: { b: FloorBubble }) {
+  return (
+    <View style={[styles.bubble, { borderColor: BUBBLE_COLOR[b.tone] }]}>
+      <Text variant="label" color={BUBBLE_COLOR[b.tone]}>
+        {b.label}
+      </Text>
+    </View>
+  );
+}
+
+export function FloorView({
+  floor,
+  bubbles = [],
+  moodAccent,
+  moodLabel,
+  title = 'The Floor',
+}: {
+  floor: FloorViewModel;
+  bubbles?: FloorBubble[];
+  /** Optional override (e.g. the live intervention reaction) for the floor's
+   *  accent + vibe label, so the room can visibly react to a choice. */
+  moodAccent?: string;
+  moodLabel?: string;
+  title?: string;
+}) {
+  const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
+  const inZone = (z: FloorBubble['zone']) => bubbles.filter((b) => b.zone === z);
 
   return (
-    <Card title="The Floor">
+    <Card title={title}>
       <View style={styles.head}>
         <Text variant="label" muted>
           {floor.eventName}
         </Text>
-        <Pill label={VIBE_LABEL[floor.vibe]} color={accent} />
+        <Pill label={moodLabel ?? VIBE_LABEL[floor.vibe]} color={accent} />
       </View>
 
       <View style={[styles.room, { borderColor: accent }]}>
@@ -70,7 +112,7 @@ export function FloorView({ floor }: { floor: FloorViewModel }) {
           </Text>
           <View style={styles.posts}>
             {floor.bouncers.length > 0 ? (
-              floor.bouncers.map((b) => <StaffChip key={b.id} s={b} color={colors.neonCyan} />)
+              floor.bouncers.map((b) => <StaffToken key={b.id} s={b} color={colors.neonCyan} />)
             ) : (
               <EmptyPost />
             )}
@@ -81,8 +123,11 @@ export function FloorView({ floor }: { floor: FloorViewModel }) {
             </Text>
           </View>
         </View>
+        {inZone('door').length > 0 ? (
+          <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
+        ) : null}
 
-        {/* CROWD (middle) */}
+        {/* CROWD (middle) + floor-level bubbles */}
         <View style={styles.crowd}>
           {floor.dots > 0 ? (
             Array.from({ length: floor.dots }).map((_, i) => (
@@ -94,15 +139,21 @@ export function FloorView({ floor }: { floor: FloorViewModel }) {
             </Text>
           )}
         </View>
+        {inZone('floor').length > 0 ? (
+          <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
+        ) : null}
 
         {/* BAR (bottom) + DJ future zone */}
+        {inZone('bar').length > 0 ? (
+          <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
+        ) : null}
         <View style={styles.zoneRow}>
           <Text variant="label" muted style={styles.zoneLabel}>
             BAR
           </Text>
           <View style={styles.posts}>
             {floor.bartenders.length > 0 ? (
-              floor.bartenders.map((b) => <StaffChip key={b.id} s={b} color={colors.neonViolet} />)
+              floor.bartenders.map((b) => <StaffToken key={b.id} s={b} color={colors.neonViolet} />)
             ) : (
               <EmptyPost />
             )}
@@ -131,24 +182,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     padding: spacing.md,
-    gap: spacing.md,
-    minHeight: 200,
+    gap: spacing.sm,
+    minHeight: 240,
     justifyContent: 'space-between',
   },
   zoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   zoneLabel: { width: 44, letterSpacing: 1 },
-  posts: { flexDirection: 'row', gap: spacing.xs, flex: 1, flexWrap: 'wrap' },
-  staffChip: {
-    minWidth: 34,
-    height: 28,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+  posts: { flexDirection: 'row', gap: spacing.sm, flex: 1, flexWrap: 'wrap' },
+  token: { alignItems: 'center', width: 52, gap: 2 },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  emptyPost: { borderColor: colors.border, borderStyle: 'dashed' },
+  emptyAvatar: { borderColor: colors.border, borderStyle: 'dashed' },
+  tokenName: { maxWidth: 52, textAlign: 'center' },
   futureZone: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -156,7 +208,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: colors.border,
-    opacity: 0.5, // clearly inactive / future-ready
+    opacity: 0.5,
   },
   crowd: {
     flexDirection: 'row',
@@ -168,4 +220,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   dot: { width: 10, height: 10, borderRadius: radius.pill },
+  bubbleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
+  bubble: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+  },
 });

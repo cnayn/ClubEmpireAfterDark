@@ -5,7 +5,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, NightResult } from '@/domain/types';
-import { buildFloorView, nextGoal } from './dashboard';
+import { buildFloorView, floorBubbles, nextGoal } from './dashboard';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -65,6 +65,32 @@ describe('buildFloorView', () => {
     const fv = buildFloorView(c, null);
     expect(fv.bouncers).toHaveLength(0);
     expect(fv.bartenders).toHaveLength(1);
+  });
+});
+
+describe('floorBubbles — interpretations of aggregate signals only', () => {
+  it('no bubbles before any night, and none on a clean profitable night', () => {
+    expect(floorBubbles(null)).toEqual([]);
+    expect(floorBubbles(result({ serviceRatio: 1, net: 300, reputationDelta: 2 }))).toEqual([]);
+  });
+
+  it('maps each aggregate signal to a zone bubble', () => {
+    const z = (over: Partial<NightResult>, id: string) =>
+      floorBubbles(result(over)).find((b) => b.id === id);
+    expect(z({ incidents: 2 }, 'incidents')?.zone).toBe('door');
+    expect(z({ fines: 300, incidents: 0 }, 'inspector')?.zone).toBe('door'); // compliance
+    expect(z({ theft: 40 }, 'theft')?.zone).toBe('bar');
+    expect(z({ serviceRatio: 0.6 }, 'service')?.zone).toBe('bar');
+    expect(z({ noShows: 1 }, 'noshow')?.zone).toBe('floor');
+    expect(z({ reputationDelta: -3 }, 'rep')?.zone).toBe('floor');
+    expect(z({ net: -100 }, 'net')?.zone).toBe('floor');
+  });
+
+  it('does not invent an inspector bubble when fines come from incidents', () => {
+    // incidents>0 means fines are incident fines, not a compliance inspector visit
+    const bubbles = floorBubbles(result({ incidents: 1, fines: 80 }));
+    expect(bubbles.some((b) => b.id === 'inspector')).toBe(false);
+    expect(bubbles.some((b) => b.id === 'incidents')).toBe(true);
   });
 });
 

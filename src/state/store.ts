@@ -18,19 +18,27 @@ import {
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
 import { getUpgrade } from '@/domain/upgrades';
 import { clearSave, createNewClub, loadClub, saveClub } from '@/save/persistence';
-import { resolveNight } from '@/sim/night';
+import { type Intervention, resolveNight } from '@/sim/night';
 
 interface GameStore {
   club: ClubState | null;
   lastResult: NightResult | null;
+  /** In-memory only (not persisted): tonight's prep, carried into the night
+   *  playback so the night can resolve AFTER the live intervention beat. */
+  plannedConfig: DayConfig | null;
   hydrated: boolean;
 
   /** Load any existing save on app start. */
   hydrate: () => Promise<void>;
   /** Start a fresh club, replacing any existing save. */
   newClub: (name?: string) => Promise<void>;
-  /** Resolve tonight from a day config; stores result and advances the club. */
-  runNight: (config: DayConfig) => NightResult | null;
+  /** Stash tonight's prep without resolving/committing (commit happens after the
+   *  night playback / intervention choice). */
+  planNight: (config: DayConfig) => void;
+  /** Resolve tonight WITHOUT committing — for the cooling check + pre-choice floor. */
+  previewNight: (config: DayConfig) => NightResult | null;
+  /** Resolve tonight (optionally with a chosen intervention); commits + advances. */
+  runNight: (config: DayConfig, intervention?: Intervention) => NightResult | null;
   /** Buy an upgrade if affordable and not already owned. Returns success. */
   buyUpgrade: (id: string) => boolean;
   /** Hire a candidate from the static pool (pays an upfront fee). Returns success. */
@@ -51,6 +59,7 @@ function nightSeed(club: ClubState): number {
 export const useGameStore = create<GameStore>((set, get) => ({
   club: null,
   lastResult: null,
+  plannedConfig: null,
   hydrated: false,
 
   hydrate: async () => {
@@ -62,10 +71,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const club = createNewClub(name);
     await clearSave();
     await saveClub(club);
-    set({ club, lastResult: null });
+    set({ club, lastResult: null, plannedConfig: null });
   },
 
-  runNight: (config) => {
+  planNight: (config) => set({ plannedConfig: config }),
+
+  previewNight: (config) => {
+    const club = get().club;
+    if (!club) return null;
+    // Pure resolve, no commit, no guards — for the cooling check + pre-choice floor.
+    return resolveNight(club, config, nightSeed(club)).result;
+  },
+
+  runNight: (config, intervention) => {
     const club = get().club;
     if (!club) return null;
     // Schedule must be valid (employed, unique, ≥1 bartender).
@@ -76,8 +94,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Bankruptcy guard: cover tonight's on-duty wages AND the event's upfront cost.
     const eventCost = getEvent(config.eventId).cost;
     if (club.cash < wagesForOnDuty(club.staff, config.staffOnDuty) + eventCost) return null;
-    const { result, nextClub } = resolveNight(club, config, nightSeed(club));
-    set({ club: nextClub, lastResult: result });
+    const { result, nextClub } = resolveNight(club, config, nightSeed(club), intervention);
+    set({ club: nextClub, lastResult: result, plannedConfig: null });
     void saveClub(nextClub);
     return result;
   },

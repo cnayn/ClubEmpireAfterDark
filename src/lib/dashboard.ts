@@ -90,6 +90,59 @@ export function buildFloorView(club: ClubState, lastResult: NightResult | null):
   };
 }
 
+// --- Floor bubbles (interpretations of EXISTING aggregate signals) ------------
+
+export type BubbleTone = 'bad' | 'warn' | 'info';
+export type BubbleZone = 'door' | 'bar' | 'floor';
+
+export interface FloorBubble {
+  id: string;
+  label: string;
+  tone: BubbleTone;
+  zone: BubbleZone;
+}
+
+/**
+ * Re-present last night's aggregate outcomes as floor bubbles. These are
+ * INTERPRETATIONS of fields the sim already produces (incidents, theft, noShows,
+ * fines, serviceRatio, reputationDelta, net) — never per-guest or located
+ * incidents, and never new state. No last result → no bubbles (quiet room).
+ */
+export function floorBubbles(lastResult: NightResult | null): FloorBubble[] {
+  if (!lastResult) return [];
+  const r = lastResult;
+  const bubbles: FloorBubble[] = [];
+
+  if (r.incidents > 0) {
+    bubbles.push({
+      id: 'incidents',
+      label: r.incidents === 1 ? 'Trouble at the door' : `${r.incidents} incidents`,
+      tone: 'bad',
+      zone: 'door',
+    });
+  }
+  // incidents === 0 here means any fine is a compliance ("inspector") fine.
+  if (r.fines > 0 && r.incidents === 0) {
+    bubbles.push({ id: 'inspector', label: 'Inspector dropped by', tone: 'warn', zone: 'door' });
+  }
+  if (r.theft > 0) {
+    bubbles.push({ id: 'theft', label: `Till short — $${r.theft.toLocaleString('en-US')}`, tone: 'bad', zone: 'bar' });
+  }
+  if (r.serviceRatio < 0.85) {
+    bubbles.push({ id: 'service', label: 'Bar backing up', tone: 'warn', zone: 'bar' });
+  }
+  if (r.noShows > 0) {
+    bubbles.push({ id: 'noshow', label: r.noShows === 1 ? 'Short-handed' : 'Crew missing', tone: 'warn', zone: 'floor' });
+  }
+  if (r.reputationDelta < 0) {
+    bubbles.push({ id: 'rep', label: 'Bad word travelled', tone: 'bad', zone: 'floor' });
+  }
+  if (r.net < 0) {
+    bubbles.push({ id: 'net', label: 'Books took a hit', tone: 'bad', zone: 'floor' });
+  }
+  return bubbles;
+}
+
 // --- Next Goal ----------------------------------------------------------------
 
 export type GoalKind = 'recovery' | 'almost' | 'tier' | 'growth';

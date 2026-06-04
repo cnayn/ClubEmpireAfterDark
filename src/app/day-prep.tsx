@@ -34,7 +34,7 @@ const NOTE_COLOR: Record<ResultNote['tone'], string> = {
 
 export default function DayPrepScreen() {
   const club = useGameStore((s) => s.club);
-  const runNight = useGameStore((s) => s.runNight);
+  const planNight = useGameStore((s) => s.planNight);
   const [config, setConfig] = useState<DayConfig>(() => ({ ...club!.lastConfig }));
 
   if (!club) {
@@ -64,8 +64,10 @@ export default function DayPrepScreen() {
   const canOpen = validSchedule && canAfford && requirement.met;
 
   const onOpen = () => {
-    // Night resolves now; the timeline narrates it before the books (Results).
-    if (runNight({ ...config, eventId, staffOnDuty: onDuty })) router.replace('/night-timeline');
+    // Defer resolution: the night resolves during playback (after the live
+    // intervention beat), so we only stash tonight's prep here.
+    planNight({ ...config, eventId, staffOnDuty: onDuty });
+    router.replace('/night-timeline');
   };
 
   return (

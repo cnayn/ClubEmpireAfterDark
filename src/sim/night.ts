@@ -28,7 +28,25 @@ export interface NightOutcome {
   nextClub: ClubState;
 }
 
-export function resolveNight(club: ClubState, config: DayConfig, seed: number): NightOutcome {
+/**
+ * Optional, isolated mid-night intervention modifier (one live-night beat). It is
+ * a DETERMINISTIC modifier vector applied to already-computed quantities — it adds
+ * NO rng calls, so the RNG stream and every chance() outcome are unchanged. The
+ * default is a no-op, so `resolveNight` with no intervention is byte-identical to
+ * before (existing tests/balance untouched). See src/lib/intervention.ts.
+ */
+export interface Intervention {
+  vibeBonus: number; // + to vibe → satisfaction → reputation
+  revenueMod: number; // × bar revenue (crowd pushed to the bar)
+}
+export const NO_INTERVENTION: Intervention = { vibeBonus: 0, revenueMod: 1 };
+
+export function resolveNight(
+  club: ClubState,
+  config: DayConfig,
+  seed: number,
+  intervention: Intervention = NO_INTERVENTION
+): NightOutcome {
   const rng = createRng(seed);
   const fx = aggregateEffects(club.ownedUpgradeIds);
 
@@ -65,7 +83,9 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const avgDrinks = B.AVG_DRINKS_PER_GUEST * lerp(1.1, 0.85, drinkV);
 
   const coverRevenue = Math.round(guests * coverPrice);
-  const barRevenue = Math.round(guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * event.spendMod);
+  const barRevenue = Math.round(
+    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * event.spendMod * intervention.revenueMod
+  );
 
   // --- Incidents & risk (security mod derives from on-duty bouncers) ---
   const crowdPressure = capacity > 0 ? guests / capacity : 0;
@@ -109,7 +129,7 @@ export function resolveNight(club: ClubState, config: DayConfig, seed: number): 
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;

@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card, StatCard } from '@/components/Card';
@@ -8,8 +9,7 @@ import { FloorView } from '@/components/FloorView';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { reputationTier } from '@/domain/balance';
-import { aggregateEffects } from '@/domain/upgrades';
-import { buildFloorView, nextGoal } from '@/lib/dashboard';
+import { buildFloorView, floorBubbles, nextGoal } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -18,13 +18,7 @@ export default function DashboardScreen() {
   const club = useGameStore((s) => s.club);
   const lastResult = useGameStore((s) => s.lastResult);
   const newClub = useGameStore((s) => s.newClub);
-
-  const onReset = () => {
-    Alert.alert('Reset Club?', 'This will erase your current save and start over.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset Club', style: 'destructive', onPress: () => void newClub() },
-    ]);
-  };
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   if (!club) {
     return (
@@ -35,9 +29,15 @@ export default function DashboardScreen() {
     );
   }
 
-  const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
   const goal = nextGoal(club);
   const floor = buildFloorView(club, lastResult);
+  const bubbles = floorBubbles(lastResult);
+
+  // Cross-platform, deliberate two-step reset (Alert.alert buttons don't fire on web).
+  const onConfirmReset = () => {
+    setConfirmingReset(false);
+    void newClub();
+  };
 
   return (
     <Screen
@@ -45,18 +45,8 @@ export default function DashboardScreen() {
         <View style={{ gap: spacing.sm }}>
           <Button label="Prepare Tonight" onPress={() => router.push('/day-prep')} />
           <View style={styles.row}>
-            <Button
-              label="Staff"
-              variant="secondary"
-              onPress={() => router.push('/staff')}
-              style={{ flex: 1 }}
-            />
-            <Button
-              label="Upgrades"
-              variant="secondary"
-              onPress={() => router.push('/shop')}
-              style={{ flex: 1 }}
-            />
+            <Button label="Crew" variant="secondary" onPress={() => router.push('/staff')} style={{ flex: 1 }} />
+            <Button label="Upgrades" variant="secondary" onPress={() => router.push('/shop')} style={{ flex: 1 }} />
           </View>
         </View>
       }
@@ -65,28 +55,43 @@ export default function DashboardScreen() {
         <View style={{ flex: 1 }}>
           <Text variant="title">{club.name}</Text>
           <Text variant="label" muted>
-            Night {club.day}
+            Night {club.day} · {reputationTier(club.reputation)}
           </Text>
         </View>
-        <View style={styles.headerRight}>
-          <Pill label={reputationTier(club.reputation)} color={colors.neonCyan} />
-          <Pressable onPress={onReset} hitSlop={8} accessibilityRole="button" accessibilityLabel="Reset club">
+        {confirmingReset ? (
+          <View style={styles.resetConfirm}>
             <Text variant="label" color={colors.danger}>
-              Reset Club
+              Erase save & start over?
+            </Text>
+            <View style={styles.resetRow}>
+              <Pressable onPress={() => setConfirmingReset(false)} hitSlop={8} accessibilityRole="button">
+                <Text variant="label" muted>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable onPress={onConfirmReset} hitSlop={8} accessibilityRole="button" accessibilityLabel="Confirm reset club">
+                <Text variant="label" color={colors.danger}>
+                  Reset Club
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Pressable onPress={() => setConfirmingReset(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Reset club">
+            <Text variant="label" color={colors.danger}>
+              Reset…
             </Text>
           </Pressable>
-        </View>
+        )}
       </View>
 
+      {/* HUD overlays */}
       <View style={styles.row}>
         <StatCard label="Cash" value={money(club.cash)} accent={colors.success} />
         <StatCard label="Reputation" value={`${club.reputation}`} accent={colors.neonMagenta} />
       </View>
-      <View style={styles.row}>
-        <StatCard label="Capacity" value={`${capacity}`} />
-        <StatCard label="Crew" value={`${club.staff.length}`} accent={colors.neonViolet} />
-      </View>
 
+      {/* One primary goal */}
       <Card title="Next Goal">
         <Text variant="heading">{goal.title}</Text>
         {goal.detail ? (
@@ -97,37 +102,23 @@ export default function DashboardScreen() {
         {goal.progress !== undefined ? (
           <View style={styles.progressTrack}>
             <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.round(Math.max(0, Math.min(1, goal.progress)) * 100)}%` },
-              ]}
+              style={[styles.progressFill, { width: `${Math.round(Math.max(0, Math.min(1, goal.progress)) * 100)}%` }]}
             />
           </View>
         ) : null}
       </Card>
 
-      <FloorView floor={floor} />
-
-      <Card title="The Plan">
-        <Text variant="body" muted style={{ lineHeight: 22 }}>
-          Set your music, prices, staff and door policy for tonight, then open
-          the doors and see how the night plays out. Profit buys upgrades; good
-          nights build your reputation toward the best club in the city.
-        </Text>
-      </Card>
+      {/* The living venue — the home screen's centerpiece */}
+      <FloorView floor={floor} bubbles={bubbles} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  headerRight: { alignItems: 'flex-end', gap: spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  resetConfirm: { alignItems: 'flex-end', gap: spacing.xs },
+  resetRow: { flexDirection: 'row', gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md },
-  progressTrack: {
-    height: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-  },
+  progressTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.neonMagenta },
 });
