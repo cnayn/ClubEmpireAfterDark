@@ -7,8 +7,9 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+import { START_CAPACITY, START_CASH, START_REPUTATION } from '@/domain/balance';
 import { hireCost, minViableNightCost, wagesForOnDuty } from '@/domain/staff';
-import { getCandidate } from '@/domain/staff';
+import { getCandidate, STARTING_ROSTER } from '@/domain/staff';
 import type { DayConfig } from '@/domain/types';
 import { useGameStore } from './store';
 
@@ -19,6 +20,44 @@ function configFromRoster(): DayConfig {
 
 beforeEach(async () => {
   await useGameStore.getState().newClub('Test');
+});
+
+describe('newClub reset', () => {
+  it('resets a dirtied club back to fresh-start values and clears transient state', async () => {
+    // Dirty the run: advance the night, mutate cash/rep/day, stash a plan.
+    const cfg = configFromRoster();
+    useGameStore.getState().runNight(cfg);
+    const dirty = useGameStore.getState().club!;
+    useGameStore.setState({
+      club: { ...dirty, cash: 9999, reputation: 80, day: 12 },
+      plannedConfig: cfg,
+    });
+    expect(useGameStore.getState().club!.day).toBeGreaterThan(1);
+
+    await useGameStore.getState().newClub();
+
+    const fresh = useGameStore.getState().club!;
+    expect(fresh.day).toBe(1);
+    expect(fresh.cash).toBe(START_CASH);
+    expect(fresh.reputation).toBe(START_REPUTATION);
+    expect(fresh.baseCapacity).toBe(START_CAPACITY);
+    expect(fresh.ownedUpgradeIds).toHaveLength(0);
+    expect(fresh.staff).toHaveLength(STARTING_ROSTER.length);
+    expect(useGameStore.getState().lastResult).toBeNull();
+    expect(useGameStore.getState().plannedConfig).toBeNull();
+  });
+
+  it('persists the fresh club so a reload loads the reset state', async () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, cash: 4242, day: 9 } });
+    await useGameStore.getState().newClub();
+
+    // A fresh hydrate (simulating a reload) must read the reset save, not the old one.
+    await useGameStore.getState().hydrate();
+    const reloaded = useGameStore.getState().club!;
+    expect(reloaded.day).toBe(1);
+    expect(reloaded.cash).toBe(START_CASH);
+  });
 });
 
 describe('runNight guards', () => {

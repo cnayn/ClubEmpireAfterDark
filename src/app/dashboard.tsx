@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card, StatCard } from '@/components/Card';
@@ -13,6 +13,10 @@ import { buildFloorView, floorBubbles, nextGoal } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
+
+const RESET_TITLE = 'Reset Club?';
+const RESET_BODY =
+  'This wipes your current club and all progress, and starts a brand-new club from Night 1. This can’t be undone.';
 
 export default function DashboardScreen() {
   const club = useGameStore((s) => s.club);
@@ -33,10 +37,25 @@ export default function DashboardScreen() {
   const floor = buildFloorView(club, lastResult);
   const bubbles = floorBubbles(lastResult);
 
-  // Cross-platform, deliberate two-step reset (Alert.alert buttons don't fire on web).
-  const onConfirmReset = () => {
+  // Actually perform the reset: clears the save and replaces store state with a
+  // fresh club (day 1, starting cash/rep/roster, lastResult/plannedConfig cleared).
+  const onConfirmReset = async () => {
     setConfirmingReset(false);
-    void newClub();
+    await newClub();
+    router.replace('/'); // land on the title screen so the fresh start is unmistakable
+  };
+
+  // Platform-aware confirmation. On web, Alert.alert / RN-Modal button taps have
+  // been unreliable, so we use the browser's synchronous window.confirm (always
+  // works). On native we show the in-app Modal below.
+  const requestReset = () => {
+    if (Platform.OS === 'web') {
+      const webConfirm = (globalThis as unknown as { confirm?: (m?: string) => boolean }).confirm;
+      const ok = webConfirm ? webConfirm(`${RESET_TITLE}\n\n${RESET_BODY}`) : true;
+      if (ok) void onConfirmReset();
+      return;
+    }
+    setConfirmingReset(true);
   };
 
   return (
@@ -58,32 +77,46 @@ export default function DashboardScreen() {
             Night {club.day} · {reputationTier(club.reputation)}
           </Text>
         </View>
-        {confirmingReset ? (
-          <View style={styles.resetConfirm}>
-            <Text variant="label" color={colors.danger}>
-              Erase save & start over?
-            </Text>
-            <View style={styles.resetRow}>
-              <Pressable onPress={() => setConfirmingReset(false)} hitSlop={8} accessibilityRole="button">
-                <Text variant="label" muted>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable onPress={onConfirmReset} hitSlop={8} accessibilityRole="button" accessibilityLabel="Confirm reset club">
-                <Text variant="label" color={colors.danger}>
-                  Reset Club
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <Pressable onPress={() => setConfirmingReset(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Reset club">
-            <Text variant="label" color={colors.danger}>
-              Reset…
-            </Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={requestReset}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Reset club"
+        >
+          <Text variant="label" color={colors.danger}>
+            Reset…
+          </Text>
+        </Pressable>
       </View>
+
+      {/* Native (iOS/Android) reset confirmation. Web uses window.confirm instead.
+          The dismiss layer is a sibling BEHIND the card, so taps on the buttons
+          are never swallowed by the backdrop. */}
+      <Modal
+        visible={confirmingReset}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmingReset(false)}
+      >
+        <View style={styles.backdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setConfirmingReset(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss reset"
+          />
+          <View style={styles.modalCard}>
+            <Text variant="heading" color={colors.danger}>
+              {RESET_TITLE}
+            </Text>
+            <Text variant="body" muted style={styles.modalText}>
+              {RESET_BODY}
+            </Text>
+            <Button label="Reset Club" accent={colors.danger} onPress={onConfirmReset} />
+            <Button label="Cancel" variant="secondary" onPress={() => setConfirmingReset(false)} />
+          </View>
+        </View>
+      </Modal>
 
       {/* HUD overlays */}
       <View style={styles.row}>
@@ -116,8 +149,24 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  resetConfirm: { alignItems: 'flex-end', gap: spacing.xs },
-  resetRow: { flexDirection: 'row', gap: spacing.md },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  modalText: { lineHeight: 21 },
   row: { flexDirection: 'row', gap: spacing.md },
   progressTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.neonMagenta },
