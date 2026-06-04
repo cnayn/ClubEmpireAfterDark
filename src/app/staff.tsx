@@ -11,14 +11,100 @@ import {
   CANDIDATE_POOL,
   hireCost,
   minViableNightCost,
-  ROLE_LABEL,
   strengthLabel,
   TRAIT_LABEL,
 } from '@/domain/staff';
-import type { StaffMember } from '@/domain/types';
+import type { StaffMember, StaffRole } from '@/domain/types';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
-import { colors, spacing } from '@/theme/tokens';
+import { colors, radius, spacing } from '@/theme/tokens';
+
+const ROLE_PLURAL: Record<StaffRole, string> = { bartender: 'Bartenders', bouncer: 'Bouncers' };
+const roleAccent = (role: StaffRole) => (role === 'bouncer' ? colors.neonCyan : colors.neonViolet);
+
+/** A short, safe one-liner from existing data — uses the staffer's own bio when
+ *  present, else a generic role line. Never reveals hidden traits. */
+function flavorLine(m: StaffMember): string {
+  if (m.description) return m.description;
+  return m.role === 'bartender'
+    ? 'Works the bar and keeps the drinks moving.'
+    : 'Holds the door and keeps the room calm.';
+}
+
+function strengthLine(m: StaffMember): string {
+  const trait = m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : '';
+  return `${strengthLabel(m.skill)}${trait}`;
+}
+
+function CharacterCard({
+  member,
+  statusLabel,
+  statusColor,
+  actionLabel,
+  actionAccent,
+  actionDisabled,
+  actionVariant,
+  onAction,
+}: {
+  member: StaffMember;
+  statusLabel: string;
+  statusColor: string;
+  actionLabel: string;
+  actionAccent?: string;
+  actionDisabled?: boolean;
+  actionVariant?: 'primary' | 'secondary';
+  onAction: () => void;
+}) {
+  const accent = roleAccent(member.role);
+  return (
+    <Card accent={accent}>
+      <View style={styles.cardTop}>
+        <View style={[styles.avatar, { borderColor: accent }]}>
+          <Text variant="heading" color={accent}>
+            {member.name.slice(0, 2).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.cardBody}>
+          <View style={styles.cardHead}>
+            <Text variant="heading" style={{ flex: 1 }} numberOfLines={1}>
+              {member.name}
+            </Text>
+            <Pill label={statusLabel} color={statusColor} />
+          </View>
+          <Text variant="label" color={accent}>
+            {strengthLine(member)}
+          </Text>
+          <Text variant="label" muted>
+            {money(member.salary)}/night
+          </Text>
+          <Text variant="body" muted style={styles.flavor}>
+            {flavorLine(member)}
+          </Text>
+        </View>
+      </View>
+      <Button
+        label={actionLabel}
+        variant={actionVariant ?? 'secondary'}
+        accent={actionAccent}
+        disabled={actionDisabled}
+        onPress={onAction}
+      />
+    </Card>
+  );
+}
+
+function RoleHeading({ title, accent, count }: { title: string; accent: string; count: number }) {
+  return (
+    <View style={styles.roleHeading}>
+      <Text variant="heading" color={accent}>
+        {title}
+      </Text>
+      <Text variant="label" muted>
+        {count}
+      </Text>
+    </View>
+  );
+}
 
 export default function StaffScreen() {
   const club = useGameStore((s) => s.club);
@@ -32,9 +118,8 @@ export default function StaffScreen() {
 
   const reserve = minViableNightCost(club.staff);
   const candidates = CANDIDATE_POOL.filter((c) => !club.staff.some((m) => m.id === c.id));
-
-  const roleAccent = (m: StaffMember) =>
-    m.role === 'bouncer' ? colors.neonCyan : colors.neonViolet;
+  const byRole = (list: StaffMember[], role: StaffRole) => list.filter((m) => m.role === role);
+  const ROLES: StaffRole[] = ['bartender', 'bouncer'];
 
   return (
     <Screen
@@ -43,86 +128,101 @@ export default function StaffScreen() {
       }
     >
       <View style={styles.header}>
-        <Text variant="heading">Your Crew</Text>
-        <Pill label={money(club.cash)} color={colors.success} />
+        <Text variant="title">Your Crew</Text>
+        <Pill label={money(club.cash)} color={club.cash < 0 ? colors.danger : colors.success} />
       </View>
       <Text variant="label" muted>
-        Everyone here is hired (on your roster). Choose who's On or Off Duty for tonight in Day Prep.
-        Firing removes someone for good.
+        Everyone here is on your roster. Set who works tonight in Day Prep; wages are paid after the
+        night. Firing removes someone for good.
       </Text>
 
-      {club.staff.map((m) => (
-        <Card key={m.id} accent={roleAccent(m)}>
-          <View style={styles.cardHead}>
-            <Text variant="heading" style={{ flex: 1 }}>
-              {m.name}
-            </Text>
-            <Pill label={ROLE_LABEL[m.role]} color={roleAccent(m)} />
+      {ROLES.map((role) => {
+        const crew = byRole(club.staff, role);
+        return (
+          <View key={`hired-${role}`} style={styles.section}>
+            <RoleHeading title={ROLE_PLURAL[role]} accent={roleAccent(role)} count={crew.length} />
+            {crew.length === 0 ? (
+              <Text variant="label" muted>
+                No {ROLE_PLURAL[role].toLowerCase()} on the roster yet.
+              </Text>
+            ) : (
+              crew.map((m) => {
+                const fireable = canFireStaff(club.staff, m.id);
+                return (
+                  <CharacterCard
+                    key={m.id}
+                    member={m}
+                    statusLabel="ON ROSTER"
+                    statusColor={colors.success}
+                    actionLabel={fireable ? 'Let go' : 'Last bartender — kept'}
+                    actionDisabled={!fireable}
+                    onAction={() => fireStaff(m.id)}
+                  />
+                );
+              })
+            )}
           </View>
-          <Text variant="label" muted>
-            {money(m.salary)}/night · {strengthLabel(m.skill)}
-            {m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : ''}
-          </Text>
-          <Text variant="body" muted style={styles.desc}>
-            {m.description}
-          </Text>
-          <Button
-            label={canFireStaff(club.staff, m.id) ? 'Fire (remove from roster)' : 'Last bartender — keep'}
-            variant="secondary"
-            disabled={!canFireStaff(club.staff, m.id)}
-            onPress={() => fireStaff(m.id)}
-          />
-        </Card>
-      ))}
+        );
+      })}
 
-      <Text variant="heading" style={styles.sectionTitle}>
+      <Text variant="heading" style={styles.forHire}>
         For Hire
       </Text>
       <Text variant="label" muted>
-        Not on your roster yet. Hiring adds them for a one-time fee; you then pay their wage only on
-        nights they're On Duty.
+        Hiring adds someone for a one-time fee; you then pay their wage only on nights they work.
       </Text>
-      {candidates.length === 0 ? (
-        <Text variant="body" muted>
-          You've hired everyone available.
-        </Text>
-      ) : (
-        candidates.map((c) => {
-          const fee = hireCost(c);
-          const canHire = club.cash - fee >= reserve;
-          return (
-            <Card key={c.id} accent={roleAccent(c)}>
-              <View style={styles.cardHead}>
-                <Text variant="heading" style={{ flex: 1 }}>
-                  {c.name}
-                </Text>
-                <Pill label={ROLE_LABEL[c.role]} color={roleAccent(c)} />
-              </View>
+
+      {ROLES.map((role) => {
+        const pool = byRole(candidates, role);
+        return (
+          <View key={`hire-${role}`} style={styles.section}>
+            <RoleHeading title={`${ROLE_PLURAL[role]} for hire`} accent={roleAccent(role)} count={pool.length} />
+            {pool.length === 0 ? (
               <Text variant="label" muted>
-                {strengthLabel(c.skill)}
-                {c.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[c.visibleTrait]}` : ''} ·{' '}
-                {money(c.salary)}/night
+                No {ROLE_PLURAL[role].toLowerCase()} available right now.
               </Text>
-              <Text variant="body" muted style={styles.desc}>
-                {c.description}
-              </Text>
-              <Button
-                label={`Hire — ${money(fee)} fee`}
-                accent={colors.neonMagenta}
-                disabled={!canHire}
-                onPress={() => hireStaff(c.id)}
-              />
-            </Card>
-          );
-        })
-      )}
+            ) : (
+              pool.map((c) => {
+                const fee = hireCost(c);
+                const canHire = club.cash - fee >= reserve;
+                return (
+                  <CharacterCard
+                    key={c.id}
+                    member={c}
+                    statusLabel="FOR HIRE"
+                    statusColor={roleAccent(c.role)}
+                    actionLabel={`Hire — ${money(fee)} fee`}
+                    actionAccent={colors.neonMagenta}
+                    actionVariant="primary"
+                    actionDisabled={!canHire}
+                    onAction={() => hireStaff(c.id)}
+                  />
+                );
+              })
+            )}
+          </View>
+        );
+      })}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  desc: { lineHeight: 20 },
-  sectionTitle: { marginTop: spacing.sm },
+  section: { gap: spacing.sm, marginTop: spacing.sm },
+  roleHeading: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  forHire: { marginTop: spacing.lg },
+  cardTop: { flexDirection: 'row', gap: spacing.md },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  cardBody: { flex: 1, gap: 2 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  flavor: { lineHeight: 20, marginTop: 2 },
 });
