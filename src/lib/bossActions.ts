@@ -38,8 +38,18 @@ export interface BossActionOutcome {
   intervention: Intervention;
   bubble: FloorBubble;
   mood: { label: string; tone: MoodTone };
-  note: string; // boss-interpretation line (shown live)
+  /** Short nightclub-style "boss call" shown the instant the action is taken. */
+  call: string;
+  note: string; // boss-interpretation line (shown live / in the debrief)
 }
+
+/** The instant "boss call" line for an action (short, physical, no corporate). */
+export const BOSS_CALL: Record<BossActionId, string> = {
+  'push-dj': 'You pushed the booth.',
+  'check-bar': 'You checked the bar.',
+  'send-bouncer': 'You sent eyes to the door.',
+  'work-room': 'You worked the room.',
+};
 
 const JOHN = 'bnc-john';
 const CARAMEL = 'bnc-kareem';
@@ -58,6 +68,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
         intervention: { vibeBonus: 18, revenueMod: 0.99 },
         bubble: { id: 'boss-dj', label: 'Booth lifting', tone: 'info', zone: 'floor' },
         mood: { label: 'Energy lifting', tone: 'good' },
+        call: BOSS_CALL['push-dj'],
         note: 'Pushed the booth — the room found another gear.',
       };
     case 'check-bar': {
@@ -67,12 +78,14 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
             intervention: { vibeBonus: 0, revenueMod: 1.06 },
             bubble: { id: 'boss-bar', label: 'Bar steadied', tone: 'info', zone: 'bar' },
             mood: { label: 'Bar steadied', tone: 'info' },
+            call: BOSS_CALL['check-bar'],
             note: 'Bar was starting to crack — you stepped in and steadied the pours.',
           }
         : {
             intervention: { vibeBonus: 0, revenueMod: 1 },
             bubble: { id: 'boss-bar', label: 'Bar holding', tone: 'info', zone: 'bar' },
             mood: { label: 'Bar holding', tone: 'good' },
+            call: BOSS_CALL['check-bar'],
             note: 'Checked the bar — drinks were flowing fine.',
           };
     }
@@ -89,6 +102,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
         intervention: { vibeBonus: risk ? 6 : 0, revenueMod: 1 },
         bubble: { id: 'boss-door', label: risk ? 'Door covered' : 'Door calm', tone: risk ? 'warn' : 'info', zone: 'door' },
         mood: { label: risk ? 'Door covered' : 'Door calm', tone: risk ? 'info' : 'good' },
+        call: BOSS_CALL['send-bouncer'],
         note,
       };
     }
@@ -98,6 +112,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
         intervention: { vibeBonus: 5, revenueMod: 1 },
         bubble: { id: 'boss-room', label: 'Boss on the floor', tone: 'info', zone: 'floor' },
         mood: { label: 'Boss working the room', tone: 'good' },
+        call: BOSS_CALL['work-room'],
         note: 'You worked the room — the boss being seen helped more than the numbers show.',
       };
   }

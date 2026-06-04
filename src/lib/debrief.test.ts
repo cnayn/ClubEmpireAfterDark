@@ -104,3 +104,21 @@ describe('crew flavor (John / Caramel) — presentation only, no relationship sy
     expect(buildDebrief(result(), c).some((l) => l.key === 'crew')).toBe(false);
   });
 });
+
+describe('boss-action debrief lines', () => {
+  it('mentions boss actions taken, capped at two', () => {
+    const lines = buildDebrief(result({ reputationDelta: 3 }), undefined, ['push-dj', 'work-room', 'send-bouncer']);
+    const calls = lines.filter((l) => l.label === 'Your call');
+    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls.length).toBeLessThanOrEqual(2);
+  });
+  it('reflects outcome direction (push-dj good when reputation held/grew)', () => {
+    const good = buildDebrief(result({ reputationDelta: 4 }), undefined, ['push-dj']).find((l) => l.key === 'ba-dj');
+    expect(good?.tone).toBe('good');
+    const bad = buildDebrief(result({ reputationDelta: -4 }), undefined, ['push-dj']).find((l) => l.key === 'ba-dj');
+    expect(bad?.tone).toBe('warn');
+  });
+  it('adds nothing when no boss actions were taken', () => {
+    expect(buildDebrief(result()).some((l) => l.label === 'Your call')).toBe(false);
+  });
+});

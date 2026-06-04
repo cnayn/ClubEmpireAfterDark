@@ -10,6 +10,7 @@
  * RNG). This is presentation flavor only — NOT a relationship system.
  */
 
+import type { BossActionId } from '@/lib/bossActions';
 import type { ClubState, NightResult } from '@/domain/types';
 import { signed, signedMoney } from './format';
 
@@ -107,8 +108,43 @@ function policyLines(result: NightResult, club: ClubState | undefined): DebriefL
   return out.slice(0, 2); // keep it sharp — at most two policy lines
 }
 
+/** Up to 2 lines connecting the boss actions the player took to how the night
+ *  actually went (uses existing result data only). */
+function bossActionLines(result: NightResult, bossActions: BossActionId[] | undefined): DebriefLine[] {
+  if (!bossActions || bossActions.length === 0) return [];
+  const out: DebriefLine[] = [];
+  for (const id of bossActions) {
+    if (id === 'push-dj') {
+      out.push(
+        result.reputationDelta >= 0
+          ? { key: 'ba-dj', label: 'Your call', tone: 'good', text: 'You pushed the booth at the right time — the room held its energy.' }
+          : { key: 'ba-dj', label: 'Your call', tone: 'warn', text: 'You pushed the booth, but the room still cooled tonight.' }
+      );
+    } else if (id === 'check-bar') {
+      out.push(
+        result.serviceRatio >= 0.85
+          ? { key: 'ba-bar', label: 'Your call', tone: 'good', text: 'Checking the bar kept the pours moving.' }
+          : { key: 'ba-bar', label: 'Your call', tone: 'warn', text: 'Checking the bar helped, but service was already cracking.' }
+      );
+    } else if (id === 'send-bouncer') {
+      out.push(
+        result.incidents === 0
+          ? { key: 'ba-door', label: 'Your call', tone: 'good', text: 'Sending a bouncer steadied the door before trouble spread.' }
+          : { key: 'ba-door', label: 'Your call', tone: 'warn', text: 'You sent a bouncer, but the door still saw trouble.' }
+      );
+    } else if (id === 'work-room') {
+      out.push(
+        result.reputationDelta >= 0
+          ? { key: 'ba-room', label: 'Your call', tone: 'good', text: 'Working the room protected your name more than the till.' }
+          : { key: 'ba-room', label: 'Your call', tone: 'info', text: 'You worked the room — it softened the blow.' }
+      );
+    }
+  }
+  return out.slice(0, 2); // at most two, keep it sharp
+}
+
 /** Build the boss-level debrief lines for a finished night. */
-export function buildDebrief(result: NightResult, club?: ClubState): DebriefLine[] {
+export function buildDebrief(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
   const lines: DebriefLine[] = [];
 
@@ -178,6 +214,9 @@ export function buildDebrief(result: NightResult, club?: ClubState): DebriefLine
   } else {
     lines.push({ key: 'rep', label: 'Reputation', tone: 'neutral', text: 'Reputation held steady — no real movement.' });
   }
+
+  // --- What the boss did tonight (optional) ---
+  lines.push(...bossActionLines(result, bossActions));
 
   // --- Policy outcomes (optional, when a non-neutral policy mattered) ---
   lines.push(...policyLines(result, club));

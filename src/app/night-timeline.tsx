@@ -17,6 +17,7 @@ import {
 import { buildFloorView, type FloorBubble, floorBubbles } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { buildTimeline } from '@/lib/timeline';
+import { nightZones, type ZoneKey } from '@/lib/venue';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
 
@@ -48,6 +49,7 @@ export default function NightTimelineScreen() {
   const [reactions, setReactions] = useState<FloorBubble[]>([]);
   const [mood, setMood] = useState<{ label: string; tone: MoodTone } | null>(null);
   const [recap, setRecap] = useState<string[]>([]);
+  const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
 
   if (!club || !plan || !preview) {
     router.replace('/dashboard');
@@ -62,13 +64,14 @@ export default function NightTimelineScreen() {
   const currentBeat = beats[beatIndex];
 
   const floor = buildFloorView(planClub, shownResult);
+  const zones = nightZones(shownResult);
   const moodAccent = !committed && mood ? MOOD_COLOR[mood.tone] : undefined;
   const moodLabel = !committed && mood ? mood.label : undefined;
   const bubbles = committed ? floorBubbles(committed) : reactions;
 
   const commit = () => {
     if (committed) return committed;
-    const r = runNight(plan, bossIntervention(chosen, preview, planClub));
+    const r = runNight(plan, bossIntervention(chosen, preview, planClub), chosen);
     if (r) setCommitted(r);
     return r;
   };
@@ -79,7 +82,8 @@ export default function NightTimelineScreen() {
     setChosen((c) => [...c, id]);
     setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
     setMood(outcome.mood);
-    setRecap((r) => [...r, outcome.note]);
+    setFlashZone(outcome.bubble.zone);
+    setRecap((r) => [...r, outcome.call]); // short "boss call" line
   };
 
   const toResults = () => {
@@ -100,7 +104,16 @@ export default function NightTimelineScreen() {
         />
       }
     >
-      <FloorView floor={floor} bubbles={bubbles} moodAccent={moodAccent} moodLabel={moodLabel} title="Tonight" pulse={!finished} />
+      <FloorView
+        floor={floor}
+        bubbles={bubbles}
+        moodAccent={moodAccent}
+        moodLabel={moodLabel}
+        title="Tonight"
+        pulse={!finished}
+        zones={zones}
+        flashZone={committed ? undefined : flashZone}
+      />
 
       {/* Current beat — short, floor-supporting. Tap to move the night along. */}
       <Pressable onPress={() => setShown((s) => Math.min(s + 1, beats.length))} disabled={finished} accessibilityRole="button" accessibilityLabel="Next moment">

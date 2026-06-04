@@ -14,6 +14,7 @@ import {
   isValidSchedule,
   minViableNightCost,
 } from '@/domain/staff';
+import type { BossActionId } from '@/lib/bossActions';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
 import { getUpgrade } from '@/domain/upgrades';
 import { clearSave, createNewClub, loadClub, saveClub } from '@/save/persistence';
@@ -25,6 +26,9 @@ interface GameStore {
   /** In-memory only (not persisted): tonight's prep, carried into the night
    *  playback so the night can resolve AFTER the live intervention beat. */
   plannedConfig: DayConfig | null;
+  /** In-memory only (not persisted): the boss actions taken on the most recent
+   *  night, so the results debrief can reference them. */
+  lastBossActions: BossActionId[];
   hydrated: boolean;
 
   /** Load any existing save on app start. */
@@ -36,8 +40,9 @@ interface GameStore {
   planNight: (config: DayConfig) => void;
   /** Resolve tonight WITHOUT committing — for the cooling check + pre-choice floor. */
   previewNight: (config: DayConfig) => NightResult | null;
-  /** Resolve tonight (optionally with a chosen intervention); commits + advances. */
-  runNight: (config: DayConfig, intervention?: Intervention) => NightResult | null;
+  /** Resolve tonight (optionally with a chosen intervention + the boss actions
+   *  taken); commits + advances. */
+  runNight: (config: DayConfig, intervention?: Intervention, bossActions?: BossActionId[]) => NightResult | null;
   /** Buy an upgrade if affordable and not already owned. Returns success. */
   buyUpgrade: (id: string) => boolean;
   /** Hire a candidate from the static pool (pays an upfront fee). Returns success. */
@@ -59,6 +64,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   club: null,
   lastResult: null,
   plannedConfig: null,
+  lastBossActions: [],
   hydrated: false,
 
   hydrate: async () => {
@@ -70,7 +76,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const club = createNewClub(name);
     await clearSave();
     await saveClub(club);
-    set({ club, lastResult: null, plannedConfig: null });
+    set({ club, lastResult: null, plannedConfig: null, lastBossActions: [] });
   },
 
   planNight: (config) => set({ plannedConfig: config }),
@@ -82,7 +88,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return resolveNight(club, config, nightSeed(club)).result;
   },
 
-  runNight: (config, intervention) => {
+  runNight: (config, intervention, bossActions) => {
     const club = get().club;
     if (!club) return null;
     // Schedule must be valid (employed, unique, ≥1 bartender).
@@ -98,7 +104,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const eventCost = getEvent(config.eventId).cost;
     if (eventCost > 0 && club.cash < eventCost) return null;
     const { result, nextClub } = resolveNight(club, config, nightSeed(club), intervention);
-    set({ club: nextClub, lastResult: result, plannedConfig: null });
+    set({ club: nextClub, lastResult: result, plannedConfig: null, lastBossActions: bossActions ?? [] });
     void saveClub(nextClub);
     return result;
   },

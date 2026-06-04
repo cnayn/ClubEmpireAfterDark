@@ -23,6 +23,7 @@ const DEBRIEF_COLOR: Record<DebriefTone, string> = {
 export default function ResultsScreen() {
   const result = useGameStore((s) => s.lastResult);
   const club = useGameStore((s) => s.club);
+  const bossActions = useGameStore((s) => s.lastBossActions);
 
   if (!result) {
     return (
@@ -127,7 +128,7 @@ export default function ResultsScreen() {
       </View>
 
       <Card title="Manager's Debrief">
-        {buildDebrief(result, club ?? undefined).map((line) => (
+        {buildDebrief(result, club ?? undefined, bossActions).map((line) => (
           <View key={line.key} style={styles.note}>
             <View style={[styles.dot, { backgroundColor: DEBRIEF_COLOR[line.tone] }]} />
             <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
