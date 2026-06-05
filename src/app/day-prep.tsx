@@ -58,30 +58,37 @@ export default function DayPrepScreen() {
     policies: club!.lastConfig.policies ?? DEFAULT_POLICIES,
     drinkPrep: club!.lastConfig.drinkPrep ?? DEFAULT_DRINK_PREP,
   }));
-  // First-night tutorial gate: which basics the owner has reviewed (in-screen only).
-  const [acked, setAcked] = useState<Set<string>>(() => new Set());
+  // First-night tutorial gate: which setup areas the owner has ACTUALLY engaged
+  // (derived from real interaction, never a fakeable manual tick). In-screen only.
+  const [touched, setTouched] = useState<Set<string>>(() => new Set());
 
   if (!club) {
     router.replace('/');
     return null;
   }
 
+  const touch = (id: string) => setTouched((s) => (s.has(id) ? s : new Set(s).add(id)));
+
   const set = <K extends keyof DayConfig>(key: K, value: DayConfig[K]) =>
     setConfig((c) => ({ ...c, [key]: value }));
 
   const policies = config.policies ?? DEFAULT_POLICIES;
-  const setPolicy = <K extends keyof PoliciesConfig>(key: K, value: PoliciesConfig[K]) =>
+  const setPolicy = <K extends keyof PoliciesConfig>(key: K, value: PoliciesConfig[K]) => {
+    touch('rules');
     setConfig((c) => {
       const nextPolicies = { ...(c.policies ?? DEFAULT_POLICIES), [key]: value };
       // Keep the legacy smoking lever in sync so the resolver's smoking math runs.
       const smoking = key === 'smoking' ? legacySmoking(value as SmokingRule) : c.smoking;
       return { ...c, policies: nextPolicies, smoking };
     });
+  };
 
   // Drop scheduled ids no longer employed (fired since last night).
   const onDuty = config.staffOnDuty.filter((id) => club.staff.some((m) => m.id === id));
-  const toggleStaff = (id: string) =>
+  const toggleStaff = (id: string) => {
+    touch('crew');
     set('staffOnDuty', onDuty.includes(id) ? onDuty.filter((x) => x !== id) : [...onDuty, id]);
+  };
 
   // Locked-event fallback: a saved event that's no longer unlocked reverts to Quiet.
   const available = unlockedEvents(club);
@@ -91,8 +98,10 @@ export default function DayPrepScreen() {
   const readiness = eventReadiness(club, { ...config, eventId, staffOnDuty: onDuty });
 
   const drink = config.drinkPrep ?? DEFAULT_DRINK_PREP;
-  const setDrink = <K extends keyof DrinkPrep>(key: K, value: DrinkPrep[K]) =>
+  const setDrink = <K extends keyof DrinkPrep>(key: K, value: DrinkPrep[K]) => {
+    touch('bar');
     setConfig((c) => ({ ...c, drinkPrep: { ...(c.drinkPrep ?? DEFAULT_DRINK_PREP), [key]: value } }));
+  };
 
   const wages = wagesForOnDuty(club.staff, onDuty); // post-night estimate, not upfront
   const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
@@ -103,11 +112,18 @@ export default function DayPrepScreen() {
   // Upfront = event fee + stock order; crew wages settle after the night. A free
   // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
   const canAffordUpfront = upfront === 0 || club.cash >= upfront;
-  // First-night gate: a brand-new owner reviews the basics before opening blind.
+  // First-night gate: a brand-new owner must genuinely engage each area before
+  // opening blind. "Done" is DERIVED from real interaction (you can't fake a tick);
+  // the crowd readout counts as reviewed once the other three are set, since the
+  // expected crowd is shaped by them.
   const firstNight = isFirstNight(club);
   const checklist = firstNightChecklist();
-  const ready = !firstNight || acked.size >= checklist.length;
-  const ackItem = (id: string) => setAcked((s) => new Set(s).add(id));
+  const isDone = (id: string) =>
+    id === 'crowd'
+      ? touched.has('crew') && touched.has('bar') && touched.has('rules')
+      : touched.has(id);
+  const doneCount = checklist.filter((i) => isDone(i.id)).length;
+  const ready = !firstNight || doneCount >= checklist.length;
   const canOpen = validSchedule && canAffordUpfront && requirement.met && ready;
 
   // Derived readouts (rendered at the BOTTOM, below every selector, so changing a
@@ -160,7 +176,7 @@ export default function DayPrepScreen() {
             </Text>
           ) : !ready ? (
             <Text variant="label" color={colors.warning}>
-              Don't open blind — review the basics above first ({acked.size}/{checklist.length}).
+              Don't open blind — set crew, bar, and house rules first ({doneCount}/{checklist.length}).
             </Text>
           ) : null}
           <Button label={ready ? 'Open the Doors' : 'Review setup first'} onPress={onOpen} disabled={!canOpen} />
@@ -175,18 +191,12 @@ export default function DayPrepScreen() {
       {firstNight ? (
         <Card title="Before You Open" accent={colors.neonCyan}>
           <Text variant="label" muted>
-            {MENTOR_LABEL}: Don't open blind. Tap each as you set it — then the doors are yours.
+            {MENTOR_LABEL}: Don't open blind. Each step ticks itself once you've actually set it.
           </Text>
           {checklist.map((item) => {
-            const done = acked.has(item.id);
+            const done = isDone(item.id);
             return (
-              <Pressable
-                key={item.id}
-                onPress={() => ackItem(item.id)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: done }}
-                style={styles.checkRow}
-              >
+              <View key={item.id} style={styles.checkRow}>
                 <View style={[styles.checkBox, done && styles.checkBoxOn]}>
                   <Text variant="label" color={done ? colors.bg : colors.textMuted}>
                     {done ? '✓' : ''}
@@ -200,7 +210,7 @@ export default function DayPrepScreen() {
                     {item.hint}
                   </Text>
                 </View>
-              </Pressable>
+              </View>
             );
           })}
         </Card>
@@ -346,7 +356,7 @@ export default function DayPrepScreen() {
           label="VIP focus"
           description="Court the big spenders. Pays off once you have a name."
           value={config.vipFocus}
-          onChange={(v) => set('vipFocus', v)}
+          onChange={(v) => { touch('rules'); set('vipFocus', v); }}
         />
       </Card>
 

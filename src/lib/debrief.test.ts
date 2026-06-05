@@ -99,6 +99,17 @@ describe('Debrief v2 — boss report frame (summary + tomorrow)', () => {
     const k = buildDebrief(result()).map((l) => l.key);
     for (const cat of ['summary', 'money', 'crowd', 'bar', 'door', 'rep', 'fix']) expect(k).toContain(cat);
   });
+
+  it('stays a tight report — context lines are capped (never a wall of text)', () => {
+    // A messy night that would otherwise fire many optional lines.
+    const c = club(['bnc-john', 'bnc-kareem'], [
+      { id: 'bnc-john', name: 'John', role: 'bouncer', salary: 100, skill: 50, honesty: 100, reliability: 100, visibleTrait: 'none', hiddenTrait: 'none', description: '' },
+      { id: 'bnc-kareem', name: 'Caramel', role: 'bouncer', salary: 100, skill: 50, honesty: 100, reliability: 100, visibleTrait: 'none', hiddenTrait: 'none', description: '' },
+    ]);
+    const lines = buildDebrief(result({ incidents: 2, serviceRatio: 0.5, theft: 40, net: -100 }), c, ['push-dj', 'check-bar', 'send-bouncer', 'work-room']);
+    expect(lines.length).toBeLessThanOrEqual(11); // 1 summary + 5 core + ≤3 context + 1 fix
+    expect(lines.filter((l) => l.label === 'Your call').length).toBeLessThanOrEqual(2);
+  });
 });
 
 describe('crew flavor (John / Caramel) — presentation only, no relationship system', () => {

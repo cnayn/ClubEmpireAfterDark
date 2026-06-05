@@ -378,34 +378,24 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
     lines.push({ key: 'rep', label: 'Reputation', tone: 'neutral', text: 'Reputation held steady — no real movement.' });
   }
 
-  // --- What the boss did tonight (optional) ---
-  lines.push(...bossActionLines(result, bossActions));
-
-  // --- Who came tonight (optional) ---
+  // --- Context lines (optional), gathered by priority then CAPPED so the report
+  //     stays a sharp boss read, not a wall of text. Your Calls + crew (Staff)
+  //     come first, then the single most relevant bit of night colour. ---
+  const optional: DebriefLine[] = [];
+  optional.push(...bossActionLines(result, bossActions)); // "Your call" (≤2)
+  const crew = crewFlavor(result, club); // Staff
+  if (crew) optional.push(crew);
   const crowd = crowdLine(result, club);
-  if (crowd) lines.push(crowd);
-
-  // --- Who's coming back (optional, once a regular base forms) ---
+  if (crowd) optional.push(crowd);
   const regs = regularsLine(result, club);
-  if (regs) lines.push(regs);
-
-  // --- DJ booking (optional, when a real act was booked) ---
+  if (regs) optional.push(regs);
   const dj = djLine(result, club);
-  if (dj) lines.push(dj);
-
-  // --- Venue look (optional) ---
+  if (dj) optional.push(dj);
+  optional.push(...drinkPrepLines(result, club));
+  optional.push(...policyLines(result, club));
   const venue = venueLine(club);
-  if (venue) lines.push(venue);
-
-  // --- Drink prep outcomes (optional, when stock/quality mattered) ---
-  lines.push(...drinkPrepLines(result, club));
-
-  // --- Policy outcomes (optional, when a non-neutral policy mattered) ---
-  lines.push(...policyLines(result, club));
-
-  // --- Crew relationship flavor (optional, presentation only) ---
-  const crew = crewFlavor(result, club);
-  if (crew) lines.push(crew);
+  if (venue) optional.push(venue);
+  lines.push(...optional.slice(0, 3));
 
   // --- What to fix before tomorrow (closing call) ---
   lines.push(fixLine(result, club, fill));
