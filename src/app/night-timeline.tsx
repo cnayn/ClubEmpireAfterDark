@@ -22,7 +22,7 @@ import { nightMentorLine } from '@/lib/mentor';
 import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
 import { buildFloorView, type FloorBubble, floorBubbles, floorEmotes, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
-import { buildTimeline } from '@/lib/timeline';
+import { buildNightPhases, encounterPhaseKey } from '@/lib/nightPhases';
 import { nightZones, type ZoneKey } from '@/lib/venue';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -48,7 +48,8 @@ export default function NightTimelineScreen() {
   const [plan] = useState(() => useGameStore.getState().plannedConfig);
   const [preview] = useState(() => (plan ? useGameStore.getState().previewNight(plan) : null));
 
-  const [shown, setShown] = useState(1);
+  // Which phase of the night we're living through (0-based).
+  const [step, setStep] = useState(0);
   const [committed, setCommitted] = useState<ReturnType<typeof runNight>>(null);
   // Boss Actions taken tonight (once per action), with their live floor reactions.
   const [chosen, setChosen] = useState<BossActionId[]>([]);
@@ -71,19 +72,29 @@ export default function NightTimelineScreen() {
 
   const planClub = { ...club, lastConfig: plan };
   const shownResult = committed ?? preview;
-  const beats = buildTimeline(shownResult, planClub);
-  const finished = shown >= beats.length;
-  const beatIndex = Math.min(shown, beats.length) - 1;
-  const currentBeat = beats[beatIndex];
+
+  const phases = buildNightPhases(shownResult, planClub);
+  const lastStep = phases.length - 1;
+  const atEnd = step >= lastStep;
+  const phase = phases[Math.min(step, lastStep)];
+
+  // The encounter fires inside the phase that matches its zone, and stays until commit.
+  const encPhaseIndex = encounter ? phases.findIndex((p) => p.key === encounterPhaseKey(encounter.zone)) : -1;
+  const encounterDue = !!encounter && !committed && step >= encPhaseIndex;
 
   const floor = buildFloorView(planClub, shownResult);
   const zones = nightZones(shownResult);
-  const moodAccent = !committed && mood ? MOOD_COLOR[mood.tone] : undefined;
-  const moodLabel = !committed && mood ? mood.label : undefined;
+  // The floor's headline reacts to the live night: a boss-action mood overrides,
+  // otherwise the current phase sets the tone/accent so the room visibly shifts.
+  const moodAccent = committed ? undefined : mood ? MOOD_COLOR[mood.tone] : TONE_COLOR[phase.tone];
+  const moodLabel = committed ? undefined : mood ? mood.label : phase.title;
   // Live floor: ambient guest emotes + the boss/encounter reactions. After the
   // night commits, switch to the outcome bubbles.
   const bubbles = committed ? floorBubbles(committed) : [...floorEmotes(preview, planClub), ...reactions];
-  const liveFlash = committed ? undefined : flashZone ?? (encounter && !encChoice ? encounter.zone : undefined);
+  // Highlight the zone in focus this phase (a boss/encounter call overrides).
+  const liveFlash = committed ? undefined : flashZone ?? phase.zone;
+
+  const advance = () => setStep((s) => Math.min(s + 1, lastStep));
 
   const commit = () => {
     if (committed) return committed;
@@ -126,11 +137,14 @@ export default function NightTimelineScreen() {
   return (
     <Screen
       footer={
-        <Button
-          label={finished ? 'See the books' : 'Skip to the books'}
-          variant={finished ? 'primary' : 'secondary'}
-          onPress={toResults}
-        />
+        atEnd ? (
+          <Button label="See the books" onPress={toResults} />
+        ) : (
+          <View style={{ gap: spacing.sm }}>
+            <Button label={phase.advanceLabel ?? 'Next moment →'} onPress={advance} />
+            <Button label="Skip to the books" variant="secondary" onPress={toResults} />
+          </View>
+        )
       }
     >
       <FloorView
@@ -139,7 +153,7 @@ export default function NightTimelineScreen() {
         moodAccent={moodAccent}
         moodLabel={moodLabel}
         title="Tonight"
-        pulse={!finished}
+        pulse={!committed}
         zones={zones}
         flashZone={liveFlash}
         venueChips={venueFloorChips(planClub)}
@@ -148,35 +162,25 @@ export default function NightTimelineScreen() {
         djLabel={DJ_FLOOR_LABEL[plan.dj ?? 'house']}
       />
 
-      {/* Current beat — short, floor-supporting. Tap to move the night along. */}
-      <Pressable onPress={() => setShown((s) => Math.min(s + 1, beats.length))} disabled={finished} accessibilityRole="button" accessibilityLabel="Next moment">
-        <Card title="In the room">
-          {currentBeat ? (
-            <View style={[styles.beat, { borderLeftColor: TONE_COLOR[currentBeat.tone] }]}>
-              <View style={styles.beatHead}>
-                <Text variant="label" color={TONE_COLOR[currentBeat.tone]}>
-                  {currentBeat.time}
-                </Text>
-                <Text variant="heading">{currentBeat.title}</Text>
-              </View>
-              <Text variant="body" muted style={styles.beatText}>
-                {currentBeat.text}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.progressRow}>
-            <Text variant="label" muted>
-              Moment {Math.min(shown, beats.length)} of {beats.length}
+      {/* The phase you're living through right now. */}
+      <Card title={`The Night · ${phase.time}`}>
+        <View style={[styles.beat, { borderLeftColor: TONE_COLOR[phase.tone] }]}>
+          <View style={styles.beatHead}>
+            <Text variant="heading" color={TONE_COLOR[phase.tone]}>
+              {phase.title}
             </Text>
             <Text variant="label" muted>
-              {finished ? 'The night is over.' : 'Tap to continue…'}
+              Phase {Math.min(step + 1, phases.length)} of {phases.length}
             </Text>
           </View>
-        </Card>
-      </Pressable>
+          <Text variant="body" muted style={styles.beatText}>
+            {phase.situation}
+          </Text>
+        </View>
+      </Card>
 
-      {/* A situation on the floor — respond before it sets the tone for the night. */}
-      {!committed && encounter ? (
+      {/* A situation on the floor — fires in the phase it belongs to. */}
+      {encounterDue && encounter ? (
         <Card title="Situation" accent={colors.warning}>
           <Text variant="heading">{encounter.situation}</Text>
           {!encChoice ? (
@@ -202,7 +206,7 @@ export default function NightTimelineScreen() {
         </Card>
       ) : null}
 
-      {/* Boss Actions tray — make calls inside the club, anytime, once each. */}
+      {/* Boss Actions tray — calls you make on the floor, anytime, once each. */}
       {!committed ? (
         <Card title="Your Call">
           {club.day <= 6 && nightMentorLine(chosen.length) ? (
@@ -255,14 +259,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.xs,
   },
-  beatHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },
+  beatHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md },
   beatText: { lineHeight: 22 },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   action: {
     flexGrow: 1,
