@@ -5,8 +5,9 @@
  */
 
 import { REPUTATION_TIERS, START_CAPACITY } from '@/domain/balance';
+import { crowdMix, topCrowd } from '@/domain/crowd';
 import { getEvent } from '@/domain/events';
-import { equippedIn, getFurniture, getVenue } from '@/domain/furniture';
+import { equippedIn, getFurniture, getVenue, venueStats } from '@/domain/furniture';
 import { getRegularBase } from '@/domain/regulars';
 import { CANDIDATE_POOL, hireCost, minViableNightCost } from '@/domain/staff';
 import type { ClubState, EventId, NightResult } from '@/domain/types';
@@ -110,7 +111,7 @@ export function venueFloorChips(club: ClubState): VenueFloorChips {
 
 // --- Floor bubbles (interpretations of EXISTING aggregate signals) ------------
 
-export type BubbleTone = 'bad' | 'warn' | 'info';
+export type BubbleTone = 'bad' | 'warn' | 'info' | 'good';
 export type BubbleZone = 'door' | 'bar' | 'floor';
 
 export interface FloorBubble {
@@ -159,6 +160,51 @@ export function floorBubbles(lastResult: NightResult | null): FloorBubble[] {
     bubbles.push({ id: 'net', label: 'Books took a hit', tone: 'bad', zone: 'floor' });
   }
   return bubbles;
+}
+
+// --- Guest emotes (ambient "voices" from aggregate signals) -------------------
+
+/**
+ * Ambient guest reactions for the live floor — quoted speech-bubble emotes read
+ * from EXISTING aggregate signals (service, incidents, fill, crowd identity,
+ * regulars, venue look). No named guests, no per-guest sim, no new state. Capped
+ * so the floor reads as a room of people, not a wall of metrics.
+ */
+export function floorEmotes(result: NightResult | null, club: ClubState): FloorBubble[] {
+  if (!result || result.guests <= 0) return [];
+  const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
+  const out: FloorBubble[] = [];
+
+  // Bar — the loudest signal first.
+  if (result.serviceRatio < 0.85) {
+    out.push({ id: 'emo-bar', label: '“Where’s my drink?”', tone: 'warn', zone: 'bar' });
+  } else if (result.serviceRatio >= 1 && fill >= 0.5) {
+    out.push({ id: 'emo-bar', label: '“Quick pour — nice.”', tone: 'good', zone: 'bar' });
+  }
+
+  // Door — trouble reads here.
+  if (result.incidents > 0) {
+    out.push({ id: 'emo-door', label: '“Door’s tense.”', tone: 'bad', zone: 'door' });
+  }
+
+  // Floor — density, then who's in and how the room feels.
+  if (fill >= 0.95) {
+    out.push({ id: 'emo-floor', label: '“Too crowded.”', tone: 'warn', zone: 'floor' });
+  } else if (fill < 0.3) {
+    out.push({ id: 'emo-floor', label: '“This is dead.”', tone: 'info', zone: 'floor' });
+  } else {
+    const top = topCrowd(crowdMix(club, club.lastConfig), 2);
+    const v = venueStats(club.venue);
+    if (top.includes('musicheads')) {
+      out.push({ id: 'emo-floor', label: '“Sound is good.”', tone: 'good', zone: 'floor' });
+    } else if (top.includes('regulars') || getRegularBase(club.regularBase).regulars >= 20) {
+      out.push({ id: 'emo-floor', label: '“Same faces tonight.”', tone: 'info', zone: 'floor' });
+    } else if (v.style + v.doorAppeal >= 4) {
+      out.push({ id: 'emo-door', label: '“This place looks better.”', tone: 'good', zone: 'door' });
+    }
+  }
+
+  return out.slice(0, 3);
 }
 
 // --- Next Goal ----------------------------------------------------------------

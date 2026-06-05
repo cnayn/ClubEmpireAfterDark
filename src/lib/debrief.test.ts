@@ -74,6 +74,33 @@ describe('buildDebrief — boss-level categories', () => {
   });
 });
 
+describe('Debrief v2 — boss report frame (summary + tomorrow)', () => {
+  it('opens with a Boss summary headline and closes with a Tomorrow fix line', () => {
+    const lines = buildDebrief(result());
+    expect(lines[0].key).toBe('summary');
+    expect(lines[0].label).toBe('Boss');
+    const last = lines[lines.length - 1];
+    expect(last.key).toBe('fix');
+    expect(last.label).toBe('Tomorrow');
+  });
+
+  it('summary + fix react to the night (loss, incident, strained bar)', () => {
+    const loss = buildDebrief(result({ net: -200 }));
+    expect(loss.find((l) => l.key === 'summary')!.tone).toBe('bad');
+
+    const incident = buildDebrief(result({ incidents: 2 }));
+    expect(incident.find((l) => l.key === 'fix')!.text.toLowerCase()).toContain('door');
+
+    const strained = buildDebrief(result({ serviceRatio: 0.6 }));
+    expect(strained.find((l) => l.key === 'fix')!.text.toLowerCase()).toContain('bar');
+  });
+
+  it('still always covers money/crowd/bar/door/rep alongside the new frame', () => {
+    const k = buildDebrief(result()).map((l) => l.key);
+    for (const cat of ['summary', 'money', 'crowd', 'bar', 'door', 'rep', 'fix']) expect(k).toContain(cat);
+  });
+});
+
 describe('crew flavor (John / Caramel) — presentation only, no relationship system', () => {
   const john = bouncer('bnc-john');
   const caramel = bouncer('bnc-kareem');

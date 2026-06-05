@@ -1,12 +1,14 @@
 /**
- * Floor-as-Home venue panel — a flat, stylized top-down club that re-presents
- * EXISTING state only: crowd density, staff as character tokens at their posts,
- * event vibe, zone pressure, and last-night outcomes as floor bubbles. Pure
- * presentation. No 3D, no real-time sim, no simulated guests, no saved positions.
- * The crowd "movement" is a deterministic opacity/drift shimmer (UI only).
+ * Floor-as-Home venue panel — a stylized, layered "2.5D" top-down club that
+ * re-presents EXISTING state only: crowd density, staff as character tokens at
+ * their posts, event vibe, per-zone pressure, the booked DJ, equipped furniture,
+ * guest emotes, and last-night outcomes as floor bubbles. Pure presentation. No
+ * 3D engine, no real-time sim, no simulated/named guests, no saved positions.
+ * Depth is faked with layered tinted panels + a neon floor grid; crowd "movement"
+ * is a deterministic opacity/drift shimmer (UI only).
  */
 
-import { useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/Card';
@@ -34,6 +36,7 @@ const BUBBLE_COLOR: Record<BubbleTone, string> = {
   bad: colors.danger,
   warn: colors.warning,
   info: colors.neonCyan,
+  good: colors.success,
 };
 
 const zoneColor = (tone: ZoneTone | undefined, accent: string): string =>
@@ -107,6 +110,29 @@ function FurnitureChips({ names }: { names: string[] }) {
   );
 }
 
+/** A tinted, glowing zone panel (door / bar). `inset` pulls it in for back-of-room depth. */
+function ZonePanel({
+  label,
+  tint,
+  inset,
+  children,
+}: {
+  label: string;
+  tint: string;
+  inset?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <View style={[styles.zonePanel, inset && styles.zonePanelInset, { borderColor: tint }]}>
+      <View style={[styles.zoneAccent, { backgroundColor: tint }]} />
+      <Text variant="label" style={[styles.zoneLabel, { color: tint }]}>
+        {label}
+      </Text>
+      <View style={styles.zoneBody}>{children}</View>
+    </View>
+  );
+}
+
 export function FloorView({
   floor,
   bubbles = [],
@@ -128,8 +154,6 @@ export function FloorView({
   title?: string;
   /** Subtle crowd movement during the live night — presentation only. */
   pulse?: boolean;
-  /** The booked DJ act for the night, shown at the booth (e.g. "Hype DJ"). */
-  djLabel?: string;
   /** Per-zone pressure states (door/bar/floor) to glow the venue. */
   zones?: NightZones;
   /** A zone to briefly highlight after a boss action (door/bar/floor). */
@@ -140,6 +164,8 @@ export function FloorView({
   crowdTags?: string[];
   /** Returning-regular notes (e.g. "Locals back") when a base has formed. */
   regularTags?: string[];
+  /** The booked DJ act for the night, shown at the booth (e.g. "Hype DJ"). */
+  djLabel?: string;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -188,6 +214,8 @@ export function FloorView({
     });
   };
 
+  const floorTint = zoneTint('floor');
+
   return (
     <Card title={title}>
       <View style={styles.head}>
@@ -198,11 +226,8 @@ export function FloorView({
       </View>
 
       <View style={[styles.room, { borderColor: accent }]}>
-        {/* DOOR (top) + VIP future zone */}
-        <View style={styles.zoneRow}>
-          <Text variant="label" style={[styles.zoneLabel, { color: zoneTint('door') }]}>
-            DOOR
-          </Text>
+        {/* DOOR — back of the room (inset for depth), with the VIP placeholder. */}
+        <ZonePanel label="DOOR" tint={zoneTint('door')} inset>
           <View style={styles.posts}>
             {floor.bouncers.length > 0 ? (
               floor.bouncers.map((b) => (
@@ -212,54 +237,77 @@ export function FloorView({
               <EmptyPost />
             )}
           </View>
-          <View style={styles.futureZone}>
+          <View style={styles.cornerChip}>
             <Text variant="label" muted>
-              VIP — reserved
+              VIP — locked
             </Text>
           </View>
-        </View>
+        </ZonePanel>
+        {venueChips ? <FurnitureChips names={venueChips.door} /> : null}
         {inZone('door').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
-        {venueChips ? <FurnitureChips names={venueChips.door} /> : null}
 
-        {/* CROWD (middle) — who's in tonight + floor bubbles */}
-        {crowdTags && crowdTags.length > 0 ? (
-          <View style={styles.crowdTagRow}>
-            {crowdTags.map((t) => (
-              <View key={t} style={styles.crowdTag}>
-                <Text variant="label" color={colors.neonCyan}>
-                  {t}
-                </Text>
-              </View>
-            ))}
+        {/* FLOOR — the hero: neon grid, the crowd, the DJ booth, who's in tonight. */}
+        <View style={[styles.floorPanel, { borderColor: floorTint }]}>
+          <View style={styles.floorHead}>
+            <Text variant="label" style={[styles.zoneLabel, { color: floorTint }]}>
+              DANCE FLOOR
+            </Text>
+            <View
+              style={[
+                djLabel ? styles.djChip : styles.cornerChip,
+                flashZone === 'floor' && { borderColor: accent },
+              ]}
+            >
+              <Text variant="label" color={djLabel ? colors.neonMagenta : colors.textMuted}>
+                {djLabel ? `♪ ${djLabel}` : 'DJ booth — soon'}
+              </Text>
+            </View>
           </View>
-        ) : null}
-        {regularTags && regularTags.length > 0 ? (
-          <View style={styles.crowdTagRow}>
-            {regularTags.map((t) => (
-              <View key={t} style={[styles.crowdTag, { borderColor: colors.success }]}>
-                <Text variant="label" color={colors.success}>
-                  {t}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        {venueChips ? <FurnitureChips names={venueChips.floor} /> : null}
-        <View style={styles.crowd}>{renderDots()}</View>
-        {inZone('floor').length > 0 ? (
-          <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
-        ) : null}
 
-        {/* BAR (bottom) + DJ future zone */}
+          {crowdTags && crowdTags.length > 0 ? (
+            <View style={styles.crowdTagRow}>
+              {crowdTags.map((t) => (
+                <View key={t} style={styles.crowdTag}>
+                  <Text variant="label" color={colors.neonCyan}>
+                    {t}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {regularTags && regularTags.length > 0 ? (
+            <View style={styles.crowdTagRow}>
+              {regularTags.map((t) => (
+                <View key={t} style={[styles.crowdTag, { borderColor: colors.success }]}>
+                  <Text variant="label" color={colors.success}>
+                    {t}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.grid}>
+            <View style={styles.gridLines} pointerEvents="none">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <View key={i} style={[styles.gridLine, { opacity: 0.05 + i * 0.035 }]} />
+              ))}
+            </View>
+            <View style={styles.crowd}>{renderDots()}</View>
+          </View>
+
+          {inZone('floor').length > 0 ? (
+            <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
+          ) : null}
+        </View>
+
+        {/* BAR — front of the room. */}
         {inZone('bar').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
-        <View style={styles.zoneRow}>
-          <Text variant="label" style={[styles.zoneLabel, { color: zoneTint('bar') }]}>
-            BAR
-          </Text>
+        <ZonePanel label="BAR" tint={zoneTint('bar')}>
           <View style={styles.posts}>
             {floor.bartenders.length > 0 ? (
               floor.bartenders.map((b) => (
@@ -269,17 +317,7 @@ export function FloorView({
               <EmptyPost />
             )}
           </View>
-          <View
-            style={[
-              djLabel ? styles.djZone : styles.futureZone,
-              flashZone === 'floor' && { borderColor: accent, opacity: 0.95 },
-            ]}
-          >
-            <Text variant="label" color={djLabel ? colors.neonMagenta : colors.textMuted}>
-              {djLabel ? `♪ ${djLabel}` : 'DJ Booth — soon'}
-            </Text>
-          </View>
-        </View>
+        </ZonePanel>
         {venueChips ? <FurnitureChips names={venueChips.bar} /> : null}
       </View>
 
@@ -295,17 +333,65 @@ export function FloorView({
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   room: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.bg,
     borderRadius: radius.md,
     borderWidth: 1,
-    padding: spacing.md,
+    padding: spacing.sm,
     gap: spacing.sm,
-    minHeight: 240,
+    minHeight: 300,
     justifyContent: 'space-between',
   },
-  zoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  zoneLabel: { width: 44, letterSpacing: 1 },
+  // Zone panels (door / bar) — tinted, glowing, layered for depth.
+  zonePanel: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+    overflow: 'hidden',
+  },
+  zonePanelInset: { marginHorizontal: spacing.lg }, // back wall reads narrower (depth)
+  zoneAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, opacity: 0.9 },
+  zoneBody: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  zoneLabel: { letterSpacing: 1 },
   posts: { flexDirection: 'row', gap: spacing.sm, flex: 1, flexWrap: 'wrap' },
+  cornerChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    opacity: 0.65,
+  },
+  djChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.neonMagenta,
+    backgroundColor: colors.surface,
+  },
+  // Floor panel — the hero.
+  floorPanel: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  floorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  grid: {
+    position: 'relative',
+    minHeight: 104,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    backgroundColor: colors.bg,
+    justifyContent: 'center',
+  },
+  gridLines: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-evenly', paddingVertical: spacing.sm },
+  gridLine: { height: 1, backgroundColor: colors.neonCyan },
   token: { alignItems: 'center', width: 56, gap: 2 },
   avatar: {
     width: 36,
@@ -319,33 +405,16 @@ const styles = StyleSheet.create({
   emptyAvatar: { borderColor: colors.border, borderStyle: 'dashed' },
   tokenName: { maxWidth: 56, textAlign: 'center' },
   tokenState: { maxWidth: 56, textAlign: 'center', fontSize: 9 },
-  futureZone: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    opacity: 0.5,
-  },
-  djZone: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.neonMagenta,
-    backgroundColor: colors.surface,
-  },
   crowd: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
-    flex: 1,
     paddingVertical: spacing.sm,
   },
-  dot: { width: 10, height: 10, borderRadius: radius.pill },
+  // Crowd "silhouettes" — tall rounded marks read as people, not dots.
+  dot: { width: 7, height: 14, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderBottomLeftRadius: 1, borderBottomRightRadius: 1 },
   bubbleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
   furnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
   furnChip: {

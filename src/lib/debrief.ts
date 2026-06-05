@@ -252,10 +252,60 @@ function regularsLine(result: NightResult, club: ClubState | undefined): Debrief
   }
 }
 
+/** One sharp headline that frames the whole night, boss-report style. */
+function summaryLine(result: NightResult, fill: number): DebriefLine {
+  const strained = result.serviceRatio < 0.85;
+  if (result.net < 0 && result.incidents > 0) {
+    return { key: 'summary', label: 'Boss', tone: 'bad', text: 'Loud night, red books — you bled money and the door bled trust.' };
+  }
+  if (result.net < 0) {
+    return { key: 'summary', label: 'Boss', tone: 'bad', text: 'You opened, but the night cost you more than it made.' };
+  }
+  if (result.incidents > 0) {
+    return { key: 'summary', label: 'Boss', tone: 'warn', text: 'You made profit — and you also taught the crowd what you tolerate.' };
+  }
+  if (strained) {
+    return { key: 'summary', label: 'Boss', tone: 'warn', text: "The bar made money, but it wasn't clean money — service was stretched." };
+  }
+  if (result.guests === 0 || fill < 0.3) {
+    return { key: 'summary', label: 'Boss', tone: 'info', text: 'A thin room. The night was calm, but the floor needs bodies.' };
+  }
+  if (result.reputationDelta >= 2) {
+    return { key: 'summary', label: 'Boss', tone: 'good', text: 'A real night — the room left happy and the books agree.' };
+  }
+  return { key: 'summary', label: 'Boss', tone: 'good', text: 'A steady night. Nothing broke; build on it.' };
+}
+
+/** The single most important thing to fix before tomorrow. */
+function fixLine(result: NightResult, club: ClubState | undefined, fill: number): DebriefLine {
+  if (result.incidents > 0) {
+    return { key: 'fix', label: 'Tomorrow', tone: 'warn', text: 'Fix the door first — more security on, or tighten the policy.' };
+  }
+  if (result.serviceRatio < 0.85) {
+    return { key: 'fix', label: 'Tomorrow', tone: 'warn', text: 'Fix the bar before you chase a bigger night — more hands or fewer bodies.' };
+  }
+  if (result.net < 0) {
+    return { key: 'fix', label: 'Tomorrow', tone: 'warn', text: 'Tighten costs or pull a bigger crowd before you spend on anything.' };
+  }
+  if (result.guests === 0 || fill < 0.3) {
+    return { key: 'fix', label: 'Tomorrow', tone: 'info', text: 'Pull a crowd first — a cheaper door, an event, or a DJ to get a name.' };
+  }
+  if (result.reputationDelta < 0) {
+    return { key: 'fix', label: 'Tomorrow', tone: 'warn', text: 'Win the room back — a clean, well-served night, no shortcuts.' };
+  }
+  if (onDutyBouncers(club) === 0) {
+    return { key: 'fix', label: 'Tomorrow', tone: 'info', text: 'You ran the door bare tonight. Put a bouncer on before it bites.' };
+  }
+  return { key: 'fix', label: 'Tomorrow', tone: 'good', text: 'Hold this and push for more — try an event or grow the room.' };
+}
+
 /** Build the boss-level debrief lines for a finished night. */
 export function buildDebrief(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
   const lines: DebriefLine[] = [];
+
+  // --- Boss summary (headline) ---
+  lines.push(summaryLine(result, fill));
 
   // --- Money ---
   if (result.net < 0) {
@@ -356,6 +406,9 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
   // --- Crew relationship flavor (optional, presentation only) ---
   const crew = crewFlavor(result, club);
   if (crew) lines.push(crew);
+
+  // --- What to fix before tomorrow (closing call) ---
+  lines.push(fixLine(result, club, fill));
 
   return lines;
 }

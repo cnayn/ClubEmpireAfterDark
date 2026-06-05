@@ -106,6 +106,50 @@ describe('Send a Bouncer — helps under door pressure', () => {
   });
 });
 
+describe('Boss Actions v2 — stronger, clearer feedback', () => {
+  const bouncer = (id: string, skill: number): StaffMember => ({
+    id, name: id, role: 'bouncer', salary: 100, skill,
+    honesty: 100, reliability: 100, visibleTrait: 'none', hiddenTrait: 'none', description: '',
+  });
+
+  it('check-bar gives a stronger bounded boost when the bar is overloaded', () => {
+    const strainedClub = club({ reputation: 100, baseCapacity: 200 });
+    const strainedCfg = cfg({ staffOnDuty: [BARTENDERS[0]], coverLevel: 'low', drinkLevel: 'low' });
+    const pv = preview(strainedClub, strainedCfg, 3);
+    expect(pv.serviceRatio).toBeLessThan(0.85);
+    const out = resolveBossAction('check-bar', pv, strainedClub);
+    expect(out.intervention.revenueMod).toBeGreaterThanOrEqual(1.1);
+    expect(out.intervention.vibeBonus).toBeGreaterThan(0);
+    expect(out.note.toLowerCase()).toContain('overloaded');
+  });
+
+  it('work-room lands harder with a culture crowd or an unstable room, never prints money', () => {
+    const calm = club({ reputation: 70 });
+    const calmCfg = cfg();
+    const calmPv = preview(calm, calmCfg, 5);
+    const baseline = resolveBossAction('work-room', calmPv, calm);
+    expect(baseline.intervention.revenueMod).toBe(1); // never money
+
+    const unstable = club({ reputation: 20 }); // low name → unstable
+    const out = resolveBossAction('work-room', preview(unstable, cfg(), 5), unstable);
+    expect(out.intervention.vibeBonus).toBeGreaterThan(baseline.intervention.vibeBonus);
+    expect(out.intervention.revenueMod).toBe(1);
+  });
+
+  it('send-bouncer: Caramel de-escalates more effectively than John on a risky night', () => {
+    const busyCfg = cfg({ coverLevel: 'low', drinkLevel: 'low' });
+    const withJohn = club({ reputation: 100, baseCapacity: 200, staff: [...STARTING_ROSTER.map((m) => ({ ...m })), bouncer('bnc-john', 50)] });
+    withJohn.lastConfig = { ...busyCfg, staffOnDuty: withJohn.staff.map((m) => m.id) };
+    const john = resolveBossAction('send-bouncer', preview(withJohn, withJohn.lastConfig, 2), withJohn);
+
+    const withCaramel = club({ reputation: 100, baseCapacity: 200, staff: [...STARTING_ROSTER.map((m) => ({ ...m })), bouncer('bnc-kareem', 50)] });
+    withCaramel.lastConfig = { ...busyCfg, staffOnDuty: withCaramel.staff.map((m) => m.id) };
+    const caramel = resolveBossAction('send-bouncer', preview(withCaramel, withCaramel.lastConfig, 2), withCaramel);
+
+    expect(caramel.intervention.vibeBonus).toBeGreaterThan(john.intervention.vibeBonus);
+  });
+});
+
 describe('determinism', () => {
   it('same seed + same actions = same result', () => {
     const c = club({ reputation: 50 });

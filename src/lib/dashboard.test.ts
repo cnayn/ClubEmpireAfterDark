@@ -5,7 +5,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, NightResult } from '@/domain/types';
-import { buildBoardGoals, buildFloorView, floorBubbles, goalBoard, nextGoal } from './dashboard';
+import { buildBoardGoals, buildFloorView, floorBubbles, floorEmotes, goalBoard, nextGoal } from './dashboard';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -91,6 +91,26 @@ describe('floorBubbles — interpretations of aggregate signals only', () => {
     const bubbles = floorBubbles(result({ incidents: 1, fines: 80 }));
     expect(bubbles.some((b) => b.id === 'inspector')).toBe(false);
     expect(bubbles.some((b) => b.id === 'incidents')).toBe(true);
+  });
+});
+
+describe('floorEmotes — ambient guest voices from aggregate signals', () => {
+  it('no emotes before a night or on an empty room', () => {
+    expect(floorEmotes(null, club())).toEqual([]);
+    expect(floorEmotes(result({ guests: 0 }), club())).toEqual([]);
+  });
+
+  it('a strained bar prompts a "where\'s my drink" emote at the bar', () => {
+    const emotes = floorEmotes(result({ guests: 50, capacity: 60, serviceRatio: 0.5 }), club());
+    const bar = emotes.find((e) => e.zone === 'bar');
+    expect(bar).toBeDefined();
+    expect(bar!.label.toLowerCase()).toContain('drink');
+  });
+
+  it('an incident prompts a tense-door emote, and emotes are capped', () => {
+    const emotes = floorEmotes(result({ guests: 58, capacity: 60, serviceRatio: 0.5, incidents: 1 }), club());
+    expect(emotes.some((e) => e.zone === 'door' && e.tone === 'bad')).toBe(true);
+    expect(emotes.length).toBeLessThanOrEqual(3);
   });
 });
 

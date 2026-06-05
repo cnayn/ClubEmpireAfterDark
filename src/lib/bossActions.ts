@@ -12,6 +12,7 @@
  */
 
 import type { FloorBubble } from '@/lib/dashboard';
+import { crowdMix, topCrowd } from '@/domain/crowd';
 import { djPushBonus } from '@/domain/dj';
 import type { ClubState, NightResult } from '@/domain/types';
 import type { Intervention } from '@/sim/night';
@@ -78,49 +79,90 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       };
     }
     case 'check-bar': {
-      const strained = preview.serviceRatio < 0.85;
-      return strained
-        ? {
-            intervention: { vibeBonus: 0, revenueMod: 1.06 },
-            bubble: { id: 'boss-bar', label: 'Bar steadied', tone: 'info', zone: 'bar' },
-            mood: { label: 'Bar steadied', tone: 'info' },
-            call: BOSS_CALL['check-bar'],
-            note: 'Bar was starting to crack — you stepped in and steadied the pours.',
-          }
-        : {
-            intervention: { vibeBonus: 0, revenueMod: 1 },
-            bubble: { id: 'boss-bar', label: 'Bar holding', tone: 'info', zone: 'bar' },
-            mood: { label: 'Bar holding', tone: 'good' },
-            call: BOSS_CALL['check-bar'],
-            note: 'Checked the bar — drinks were flowing fine.',
-          };
+      // Three-state diagnosis. Only an OVERLOADED bar (strained service) gets a
+      // real, bounded stabilization; "starting to crack" and "holding" are
+      // diagnosis-only (no-op) so reading a healthy bar is never free value.
+      const ratio = preview.serviceRatio;
+      if (ratio < 0.85) {
+        return {
+          intervention: { vibeBonus: 3, revenueMod: 1.1 },
+          bubble: { id: 'boss-bar', label: 'Backlog cleared', tone: 'info', zone: 'bar' },
+          mood: { label: 'Bar was overloaded — you stepped in', tone: 'warn' },
+          call: BOSS_CALL['check-bar'],
+          note: 'Bar was overloaded — you caught the backlog before it became a complaint.',
+        };
+      }
+      if (ratio < 1) {
+        return {
+          intervention: { vibeBonus: 0, revenueMod: 1 },
+          bubble: { id: 'boss-bar', label: 'Bar starting to crack', tone: 'warn', zone: 'bar' },
+          mood: { label: 'Bar starting to crack', tone: 'info' },
+          call: BOSS_CALL['check-bar'],
+          note: 'Bar is starting to crack — keep an eye on it before the line snaps.',
+        };
+      }
+      return {
+        intervention: { vibeBonus: 0, revenueMod: 1 },
+        bubble: { id: 'boss-bar', label: 'Bar holding', tone: 'info', zone: 'bar' },
+        mood: { label: 'Bar holding', tone: 'good' },
+        call: BOSS_CALL['check-bar'],
+        note: "Bar's holding — drinks were flowing fine.",
+      };
     }
     case 'send-bouncer': {
+      // Door risk = incidents or a packed-enough room. Effectiveness scales with
+      // who's actually on the door: Caramel de-escalates best, John is effective
+      // but harder, a sharp bouncer holds it, a green one barely. No risk = no-op.
       const risk = preview.incidents > 0 || fill >= 0.7;
-      const note = !risk
-        ? 'Put eyes on the door — it was calm out there.'
-        : johnOn
-          ? 'John moved fast on the door. Maybe too fast.'
-          : caramelOn
-            ? 'Caramel cooled the line before it reached the floor.'
-            : 'Sent a bouncer to the door — it held the line.';
+      const bouncers = club.staff.filter((m) => m.role === 'bouncer' && onDuty.has(m.id));
+      const avgSkill = bouncers.length ? bouncers.reduce((s, m) => s + m.skill, 0) / bouncers.length : 0;
+      let vibeBonus = 0;
+      let note = 'Put eyes on the door — it was calm out there.';
+      let label = 'Door calm';
+      let tone: MoodTone = 'good';
+      if (risk) {
+        if (caramelOn) {
+          vibeBonus = 12; note = 'Caramel cooled the line before it reached the floor.'; label = 'Caramel cooled the door'; tone = 'info';
+        } else if (johnOn) {
+          vibeBonus = 8; note = 'John moved fast on the door. It held — maybe too hard.'; label = 'John worked the door'; tone = 'warn';
+        } else if (avgSkill >= 55) {
+          vibeBonus = 8; note = 'Your bouncer read it early and held the door clean.'; label = 'Door held'; tone = 'info';
+        } else if (bouncers.length > 0) {
+          vibeBonus = 4; note = 'A green bouncer held the door — barely.'; label = 'Door barely held'; tone = 'warn';
+        } else {
+          vibeBonus = 3; note = 'Nobody on the door, so you stepped in yourself. Hire someone.'; label = 'You held the door'; tone = 'warn';
+        }
+      }
       return {
-        intervention: { vibeBonus: risk ? 6 : 0, revenueMod: 1 },
-        bubble: { id: 'boss-door', label: risk ? 'Door covered' : 'Door calm', tone: risk ? 'warn' : 'info', zone: 'door' },
-        mood: { label: risk ? 'Door covered' : 'Door calm', tone: risk ? 'info' : 'good' },
+        intervention: { vibeBonus, revenueMod: 1 },
+        bubble: { id: 'boss-door', label, tone: risk ? 'warn' : 'info', zone: 'door' },
+        mood: { label, tone },
         call: BOSS_CALL['send-bouncer'],
         note,
       };
     }
     case 'work-room':
-    default:
+    default: {
+      // Owner presence — protects culture, never prints money. Lands harder when a
+      // culture crowd (regulars/locals) is in or the room is unstable (cooling /
+      // low name). Bounded; combineInterventions caps the total swing.
+      const top = topCrowd(crowdMix(club, club.lastConfig), 2);
+      const cultureCrowd = top.includes('regulars') || top.includes('locals');
+      const unstable = club.reputation < 35 || preview.regularLoyalty < 52;
+      const vibeBonus = 6 + (cultureCrowd ? 4 : 0) + (unstable ? 3 : 0);
+      const note = cultureCrowd
+        ? 'You worked the room — the regulars clocked that the boss was present.'
+        : unstable
+          ? 'You showed face before the room turned — steadied it without touching the till.'
+          : 'You worked the room — being seen helped more than the numbers show.';
       return {
-        intervention: { vibeBonus: 5, revenueMod: 1 },
+        intervention: { vibeBonus, revenueMod: 1 },
         bubble: { id: 'boss-room', label: 'Boss on the floor', tone: 'info', zone: 'floor' },
         mood: { label: 'Boss working the room', tone: 'good' },
         call: BOSS_CALL['work-room'],
-        note: 'You worked the room — the boss being seen helped more than the numbers show.',
+        note,
       };
+    }
   }
 }
 

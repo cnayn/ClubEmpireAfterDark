@@ -11,6 +11,7 @@ import {
   BOSS_ACTIONS,
   type BossActionId,
   bossIntervention,
+  combineInterventions,
   type MoodTone,
   resolveBossAction,
 } from '@/lib/bossActions';
@@ -18,7 +19,8 @@ import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
 import { nightMentorLine } from '@/lib/mentor';
-import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
+import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
+import { buildFloorView, type FloorBubble, floorBubbles, floorEmotes, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { buildTimeline } from '@/lib/timeline';
 import { nightZones, type ZoneKey } from '@/lib/venue';
@@ -54,6 +56,13 @@ export default function NightTimelineScreen() {
   const [mood, setMood] = useState<{ label: string; tone: MoodTone } | null>(null);
   const [recap, setRecap] = useState<string[]>([]);
   const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
+  // A transient "situation" the night may throw — derived once from the preview.
+  const [encounter] = useState<Encounter | null>(() => {
+    const c = useGameStore.getState().club;
+    if (!plan || !preview || !c) return null;
+    return pickEncounter(preview, { ...c, lastConfig: plan });
+  });
+  const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
 
   if (!club || !plan || !preview) {
     router.replace('/dashboard');
@@ -71,13 +80,29 @@ export default function NightTimelineScreen() {
   const zones = nightZones(shownResult);
   const moodAccent = !committed && mood ? MOOD_COLOR[mood.tone] : undefined;
   const moodLabel = !committed && mood ? mood.label : undefined;
-  const bubbles = committed ? floorBubbles(committed) : reactions;
+  // Live floor: ambient guest emotes + the boss/encounter reactions. After the
+  // night commits, switch to the outcome bubbles.
+  const bubbles = committed ? floorBubbles(committed) : [...floorEmotes(preview, planClub), ...reactions];
+  const liveFlash = committed ? undefined : flashZone ?? (encounter && !encChoice ? encounter.zone : undefined);
 
   const commit = () => {
     if (committed) return committed;
-    const r = runNight(plan, bossIntervention(chosen, preview, planClub), chosen);
+    // Fold any boss actions AND the encounter choice into ONE bounded intervention.
+    const combined = combineInterventions([
+      bossIntervention(chosen, preview, planClub),
+      ...(encChoice ? [encChoice.intervention] : []),
+    ]);
+    const r = runNight(plan, combined, chosen);
     if (r) setCommitted(r);
     return r;
+  };
+
+  const onChoose = (ch: EncounterChoice) => {
+    if (committed || encChoice) return; // one call per situation; locked after
+    setEncChoice(ch);
+    setReactions((b) => [...b.filter((x) => x.zone !== ch.bubble.zone), ch.bubble]);
+    setFlashZone(ch.bubble.zone);
+    setRecap((r) => [...r, ch.outcome]);
   };
 
   const onAction = (id: BossActionId) => {
@@ -116,7 +141,7 @@ export default function NightTimelineScreen() {
         title="Tonight"
         pulse={!finished}
         zones={zones}
-        flashZone={committed ? undefined : flashZone}
+        flashZone={liveFlash}
         venueChips={venueFloorChips(planClub)}
         crowdTags={topCrowd(crowdMix(planClub, plan), 3).map((id) => CROWD_SEGMENTS[id].name)}
         regularTags={topRegulars(club.regularBase, 2).filter((r) => r.score >= 15).map((r) => `${r.name} back`)}
@@ -149,6 +174,33 @@ export default function NightTimelineScreen() {
           </View>
         </Card>
       </Pressable>
+
+      {/* A situation on the floor — respond before it sets the tone for the night. */}
+      {!committed && encounter ? (
+        <Card title="Situation" accent={colors.warning}>
+          <Text variant="heading">{encounter.situation}</Text>
+          {!encChoice ? (
+            <View style={styles.tray}>
+              {encounter.choices.map((ch) => (
+                <Pressable
+                  key={ch.id}
+                  onPress={() => onChoose(ch)}
+                  accessibilityRole="button"
+                  style={styles.action}
+                >
+                  <Text variant="heading" color={colors.neonMagenta}>
+                    {ch.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text variant="body" muted style={styles.beatText}>
+              {encChoice.outcome}
+            </Text>
+          )}
+        </Card>
+      ) : null}
 
       {/* Boss Actions tray — make calls inside the club, anytime, once each. */}
       {!committed ? (
