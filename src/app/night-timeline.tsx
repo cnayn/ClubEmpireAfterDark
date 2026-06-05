@@ -22,8 +22,8 @@ import { nightMentorLine } from '@/lib/mentor';
 import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
 import { buildFloorView, type FloorBubble, floorBubbles, floorEmotes, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
-import { buildNightPhases, encounterPhaseKey } from '@/lib/nightPhases';
-import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS, phaseForProgress } from '@/lib/nightClock';
+import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS } from '@/lib/nightClock';
+import { encounterTrigger, livePressures, type NightPressures, pressureHeadline } from '@/lib/nightPressure';
 import { nightZones, type ZoneKey } from '@/lib/venue';
 import type { ClubState, DayConfig } from '@/domain/types';
 import { useGameStore } from '@/state/store';
@@ -43,6 +43,27 @@ const MOOD_COLOR: Record<MoodTone, string> = {
   neutral: colors.textMuted,
 };
 
+type MeterMode = 'crowd' | 'strain' | 'good';
+function meterColor(value: number, mode: MeterMode): string {
+  if (mode === 'crowd') return colors.neonCyan;
+  const hi = mode === 'good' ? colors.success : colors.danger;
+  const lo = mode === 'good' ? colors.danger : colors.success;
+  return value >= 0.66 ? hi : value >= 0.33 ? colors.warning : lo;
+}
+
+function Meter({ label, value, mode }: { label: string; value: number; mode: MeterMode }) {
+  return (
+    <View style={styles.meterRow}>
+      <Text variant="label" muted style={styles.meterLabel}>
+        {label}
+      </Text>
+      <View style={styles.meterTrack}>
+        <View style={[styles.meterFill, { width: `${Math.round(value * 100)}%`, backgroundColor: meterColor(value, mode) }]} />
+      </View>
+    </View>
+  );
+}
+
 export default function NightTimelineScreen() {
   const club = useGameStore((s) => s.club);
   const plan = useGameStore((s) => s.plannedConfig);
@@ -50,8 +71,8 @@ export default function NightTimelineScreen() {
     router.replace('/dashboard');
     return null;
   }
-  // Inner component owns all the clock hooks with guaranteed-present props, so the
-  // hook order is unconditional (no rules-of-hooks violation behind a guard).
+  // Inner component owns all clock hooks with guaranteed-present props (so hook
+  // order is unconditional behind the guard).
   return <LivingNight club={club} plan={plan} />;
 }
 
@@ -60,13 +81,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [preview] = useState(() => useGameStore.getState().previewNight(plan));
 
   const planClub = { ...club, lastConfig: plan };
-  const phases = preview ? buildNightPhases(preview, planClub) : [];
-  const phaseCount = phases.length;
 
-  // The transient situation for tonight + the phase it belongs to (start fraction).
+  // Tonight's transient situation + when (0..1) it interrupts the flow.
   const [encounter] = useState<Encounter | null>(() => (preview ? pickEncounter(preview, planClub) : null));
-  const encIndex = encounter ? phases.findIndex((p) => p.key === encounterPhaseKey(encounter.zone)) : -1;
-  const encStart = encIndex >= 0 && phaseCount > 0 ? encIndex / phaseCount : null;
+  const encTrigger = encounter ? encounterTrigger(encounter.zone) : null;
 
   // Real-time clock state.
   const [progress, setProgress] = useState(0); // 0..1 across the whole night
@@ -96,12 +114,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     if (progress >= 1 && running) setRunning(false);
   }, [progress, running]);
 
-  // Auto-pause when the night throws a situation, so the owner has to respond.
+  // Auto-pause when a situation interrupts, so the owner has to respond.
   useEffect(() => {
-    if (committed || encStart == null || encChoice || phaseCount === 0) return;
-    const end = encStart + 1 / phaseCount;
-    if (progress >= encStart && progress < end && running) setRunning(false);
-  }, [progress, committed, encStart, encChoice, phaseCount, running]);
+    if (committed || encTrigger == null || encChoice) return;
+    if (progress >= encTrigger && running) setRunning(false);
+  }, [progress, committed, encTrigger, encChoice, running]);
 
   if (!preview) {
     router.replace('/dashboard');
@@ -109,19 +126,19 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   }
 
   const shownResult = committed ?? preview;
-  const lastStep = Math.max(0, phaseCount - 1);
-  const step = committed ? lastStep : phaseForProgress(progress, phaseCount);
-  const phase = phases[Math.min(step, lastStep)];
+  const liveProgress = committed ? 1 : progress;
+  const pressures: NightPressures = livePressures(preview, planClub, liveProgress);
+  const headline = pressureHeadline(pressures);
   const atEnd = committed != null || progress >= 1;
-  const encounterDue = !!encounter && !committed && step >= encIndex;
+  const encounterDue = !!encounter && !committed && encTrigger != null && progress >= encTrigger;
   const encounterBlocking = encounterDue && !encChoice; // night paused on this call
 
   const floor = buildFloorView(planClub, shownResult);
   const zones = nightZones(shownResult);
-  const moodAccent = committed ? undefined : mood ? MOOD_COLOR[mood.tone] : TONE_COLOR[phase.tone];
-  const moodLabel = committed ? undefined : mood ? mood.label : phase.title;
+  const moodAccent = committed ? undefined : mood ? MOOD_COLOR[mood.tone] : TONE_COLOR[headline.tone];
+  const moodLabel = committed ? undefined : mood ? mood.label : headline.label;
   const bubbles = committed ? floorBubbles(committed) : [...floorEmotes(preview, planClub), ...reactions];
-  const liveFlash = committed ? undefined : flashZone ?? phase.zone;
+  const liveFlash = committed ? undefined : flashZone ?? headline.zone;
   const liveScale = committed ? 1 : liveCrowdFraction(progress);
 
   const commit = () => {
@@ -145,7 +162,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   };
 
   const onAction = (id: BossActionId) => {
-    if (committed || chosen.includes(id)) return; // once each; you can act anytime
+    if (committed || chosen.includes(id)) return; // once each; act anytime
     const outcome = resolveBossAction(id, preview, planClub);
     setChosen((c) => [...c, id]);
     setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
@@ -200,11 +217,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         liveScale={liveScale}
       />
 
-      {/* Live clock + the moment unfolding right now. */}
-      <Card title={`The Night · ${committed ? '02:30' : clockLabel(progress)}`}>
+      {/* The room, live — a clock + pressure meters, not a scene card. */}
+      <Card title={`The Room · ${committed ? '02:30' : clockLabel(progress)}`}>
         <View style={styles.clockHead}>
-          <Text variant="heading" color={TONE_COLOR[phase.tone]}>
-            {phase.title}
+          <Text variant="heading" color={TONE_COLOR[headline.tone]}>
+            {headline.label}
           </Text>
           {!committed ? (
             <Pressable onPress={() => setSpeed((s) => (s === 1 ? 2 : 1))} accessibilityRole="button" style={styles.speed}>
@@ -215,11 +232,13 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           ) : null}
         </View>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${Math.round((committed ? 1 : progress) * 100)}%`, backgroundColor: TONE_COLOR[phase.tone] }]} />
+          <View style={[styles.progressFill, { width: `${Math.round(liveProgress * 100)}%`, backgroundColor: TONE_COLOR[headline.tone] }]} />
         </View>
-        <Text variant="body" muted style={styles.beatText}>
-          {phase.situation}
-        </Text>
+        <Meter label="Crowd" value={pressures.crowd} mode="crowd" />
+        <Meter label="Bar" value={pressures.bar} mode="strain" />
+        <Meter label="Door" value={pressures.door} mode="strain" />
+        <Meter label="Bathroom" value={pressures.bathroom} mode="strain" />
+        <Meter label="Energy" value={pressures.energy} mode="good" />
       </Card>
 
       {/* A situation on the floor — it pauses the night until you respond. */}
@@ -301,13 +320,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  progressTrack: {
-    height: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-  },
+  progressTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: radius.pill },
+  meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  meterLabel: { width: 68 },
+  meterTrack: { flex: 1, height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  meterFill: { height: 8, borderRadius: radius.pill },
   beatText: { lineHeight: 22 },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   action: {
