@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { reputationTier } from '@/domain/balance';
 import { REGULAR_COPY, topRegulars } from '@/domain/regulars';
+import { mentorNote } from '@/lib/mentor';
 import { buildFloorView, floorBubbles, goalBoard, venueFloorChips } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -37,6 +38,7 @@ export default function DashboardScreen() {
   // Compact board on the dashboard; the full board lives on the Goals tab.
   const goals = goalBoard(club, lastResult).slice(0, 3);
   const regulars = topRegulars(club.regularBase, 3);
+  const mentor = mentorNote(club, lastResult, useGameStore.getState().lastBossActions);
   const floor = buildFloorView(club, lastResult);
   const bubbles = floorBubbles(lastResult);
 
@@ -111,6 +113,22 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
+      {/* Mentor / Owner's notes — teaches the loop, hides once you know it. */}
+      {mentor ? (
+        <Card title={mentor.label} accent={colors.neonCyan}>
+          <Text variant="body" style={styles.mentorLine}>
+            {mentor.line}
+          </Text>
+          {mentor.route ? (
+            <Pressable onPress={() => router.push(mentor.route!)} accessibilityRole="button" hitSlop={8}>
+              <Text variant="label" color={colors.neonCyan} style={styles.seeAll}>
+                {mentor.actionLabel ?? 'Go'} →
+              </Text>
+            </Pressable>
+          ) : null}
+        </Card>
+      ) : null}
+
       {/* HUD overlays */}
       <View style={styles.row}>
         <StatCard label="Cash" value={money(club.cash)} accent={club.cash < 0 ? colors.danger : colors.success} />
@@ -184,4 +202,5 @@ const styles = StyleSheet.create({
   seeAll: { marginTop: spacing.sm, textAlign: 'right' },
   regularRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   regularChip: { alignItems: 'center', minWidth: 64 },
+  mentorLine: { lineHeight: 21 },
 });

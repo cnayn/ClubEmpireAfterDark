@@ -17,6 +17,7 @@ import {
   stockCost,
 } from '@/domain/drinks';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
+import { MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
 import { aggregateEffects } from '@/domain/upgrades';
 import {
@@ -139,6 +140,17 @@ export default function DayPrepScreen() {
         </View>
       }
     >
+      {(() => {
+        const tip = prepMentorLine(club, { ...config, eventId, staffOnDuty: onDuty });
+        return tip ? (
+          <Card title={MENTOR_LABEL} accent={colors.neonCyan}>
+            <Text variant="body" style={{ lineHeight: 21 }}>
+              {tip}
+            </Text>
+          </Card>
+        ) : null;
+      })()}
+
       <Card title="Tonight's Event">
         {available.map((e) => {
           const selected = e.id === eventId;
