@@ -16,6 +16,7 @@ import {
 } from '@/lib/bossActions';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { topRegulars } from '@/domain/regulars';
+import { nightMentorLine } from '@/lib/mentor';
 import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { buildTimeline } from '@/lib/timeline';
@@ -150,6 +151,11 @@ export default function NightTimelineScreen() {
       {/* Boss Actions tray — make calls inside the club, anytime, once each. */}
       {!committed ? (
         <Card title="Your Call">
+          {club.day <= 6 && nightMentorLine(chosen.length) ? (
+            <Text variant="label" color={colors.neonCyan} style={{ lineHeight: 18 }}>
+              {nightMentorLine(chosen.length)}
+            </Text>
+          ) : null}
           <View style={styles.tray}>
             {BOSS_ACTIONS.map((a) => {
               const used = chosen.includes(a.id);

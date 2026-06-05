@@ -4,7 +4,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
-import { MENTOR_LABEL, mentorNote, prepMentorLine } from './mentor';
+import { MENTOR_LABEL, mentorNote, nightMentorLine, prepMentorLine, resultMentorLine } from './mentor';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -73,6 +73,19 @@ describe('prepMentorLine', () => {
   it('is quiet on a sensibly prepared night', () => {
     const all = STARTING_ROSTER.map((m) => m.id);
     expect(prepMentorLine(club(), cfg({ staffOnDuty: all }))).toBeNull();
+  });
+
+  it('night line nudges a boss action until one is used', () => {
+    expect(nightMentorLine(0)).not.toBeNull();
+    expect(nightMentorLine(0)!.toLowerCase()).toContain('make a call');
+    expect(nightMentorLine(2)).toBeNull();
+  });
+
+  it('result line teaches reading the damage by outcome', () => {
+    expect(resultMentorLine(result({ incidents: 1 })).toLowerCase()).toContain('damage');
+    expect(resultMentorLine(result({ incidents: 0, net: -50 })).toLowerCase()).toContain('red night');
+    expect(resultMentorLine(result({ incidents: 0, net: 50, serviceRatio: 0.6 })).toLowerCase()).toContain('bar line');
+    expect(resultMentorLine(result()).toLowerCase()).toContain('debrief');
   });
 
   it('works on an old config missing optional policy/drink/venue fields', () => {

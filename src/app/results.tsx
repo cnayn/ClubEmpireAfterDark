@@ -9,6 +9,7 @@ import { Text } from '@/components/Text';
 import { stockCost } from '@/domain/drinks';
 import { getEvent } from '@/domain/events';
 import { buildDebrief, type DebriefTone } from '@/lib/debrief';
+import { MENTOR_LABEL, resultMentorLine } from '@/lib/mentor';
 import { money, moneyColor, signed, signedMoney } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -133,6 +134,14 @@ export default function ResultsScreen() {
         <StatCard label="VIP Satisfaction" value={`${result.vipSatisfaction}`} />
         <StatCard label="Regular Loyalty" value={`${result.regularLoyalty}`} />
       </View>
+
+      {club && club.day <= 6 ? (
+        <Card title={MENTOR_LABEL} accent={colors.neonCyan}>
+          <Text variant="body" style={{ lineHeight: 21 }}>
+            {resultMentorLine(result)}
+          </Text>
+        </Card>
+      ) : null}
 
       <Card title="Manager's Debrief">
         {buildDebrief(result, club ?? undefined, bossActions).map((line) => (

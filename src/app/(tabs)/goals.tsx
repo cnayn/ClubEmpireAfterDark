@@ -6,8 +6,9 @@ import { GoalBoardList } from '@/components/GoalBoard';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { goalBoard } from '@/lib/dashboard';
+import { mentorNote } from '@/lib/mentor';
 import { useGameStore } from '@/state/store';
-import { spacing } from '@/theme/tokens';
+import { colors, spacing } from '@/theme/tokens';
 
 export default function GoalsScreen() {
   const club = useGameStore((s) => s.club);
@@ -23,6 +24,7 @@ export default function GoalsScreen() {
   }
 
   const goals = goalBoard(club, lastResult);
+  const mentor = mentorNote(club, lastResult, useGameStore.getState().lastBossActions);
 
   return (
     <Screen footer={<Button label="Prepare Tonight" onPress={() => router.push('/day-prep')} />}>
@@ -30,6 +32,13 @@ export default function GoalsScreen() {
       <Text variant="label" muted style={{ marginBottom: spacing.sm }}>
         A few things worth chasing right now. Pick whatever fits your plan tonight.
       </Text>
+      {mentor ? (
+        <Card title={mentor.label} accent={colors.neonCyan}>
+          <Text variant="body" style={{ lineHeight: 21 }}>
+            {mentor.line}
+          </Text>
+        </Card>
+      ) : null}
       <Card>
         <GoalBoardList goals={goals} />
       </Card>

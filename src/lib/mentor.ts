@@ -118,6 +118,32 @@ export function mentorNote(
 }
 
 /**
+ * A short mentor line for the night screen teaching boss actions, shown until the
+ * owner makes their first call of the night. `actionsTaken` = boss actions used.
+ */
+export function nightMentorLine(actionsTaken: number): string | null {
+  if (actionsTaken > 0) return null;
+  return 'You are the owner — do not just watch. Push the booth, check the bar, send a bouncer. Make a call.';
+}
+
+/**
+ * A short mentor line for the results / debrief screen teaching the owner to read
+ * the damage, not just the money. Reads what actually happened tonight.
+ */
+export function resultMentorLine(result: NightResult): string {
+  if (result.incidents > 0) {
+    return 'The books tell you money. This tells you damage — and tonight there was some. Read it.';
+  }
+  if (result.net < 0) {
+    return 'Red night. The debrief shows what cost you — fix the cause, not your mood.';
+  }
+  if (result.serviceRatio < 0.85) {
+    return 'See the bar line? That is money you did not make. More hands or fewer bodies next time.';
+  }
+  return 'Read this every night. The books are the money; the debrief is what actually happened.';
+}
+
+/**
  * A focused, pre-open warning for the Day Prep screen (or null). Reads the prep
  * the player is currently assembling.
  */

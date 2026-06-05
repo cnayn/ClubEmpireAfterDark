@@ -336,6 +336,13 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
     benefit: 'Stock and quality shape the night.',
   };
+  const setTheRules: BoardGoal = {
+    id: 'set-the-rules', category: 'tutorial',
+    title: 'Set your house rules',
+    instruction: 'Choose your policies in Day Prep — smoking, ID strictness, security, bar service. The middle option is safe; change one on purpose.',
+    progress: hasPlayed ? 1 : 0, status: done(hasPlayed),
+    benefit: 'Policies shape who comes and how the night goes.',
+  };
   const eventChosen = club.lastConfig.eventId !== 'regular' || (!!lastResult && lastResult.eventId !== 'regular');
   const chooseEvent: BoardGoal = {
     id: 'choose-event', category: 'tutorial',
@@ -543,8 +550,8 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     // read the debrief → try an event → grow → buy an upgrade last (once the
     // player understands why), never "buy a random upgrade" first.
     early: [
-      learnCrew, scheduleFullCrew, prepareTheBar, openFirstNight, readTheNight, chooseEvent,
-      haveBartender, haveBouncer, reachCash, repTier, buyFirstUpgrade,
+      learnCrew, scheduleFullCrew, prepareTheBar, setTheRules, openFirstNight, readTheNight,
+      chooseEvent, haveBartender, haveBouncer, reachCash, repTier, buyFirstUpgrade,
     ],
     // Interleaved by category so the top few span business / reputation / venue /
     // staff (the player should see several different things to chase, not five of
