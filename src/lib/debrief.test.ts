@@ -5,7 +5,7 @@
  */
 
 import type { ClubState, NightResult, StaffMember } from '@/domain/types';
-import { buildDebrief } from './debrief';
+import { buildBossReport, buildDebrief } from './debrief';
 
 function result(over: Partial<NightResult> = {}): NightResult {
   return {
@@ -109,6 +109,24 @@ describe('Debrief v2 — boss report frame (summary + tomorrow)', () => {
     const lines = buildDebrief(result({ incidents: 2, serviceRatio: 0.5, theft: 40, net: -100 }), c, ['push-dj', 'check-bar', 'send-bouncer', 'work-room']);
     expect(lines.length).toBeLessThanOrEqual(11); // 1 summary + 5 core + ≤3 context + 1 fix
     expect(lines.filter((l) => l.label === 'Your call').length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('buildBossReport (Debrief v3) — tight boss report', () => {
+  it('is a summary + at most 3 bullets + a fix, with the full report available', () => {
+    const r = buildBossReport(result({ incidents: 2, serviceRatio: 0.5, net: -100 }));
+    expect(r.summary.key).toBe('summary');
+    expect(r.fix.key).toBe('fix');
+    expect(r.bullets.length).toBeGreaterThanOrEqual(1);
+    expect(r.bullets.length).toBeLessThanOrEqual(3);
+    // bullets never duplicate the summary/fix
+    expect(r.bullets.some((b) => b.key === 'summary' || b.key === 'fix')).toBe(false);
+    expect(r.full.length).toBeGreaterThan(r.bullets.length); // details has more
+  });
+
+  it('leads its bullets with the sharpest read (door on an incident night)', () => {
+    const r = buildBossReport(result({ incidents: 3 }));
+    expect(r.bullets[0].key).toBe('door');
   });
 });
 

@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { Card, StatCard } from '@/components/Card';
@@ -9,7 +10,7 @@ import { Text } from '@/components/Text';
 import { djCost } from '@/domain/dj';
 import { stockCost } from '@/domain/drinks';
 import { getEvent } from '@/domain/events';
-import { buildDebrief, type DebriefTone } from '@/lib/debrief';
+import { buildBossReport, type DebriefTone } from '@/lib/debrief';
 import { MENTOR_LABEL, resultMentorLine } from '@/lib/mentor';
 import { money, moneyColor, signed, signedMoney } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -27,6 +28,7 @@ export default function ResultsScreen() {
   const result = useGameStore((s) => s.lastResult);
   const club = useGameStore((s) => s.club);
   const bossActions = useGameStore((s) => s.lastBossActions);
+  const [showDetails, setShowDetails] = useState(false);
 
   if (!result) {
     return (
@@ -150,19 +152,53 @@ export default function ResultsScreen() {
         </Card>
       ) : null}
 
-      <Card title="Manager's Debrief">
-        {buildDebrief(result, club ?? undefined, bossActions).map((line) => (
-          <View key={line.key} style={styles.note}>
-            <View style={[styles.dot, { backgroundColor: DEBRIEF_COLOR[line.tone] }]} />
-            <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
-              <Text variant="body" color={DEBRIEF_COLOR[line.tone]}>
-                {line.label}:{' '}
-              </Text>
-              {line.text}
+      {(() => {
+        const report = buildBossReport(result, club ?? undefined, bossActions);
+        return (
+          <Card title="Manager's Debrief">
+            <Text variant="body" color={DEBRIEF_COLOR[report.summary.tone]} style={styles.summary}>
+              {report.summary.text}
             </Text>
-          </View>
-        ))}
-      </Card>
+            {report.bullets.map((line) => (
+              <View key={line.key} style={styles.note}>
+                <View style={[styles.dot, { backgroundColor: DEBRIEF_COLOR[line.tone] }]} />
+                <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
+                  {line.text}
+                </Text>
+              </View>
+            ))}
+            <View style={styles.fixRow}>
+              <Text variant="body" color={DEBRIEF_COLOR[report.fix.tone]}>
+                Tomorrow:{' '}
+              </Text>
+              <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
+                {report.fix.text}
+              </Text>
+            </View>
+
+            <Pressable onPress={() => setShowDetails((s) => !s)} accessibilityRole="button" style={styles.detailsToggle}>
+              <Text variant="label" color={colors.neonCyan}>
+                {showDetails ? 'Hide details ▴' : 'Details ▾'}
+              </Text>
+            </Pressable>
+            {showDetails
+              ? report.full
+                  .filter((line) => line.key !== 'summary' && line.key !== 'fix')
+                  .map((line) => (
+                    <View key={line.key} style={styles.note}>
+                      <View style={[styles.dot, { backgroundColor: DEBRIEF_COLOR[line.tone] }]} />
+                      <Text variant="body" style={{ flex: 1, lineHeight: 21 }}>
+                        <Text variant="body" color={DEBRIEF_COLOR[line.tone]}>
+                          {line.label}:{' '}
+                        </Text>
+                        {line.text}
+                      </Text>
+                    </View>
+                  ))
+              : null}
+          </Card>
+        );
+      })()}
     </Screen>
   );
 }
@@ -173,4 +209,7 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.xs },
   note: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start', paddingVertical: spacing.xs },
   dot: { width: 8, height: 8, borderRadius: radius.pill, marginTop: 7 },
+  summary: { lineHeight: 22, fontWeight: '600' },
+  fixRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.xs },
+  detailsToggle: { paddingVertical: spacing.xs, marginTop: spacing.xs },
 });

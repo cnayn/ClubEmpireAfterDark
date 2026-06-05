@@ -402,3 +402,36 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
 
   return lines;
 }
+
+export interface BossReport {
+  /** One-line headline. */
+  summary: DebriefLine;
+  /** The 3 sharpest read lines. */
+  bullets: DebriefLine[];
+  /** The single "fix tomorrow" call. */
+  fix: DebriefLine;
+  /** The full report, for an optional "Details" expander. */
+  full: DebriefLine[];
+}
+
+/**
+ * Debrief v3 — a TIGHT boss report: a summary headline, the 3 sharpest bullets,
+ * and the fix line. Built by selecting from the full debrief, so nothing new is
+ * invented and the full report stays available behind a "Details" expander.
+ */
+export function buildBossReport(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): BossReport {
+  const full = buildDebrief(result, club, bossActions);
+  const summary = full.find((l) => l.key === 'summary') ?? full[0];
+  const fix = full.find((l) => l.key === 'fix') ?? full[full.length - 1];
+  // Sharpest-first: the decision-relevant lines come before flavour.
+  const priority = ['door', 'bar', 'money', 'ba-dj', 'ba-bar', 'ba-door', 'ba-room', 'crew', 'rep', 'crowd', 'crowd-seg', 'reg', 'dj'];
+  const rank = (k: string) => {
+    const i = priority.indexOf(k);
+    return i < 0 ? 99 : i;
+  };
+  const bullets = full
+    .filter((l) => l.key !== 'summary' && l.key !== 'fix')
+    .sort((a, b) => rank(a.key) - rank(b.key))
+    .slice(0, 3);
+  return { summary, bullets, fix, full };
+}
