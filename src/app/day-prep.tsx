@@ -101,6 +101,12 @@ export default function DayPrepScreen() {
   const canAffordUpfront = upfront === 0 || club.cash >= upfront;
   const canOpen = validSchedule && canAffordUpfront && requirement.met;
 
+  // Derived readouts (rendered at the BOTTOM, below every selector, so changing a
+  // selector never reflows content above the control you just tapped — this is the
+  // scroll-jump fix).
+  const crowdTags = topCrowd(crowdMix(club, { ...config, eventId, staffOnDuty: onDuty }), 3);
+  const mentorTip = prepMentorLine(club, { ...config, eventId, staffOnDuty: onDuty });
+
   const onOpen = () => {
     // Defer resolution: the night resolves during playback (after the live
     // intervention beat), so we only stash tonight's prep here.
@@ -112,6 +118,11 @@ export default function DayPrepScreen() {
     <Screen
       footer={
         <View style={{ gap: 8 }}>
+          {mentorTip ? (
+            <Text variant="label" color={colors.neonCyan} style={styles.footerTip}>
+              {MENTOR_LABEL}: {mentorTip}
+            </Text>
+          ) : null}
           {event.cost > 0 ? (
             <ResultRow label={`${event.name} cost (upfront)`} value={`-${money(event.cost)}`} valueColor={colors.warning} />
           ) : null}
@@ -140,18 +151,12 @@ export default function DayPrepScreen() {
         </View>
       }
     >
-      {(() => {
-        const tip = prepMentorLine(club, { ...config, eventId, staffOnDuty: onDuty });
-        return tip ? (
-          <Card title={MENTOR_LABEL} accent={colors.neonCyan}>
-            <Text variant="body" style={{ lineHeight: 21 }}>
-              {tip}
-            </Text>
-          </Card>
-        ) : null;
-      })()}
+      <Text variant="title">Prepare the Club</Text>
+      <Text variant="label" muted style={styles.subhead}>
+        Set the room before you open. Your plan for the night lives at the bottom.
+      </Text>
 
-      <Card title="Tonight's Event">
+      <Card title="Tonight's Booking">
         {available.map((e) => {
           const selected = e.id === eventId;
           return (
@@ -178,29 +183,6 @@ export default function DayPrepScreen() {
             </Pressable>
           );
         })}
-        {readiness.messages.map((m, i) => (
-          <Text key={i} variant="label" color={NOTE_COLOR[m.tone]}>
-            {m.text}
-          </Text>
-        ))}
-      </Card>
-
-      <Card title="Expected Crowd">
-        {(() => {
-          const tags = topCrowd(crowdMix(club, { ...config, eventId, staffOnDuty: onDuty }), 3);
-          return (
-            <>
-              <View style={styles.crowdTags}>
-                {tags.map((id) => (
-                  <Pill key={id} label={CROWD_SEGMENTS[id].name} color={colors.neonCyan} />
-                ))}
-              </View>
-              <Text variant="label" muted>
-                {CROWD_SEGMENTS[tags[0]].likes}
-              </Text>
-            </>
-          );
-        })()}
       </Card>
 
       <Card title="Music">
@@ -221,14 +203,11 @@ export default function DayPrepScreen() {
           onChange={(v) => set('drinkLevel', v)}
         />
         <Text variant="label" muted>
-          Low = accessible · Med = house pricing · High = premium margin, fewer guests.
+          Low = accessible · Med = house · High = premium margin, fewer guests.
         </Text>
       </Card>
 
-      <Card title="Drink Prep">
-        <Text variant="label" muted>
-          Order the bar for tonight. Standard + House is the safe, free middle.
-        </Text>
+      <Card title="Bar Stock">
         <SegmentedControl
           label="Stock level"
           value={drink.stock}
@@ -244,14 +223,11 @@ export default function DayPrepScreen() {
           onChange={(v) => setDrink('quality', v)}
         />
         <Text variant="label" muted>{QUALITY_BLURB[drink.quality]}</Text>
-        <Text variant="label" color={stock > 0 ? colors.warning : colors.textMuted}>
-          {stock > 0 ? `Stock order: ${money(stock)} upfront` : 'No stock order cost tonight.'}
-        </Text>
       </Card>
 
-      <Card title="On Duty Tonight">
+      <Card title="Crew on Duty">
         <Text variant="label" muted>
-          Toggle off to rest someone tonight — they stay hired, and you only pay who works.
+          Toggle off to rest someone — they stay hired, and you only pay who works.
         </Text>
         {club.staff.map((m) => {
           const working = onDuty.includes(m.id);
@@ -263,7 +239,7 @@ export default function DayPrepScreen() {
               description={
                 working
                   ? `On duty · paid ${money(m.salary)} tonight · ${strengthLabel(m.skill)}${trait}`
-                  : `Off duty · not scheduled, no wage tonight · ${strengthLabel(m.skill)}${trait}`
+                  : `Off duty · no wage tonight · ${strengthLabel(m.skill)}${trait}`
               }
               value={working}
               onChange={() => toggleStaff(m.id)}
@@ -274,11 +250,7 @@ export default function DayPrepScreen() {
         <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
       </Card>
 
-      <Card title="Club Policies">
-        <Text variant="label" muted>
-          Set the house rules. The middle option of each is the safe, balanced choice.
-        </Text>
-
+      <Card title="House Rules">
         <SegmentedControl
           label="Smoking"
           value={policies.smoking}
@@ -319,11 +291,31 @@ export default function DayPrepScreen() {
           onChange={(v) => set('vipFocus', v)}
         />
       </Card>
+
+      {/* Derived readouts — kept LAST so a selector change never pushes a control
+          above it up the page (the scroll-jump fix). */}
+      <Card title="Tonight's Plan" accent={colors.neonViolet}>
+        <Text variant="label" muted>Expected crowd</Text>
+        <View style={styles.crowdTags}>
+          {crowdTags.map((id) => (
+            <Pill key={id} label={CROWD_SEGMENTS[id].name} color={colors.neonCyan} />
+          ))}
+        </View>
+        <Text variant="label" muted>{CROWD_SEGMENTS[crowdTags[0]].likes}</Text>
+        {readiness.messages.length > 0 ? <View style={styles.planDivider} /> : null}
+        {readiness.messages.map((m, i) => (
+          <Text key={i} variant="label" color={NOTE_COLOR[m.tone]}>
+            {m.text}
+          </Text>
+        ))}
+      </Card>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  subhead: { marginTop: -spacing.xs },
+  footerTip: { lineHeight: 18 },
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -336,4 +328,5 @@ const styles = StyleSheet.create({
   },
   eventRowSel: { borderColor: colors.neonMagenta },
   crowdTags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  planDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.xs },
 });
