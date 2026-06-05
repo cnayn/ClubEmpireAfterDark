@@ -448,6 +448,13 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     status: done(!!lastResult && lastResult.guests > 0 && lastResult.incidents === 0),
     benefit: 'A safe room keeps regulars coming back.',
   };
+  const buildRegularBase: BoardGoal = {
+    id: 'build-regular-base', category: 'reputation',
+    title: 'Build a regular base',
+    instruction: 'Grow your name to Rising Name — that is when a crowd starts treating the club as theirs.',
+    progress: clamp01(club.reputation / 40), status: done(club.reputation >= 40),
+    benefit: 'Regulars steady your nights.',
+  };
 
   // --- Venue -----------------------------------------------------------------
   const venue = getVenue(club.venue);
@@ -541,6 +548,7 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
       hireAnotherBartender, // staff
       bigNight,             // business
       cleanNight,           // reputation
+      buildRegularBase,     // reputation (crowd identity)
       buyBiggerFloor,       // venue
       hireAnotherBouncer,   // staff
       profitableNight,      // business

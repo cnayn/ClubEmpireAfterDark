@@ -11,6 +11,7 @@
  */
 
 import type { BossActionId } from '@/lib/bossActions';
+import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { venueStats } from '@/domain/furniture';
 import type { ClubState, NightResult } from '@/domain/types';
 import { signed, signedMoney } from './format';
@@ -179,6 +180,32 @@ function venueLine(club: ClubState | undefined): DebriefLine | null {
   return null;
 }
 
+/** One crowd line about who came and what it meant (aggregate, no fake guests). */
+function crowdLine(result: NightResult, club: ClubState | undefined): DebriefLine | null {
+  if (!club) return null;
+  const top = topCrowd(crowdMix(club, club.lastConfig), 1)[0];
+  if (!top) return null;
+  switch (top) {
+    case 'students':
+      return result.serviceRatio < 0.85
+        ? { key: 'crowd-seg', label: 'Crowd', tone: 'warn', text: 'Students packed the room, but the bar felt every one of them.' }
+        : { key: 'crowd-seg', label: 'Crowd', tone: 'info', text: 'Students filled the place — cheap rounds, loud room.' };
+    case 'rough':
+      return result.incidents > 0
+        ? { key: 'crowd-seg', label: 'Crowd', tone: 'warn', text: 'The rougher crowd brought energy — and the door had to stay sharp.' }
+        : { key: 'crowd-seg', label: 'Crowd', tone: 'info', text: 'A rougher crowd came in, but the door held it together.' };
+    case 'musicheads':
+      return { key: 'crowd-seg', label: 'Crowd', tone: 'good', text: 'Music heads noticed the sound tonight.' };
+    case 'vipcurious':
+      return { key: 'crowd-seg', label: 'Crowd', tone: 'good', text: 'VIP-curious guests clocked the entrance — the club’s starting to look worth the line.' };
+    case 'regulars':
+      return { key: 'crowd-seg', label: 'Crowd', tone: 'good', text: 'Regulars liked seeing familiar faces behind the bar.' };
+    case 'locals':
+    default:
+      return { key: 'crowd-seg', label: 'Crowd', tone: 'info', text: 'Locals kept the night steady — that trust is worth more than one big spike.' };
+  }
+}
+
 /** Build the boss-level debrief lines for a finished night. */
 export function buildDebrief(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
@@ -253,6 +280,10 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
 
   // --- What the boss did tonight (optional) ---
   lines.push(...bossActionLines(result, bossActions));
+
+  // --- Who came tonight (optional) ---
+  const crowd = crowdLine(result, club);
+  if (crowd) lines.push(crowd);
 
   // --- Venue look (optional) ---
   const venue = venueLine(club);

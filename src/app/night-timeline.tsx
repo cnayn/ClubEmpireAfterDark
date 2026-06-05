@@ -14,6 +14,7 @@ import {
   type MoodTone,
   resolveBossAction,
 } from '@/lib/bossActions';
+import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { buildTimeline } from '@/lib/timeline';
@@ -114,6 +115,7 @@ export default function NightTimelineScreen() {
         zones={zones}
         flashZone={committed ? undefined : flashZone}
         venueChips={venueFloorChips(planClub)}
+        crowdTags={topCrowd(crowdMix(planClub, plan), 3).map((id) => CROWD_SEGMENTS[id].name)}
       />
 
       {/* Current beat — short, floor-supporting. Tap to move the night along. */}

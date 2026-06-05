@@ -117,6 +117,7 @@ export function FloorView({
   zones,
   flashZone,
   venueChips,
+  crowdTags,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -131,6 +132,8 @@ export function FloorView({
   flashZone?: ZoneKey;
   /** Equipped furniture names per visible zone (door/bar/floor). */
   venueChips?: VenueFloorChips;
+  /** Crowd segment names in the room tonight (e.g. Locals / Students). */
+  crowdTags?: string[];
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -214,7 +217,18 @@ export function FloorView({
         ) : null}
         {venueChips ? <FurnitureChips names={venueChips.door} /> : null}
 
-        {/* CROWD (middle) + floor-level bubbles */}
+        {/* CROWD (middle) — who's in tonight + floor bubbles */}
+        {crowdTags && crowdTags.length > 0 ? (
+          <View style={styles.crowdTagRow}>
+            {crowdTags.map((t) => (
+              <View key={t} style={styles.crowdTag}>
+                <Text variant="label" color={colors.neonCyan}>
+                  {t}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {venueChips ? <FurnitureChips names={venueChips.floor} /> : null}
         <View style={styles.crowd}>{renderDots()}</View>
         {inZone('floor').length > 0 ? (
@@ -310,6 +324,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  crowdTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
+  crowdTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.neonCyan,
     backgroundColor: colors.surface,
   },
   bubble: {

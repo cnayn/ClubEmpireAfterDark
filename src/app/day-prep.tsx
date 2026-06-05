@@ -16,6 +16,7 @@ import {
   STOCK_OPTIONS,
   stockCost,
 } from '@/domain/drinks';
+import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
 import { aggregateEffects } from '@/domain/upgrades';
 import {
@@ -172,6 +173,24 @@ export default function DayPrepScreen() {
         ))}
       </Card>
 
+      <Card title="Expected Crowd">
+        {(() => {
+          const tags = topCrowd(crowdMix(club, { ...config, eventId, staffOnDuty: onDuty }), 3);
+          return (
+            <>
+              <View style={styles.crowdTags}>
+                {tags.map((id) => (
+                  <Pill key={id} label={CROWD_SEGMENTS[id].name} color={colors.neonCyan} />
+                ))}
+              </View>
+              <Text variant="label" muted>
+                {CROWD_SEGMENTS[tags[0]].likes}
+              </Text>
+            </>
+          );
+        })()}
+      </Card>
+
       <Card title="Music">
         <SegmentedControl value={config.music} options={MUSIC} onChange={(v) => set('music', v)} />
       </Card>
@@ -304,4 +323,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   eventRowSel: { borderColor: colors.neonMagenta },
+  crowdTags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
