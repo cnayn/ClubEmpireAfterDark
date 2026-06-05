@@ -63,8 +63,8 @@ export const SERVICE_PER_BARTENDER = 35;
  * a 3rd bartender or a sharper crew visibly helps even a small full room. Bounded
  * at 2× coverage; a real trade-off against wages, never free money.
  */
-export const SERVICE_HEADROOM_VIBE = 4; // max +vibe at ≥2× coverage
-export const SERVICE_HEADROOM_REVENUE = 0.035; // max +3.5% bar revenue at ≥2× coverage
+export const SERVICE_HEADROOM_VIBE = 8; // max +vibe at ≥2× coverage (crew must visibly matter)
+export const SERVICE_HEADROOM_REVENUE = 0.08; // max +8% bar revenue at ≥2× coverage
 
 /**
  * Bartender QUALITY → bar revenue, on top of raw service capacity. Centered on

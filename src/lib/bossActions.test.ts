@@ -58,34 +58,39 @@ describe('Push the DJ — bounded lift, not a trap', () => {
   });
 });
 
-describe('Check the Bar — helps only a strained bar', () => {
+describe('Check the Bar — always does something, biggest when strained', () => {
   const strainedClub = club({ reputation: 100, baseCapacity: 200 });
   const strainedCfg = cfg({ staffOnDuty: [BARTENDERS[0]], coverLevel: 'low', drinkLevel: 'low' }); // 1 bartender, packed
-  it('boosts revenue when the bar is strained', () => {
+  it('boosts revenue most when the bar is strained', () => {
     const pv = preview(strainedClub, strainedCfg, 3);
     expect(pv.serviceRatio).toBeLessThan(0.85);
-    expect(resolveBossAction('check-bar', pv, strainedClub).intervention.revenueMod).toBeGreaterThan(1);
+    expect(resolveBossAction('check-bar', pv, strainedClub).intervention.revenueMod).toBeGreaterThanOrEqual(1.1);
   });
-  it('is a no-op when the bar is holding', () => {
+  it('still gives a small, bounded lift when the bar is holding (never a dead no-op)', () => {
     const c = club({ baseCapacity: 60, reputation: 40 }); // small house, full crew → bar keeps up
     const config = cfg({ coverLevel: 'high', drinkLevel: 'high' }); // thinner crowd
     const pv = preview(c, config, 3);
     expect(pv.serviceRatio).toBeGreaterThanOrEqual(0.85);
-    expect(resolveBossAction('check-bar', pv, c).intervention).toEqual({ vibeBonus: 0, revenueMod: 1 });
+    const iv = resolveBossAction('check-bar', pv, c).intervention;
+    expect(iv.revenueMod).toBeGreaterThan(1);
+    expect(iv.revenueMod).toBeLessThanOrEqual(1.05); // smaller than the strained boost
   });
 });
 
-describe('Send a Bouncer — helps under door pressure', () => {
-  it('lifts the room when there is risk, no-op when calm', () => {
+describe('Send a Bouncer — always sharpens the door, scales under pressure', () => {
+  it('lifts the room more under risk than on a calm door (but a calm door still benefits)', () => {
     const busy = club({ reputation: 100, baseCapacity: 200 });
     const busyCfg = cfg({ coverLevel: 'low', drinkLevel: 'low' }); // packed → fill high
     const busyPv = preview(busy, busyCfg, 2);
-    expect(resolveBossAction('send-bouncer', busyPv, busy).intervention.vibeBonus).toBeGreaterThan(0);
+    const risk = resolveBossAction('send-bouncer', busyPv, busy).intervention.vibeBonus;
 
     const calm = club({ reputation: 10 });
     const calmCfg = cfg({ coverLevel: 'high', drinkLevel: 'high' }); // thin crowd
     const calmPv = preview(calm, calmCfg, 2);
-    expect(resolveBossAction('send-bouncer', calmPv, calm).intervention.vibeBonus).toBe(0);
+    const calmVibe = resolveBossAction('send-bouncer', calmPv, calm).intervention.vibeBonus;
+
+    expect(calmVibe).toBeGreaterThan(0); // never a dead no-op
+    expect(risk).toBeGreaterThan(calmVibe); // but risk matters more
   });
 
   it('flavor reflects John vs Caramel on a risky night', () => {

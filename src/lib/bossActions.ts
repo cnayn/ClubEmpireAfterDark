@@ -65,28 +65,36 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
 
   switch (id) {
     case 'push-dj': {
-      // Reuses the Push DJ feel: clear vibe lift, tiny bar cost — not a trap. A
-      // real booked act (Local/Hype) has more to give when you push it.
+      // Pushing the booth ONLY lifts the room — it never costs money (revenueMod 1)
+      // so it can't "backfire." Strongest when the floor is cooling or music heads
+      // are in, and a real booked act (Local/Hype) has more to give when pushed.
       const djBonus = djPushBonus(club.lastConfig.dj);
+      const top = topCrowd(crowdMix(club, club.lastConfig), 3);
+      const cooling = preview.regularLoyalty < 52 || top.includes('musicheads');
+      const coolBonus = cooling ? 6 : 0;
       return {
-        intervention: { vibeBonus: 18 + djBonus, revenueMod: 0.99 },
-        bubble: { id: 'boss-dj', label: djBonus > 0 ? 'DJ lifted the room' : 'Booth lifting', tone: 'info', zone: 'floor' },
-        mood: { label: djBonus > 0 ? 'Music heads noticed' : 'Energy lifting', tone: 'good' },
+        intervention: { vibeBonus: 18 + djBonus + coolBonus, revenueMod: 1 },
+        bubble: { id: 'boss-dj', label: djBonus > 0 ? 'DJ lifted the room' : 'Booth lifting', tone: 'good', zone: 'floor' },
+        mood: { label: cooling ? 'DJ pulled the floor back' : djBonus > 0 ? 'Music heads noticed' : 'Energy lifting', tone: 'good' },
         call: BOSS_CALL['push-dj'],
-        note: djBonus > 0
-          ? 'Pushed the booth — the DJ lifted the room and the music heads noticed.'
-          : 'Pushed the booth — the room found another gear.',
+        note: cooling
+          ? 'Pushed the booth — the floor was slipping and the DJ pulled it back.'
+          : djBonus > 0
+            ? 'Pushed the booth — the DJ lifted the room and the music heads noticed.'
+            : 'Pushed the booth — the room found another gear.',
       };
     }
     case 'check-bar': {
       // Three-state diagnosis. Only an OVERLOADED bar (strained service) gets a
       // real, bounded stabilization; "starting to crack" and "holding" are
       // diagnosis-only (no-op) so reading a healthy bar is never free value.
+      // Three-state diagnosis — and every state does SOMETHING: the worse the bar,
+      // the bigger the bounded stabilization when you step in.
       const ratio = preview.serviceRatio;
       if (ratio < 0.85) {
         return {
           intervention: { vibeBonus: 3, revenueMod: 1.1 },
-          bubble: { id: 'boss-bar', label: 'Backlog cleared', tone: 'info', zone: 'bar' },
+          bubble: { id: 'boss-bar', label: 'Backlog cleared', tone: 'good', zone: 'bar' },
           mood: { label: 'Bar was overloaded — you stepped in', tone: 'warn' },
           call: BOSS_CALL['check-bar'],
           note: 'Bar was overloaded — you caught the backlog before it became a complaint.',
@@ -94,19 +102,19 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       }
       if (ratio < 1) {
         return {
-          intervention: { vibeBonus: 0, revenueMod: 1 },
-          bubble: { id: 'boss-bar', label: 'Bar starting to crack', tone: 'warn', zone: 'bar' },
-          mood: { label: 'Bar starting to crack', tone: 'info' },
+          intervention: { vibeBonus: 2, revenueMod: 1.05 },
+          bubble: { id: 'boss-bar', label: 'Bar steadied', tone: 'good', zone: 'bar' },
+          mood: { label: 'Bar was starting to crack — you steadied it', tone: 'info' },
           call: BOSS_CALL['check-bar'],
-          note: 'Bar is starting to crack — keep an eye on it before the line snaps.',
+          note: 'Bar was starting to crack — you got the pours moving before the line snapped.',
         };
       }
       return {
-        intervention: { vibeBonus: 0, revenueMod: 1 },
-        bubble: { id: 'boss-bar', label: 'Bar holding', tone: 'info', zone: 'bar' },
-        mood: { label: 'Bar holding', tone: 'good' },
+        intervention: { vibeBonus: 1, revenueMod: 1.02 },
+        bubble: { id: 'boss-bar', label: 'Bar sharp', tone: 'good', zone: 'bar' },
+        mood: { label: 'Bar holding — you kept it sharp', tone: 'good' },
         call: BOSS_CALL['check-bar'],
-        note: "Bar's holding — drinks were flowing fine.",
+        note: "Bar's holding — a word from the boss kept the pours sharp.",
       };
     }
     case 'send-bouncer': {
@@ -116,9 +124,11 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       const risk = preview.incidents > 0 || fill >= 0.7;
       const bouncers = club.staff.filter((m) => m.role === 'bouncer' && onDuty.has(m.id));
       const avgSkill = bouncers.length ? bouncers.reduce((s, m) => s + m.skill, 0) / bouncers.length : 0;
-      let vibeBonus = 0;
-      let note = 'Put eyes on the door — it was calm out there.';
-      let label = 'Door calm';
+      // A calm door still benefits from a visible presence (never a pure no-op);
+      // under real risk the effect scales with who's working the door.
+      let vibeBonus = 3;
+      let note = 'Put eyes on the door — kept it sharp before anything could start.';
+      let label = 'Door kept sharp';
       let tone: MoodTone = 'good';
       if (risk) {
         if (caramelOn) {
