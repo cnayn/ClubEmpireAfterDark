@@ -9,6 +9,7 @@ import { GoalBoardList } from '@/components/GoalBoard';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { reputationTier } from '@/domain/balance';
+import { REGULAR_COPY, topRegulars } from '@/domain/regulars';
 import { buildFloorView, floorBubbles, goalBoard, venueFloorChips } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -35,6 +36,7 @@ export default function DashboardScreen() {
 
   // Compact board on the dashboard; the full board lives on the Goals tab.
   const goals = goalBoard(club, lastResult).slice(0, 3);
+  const regulars = topRegulars(club.regularBase, 3);
   const floor = buildFloorView(club, lastResult);
   const bubbles = floorBubbles(lastResult);
 
@@ -125,6 +127,33 @@ export default function DashboardScreen() {
         </Pressable>
       </Card>
 
+      {/* Regular Base — who's becoming loyal */}
+      <Card title="Regular Base">
+        {regulars.length === 0 ? (
+          <Text variant="label" muted>
+            No regulars yet — give a crowd a reason to come back.
+          </Text>
+        ) : (
+          <>
+            <View style={styles.regularRow}>
+              {regulars.map((r) => (
+                <View key={r.id} style={styles.regularChip}>
+                  <Text variant="label" muted>
+                    {r.name}
+                  </Text>
+                  <Text variant="heading" color={colors.neonCyan}>
+                    {r.score}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <Text variant="label" muted>
+              {REGULAR_COPY[regulars[0].id]}
+            </Text>
+          </>
+        )}
+      </Card>
+
       {/* The living venue — the home screen's centerpiece */}
       <FloorView floor={floor} bubbles={bubbles} venueChips={venueFloorChips(club)} />
     </Screen>
@@ -153,4 +182,6 @@ const styles = StyleSheet.create({
   modalText: { lineHeight: 21 },
   row: { flexDirection: 'row', gap: spacing.md },
   seeAll: { marginTop: spacing.sm, textAlign: 'right' },
+  regularRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  regularChip: { alignItems: 'center', minWidth: 64 },
 });

@@ -12,6 +12,7 @@
 
 import type { BossActionId } from '@/lib/bossActions';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
+import { topRegulars } from '@/domain/regulars';
 import { venueStats } from '@/domain/furniture';
 import type { ClubState, NightResult } from '@/domain/types';
 import { signed, signedMoney } from './format';
@@ -206,6 +207,30 @@ function crowdLine(result: NightResult, club: ClubState | undefined): DebriefLin
   }
 }
 
+/** One line about the regulars who are starting to come back (aggregate). */
+function regularsLine(result: NightResult, club: ClubState | undefined): DebriefLine | null {
+  if (!club) return null;
+  const top = topRegulars(club.regularBase, 1)[0];
+  if (!top || top.score < 15) return null; // only once a base is genuinely forming
+  switch (top.id) {
+    case 'regulars':
+      return { key: 'reg', label: 'Regulars', tone: 'good', text: 'Regulars came back tonight. That is not luck.' };
+    case 'locals':
+      return { key: 'reg', label: 'Regulars', tone: 'good', text: 'Locals are starting to treat this place like theirs.' };
+    case 'musicheads':
+      return { key: 'reg', label: 'Regulars', tone: 'good', text: 'Music heads noticed the sound again — that reputation is building.' };
+    case 'students':
+      return result.serviceRatio < 0.85
+        ? { key: 'reg', label: 'Regulars', tone: 'warn', text: 'Students brought bodies, but the bar paid the price.' }
+        : { key: 'reg', label: 'Regulars', tone: 'info', text: 'Students keep coming for the cheap, loud nights.' };
+    case 'rough':
+      return { key: 'reg', label: 'Regulars', tone: 'warn', text: 'The wrong crowd is also a reputation. Watch the door.' };
+    case 'vipcurious':
+    default:
+      return { key: 'reg', label: 'Regulars', tone: 'info', text: 'A sharper crowd is circling — the club is getting noticed.' };
+  }
+}
+
 /** Build the boss-level debrief lines for a finished night. */
 export function buildDebrief(result: NightResult, club?: ClubState, bossActions?: BossActionId[]): DebriefLine[] {
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
@@ -284,6 +309,10 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
   // --- Who came tonight (optional) ---
   const crowd = crowdLine(result, club);
   if (crowd) lines.push(crowd);
+
+  // --- Who's coming back (optional, once a regular base forms) ---
+  const regs = regularsLine(result, club);
+  if (regs) lines.push(regs);
 
   // --- Venue look (optional) ---
   const venue = venueLine(club);

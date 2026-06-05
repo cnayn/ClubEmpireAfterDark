@@ -161,6 +161,18 @@ export interface VenueState {
   equipped: Partial<Record<VenueZone, string[]>>;
 }
 
+// --- Regulars Persistence v1 -------------------------------------------------
+/** Aggregate crowd-loyalty scores (0–100) per segment — NOT individual guests.
+ *  Keys match CrowdSegmentId (src/domain/crowd.ts). */
+export interface RegularBase {
+  locals: number;
+  students: number;
+  musicheads: number;
+  vipcurious: number;
+  rough: number;
+  regulars: number;
+}
+
 /** Persisted club + meta state (everything that survives between nights). */
 export interface ClubState {
   name: string;
@@ -176,6 +188,9 @@ export interface ClubState {
   /** Venue / Furniture v1. Optional for save back-compat: old saves without it
    *  load fine and are treated as an empty (neutral) venue. */
   venue?: VenueState;
+  /** Regulars Persistence v1. Optional for save back-compat: absent = empty
+   *  (neutral) regular base. Aggregate loyalty only — no individual guests. */
+  regularBase?: RegularBase;
 }
 
 /** A single line in the night results breakdown. */

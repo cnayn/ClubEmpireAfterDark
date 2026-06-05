@@ -118,6 +118,7 @@ export function FloorView({
   flashZone,
   venueChips,
   crowdTags,
+  regularTags,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -134,6 +135,8 @@ export function FloorView({
   venueChips?: VenueFloorChips;
   /** Crowd segment names in the room tonight (e.g. Locals / Students). */
   crowdTags?: string[];
+  /** Returning-regular notes (e.g. "Locals back") when a base has formed. */
+  regularTags?: string[];
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -223,6 +226,17 @@ export function FloorView({
             {crowdTags.map((t) => (
               <View key={t} style={styles.crowdTag}>
                 <Text variant="label" color={colors.neonCyan}>
+                  {t}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {regularTags && regularTags.length > 0 ? (
+          <View style={styles.crowdTagRow}>
+            {regularTags.map((t) => (
+              <View key={t} style={[styles.crowdTag, { borderColor: colors.success }]}>
+                <Text variant="label" color={colors.success}>
                   {t}
                 </Text>
               </View>

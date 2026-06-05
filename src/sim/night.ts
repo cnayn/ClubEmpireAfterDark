@@ -16,6 +16,7 @@
 import * as B from '@/domain/balance';
 import { effectiveBookingFee, eventResultNotes, getEvent } from '@/domain/events';
 import { crowdEffects, crowdMix } from '@/domain/crowd';
+import { regularBaseEffects, updateRegularBase } from '@/domain/regulars';
 import { drinkPrepEffects, stockCost } from '@/domain/drinks';
 import { policyEffects } from '@/domain/policies';
 import { venueEffects, venueStats } from '@/domain/furniture';
@@ -66,7 +67,11 @@ export function resolveNight(
   const ve = venueEffects(venueStats(club.venue));
   // Crowd Identity v1: a Locals-anchored crowd mix nudges draw/incident/vibe a
   // little, bounded. Derived from this night's setup (no persisted state).
-  const ce = crowdEffects(crowdMix(club, config));
+  const cm = crowdMix(club, config);
+  const ce = crowdEffects(cm);
+  // Regulars Persistence v1: the loyalty already built nudges the night gently.
+  // Empty/absent base ⇒ neutral (×1 / +0), so a club with no regulars is unchanged.
+  const re = regularBaseEffects(club.regularBase);
 
   // Tonight's event is a deterministic modifier vector (no new RNG draws).
   // Quiet Night (`regular`) is all-neutral, so its path is identical to Phase 2A.
@@ -84,7 +89,7 @@ export function resolveNight(
   const smokingDraw = config.smoking === 'relaxed' ? B.SMOKING_RELAXED_DRAW : 0;
   const noise = rng.range(0.9, 1.1);
 
-  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise * pe.drawMod * ve.drawMod * ce.drawMod;
+  const expected = capacity * repFactor * priceMod * musicFit * (1 + smokingDraw) * event.drawMod * noise * pe.drawMod * ve.drawMod * ce.drawMod * re.drawMod;
   const guests = clamp(Math.round(expected), 0, capacity);
 
   // --- Service capacity (bartenders gate bar revenue) ---
@@ -126,7 +131,7 @@ export function resolveNight(
   const crowdPressure = capacity > 0 ? guests / capacity : 0;
   const securityMod = B.bouncerSecurityMod(crew.bouncerUnits) * (fx.securityDiscount ? 0.8 : 1);
   const riskFromSmoking = config.smoking === 'relaxed' ? B.RELAXED_SMOKING_RISK : 0;
-  const incidentChance = clamp((crowdPressure * 0.5 * securityMod + riskFromSmoking + event.riskMod) * pe.incidentMod * ce.incidentMod, 0, 0.9);
+  const incidentChance = clamp((crowdPressure * 0.5 * securityMod + riskFromSmoking + event.riskMod) * pe.incidentMod * ce.incidentMod * re.incidentMod, 0, 0.9);
 
   let incidents = 0;
   if (rng.chance(incidentChance)) {
@@ -164,7 +169,7 @@ export function resolveNight(
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd + ce.vibeAdd, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd + ce.vibeAdd + re.vibeAdd, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;
@@ -240,6 +245,14 @@ export function resolveNight(
     cash: club.cash + net,
     reputation: reputationAfter,
     lastConfig: config,
+    // Regulars Persistence v1: who came back, drifted gently from tonight.
+    regularBase: updateRegularBase(club.regularBase, cm, {
+      reputationDelta: reputationAfter - reputationBefore,
+      serviceRatio,
+      incidents,
+      fines,
+      noShows: crew.noShows,
+    }),
   };
 
   return { result, nextClub };

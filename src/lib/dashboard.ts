@@ -7,6 +7,7 @@
 import { REPUTATION_TIERS, START_CAPACITY } from '@/domain/balance';
 import { getEvent } from '@/domain/events';
 import { equippedIn, getFurniture, getVenue } from '@/domain/furniture';
+import { getRegularBase } from '@/domain/regulars';
 import { CANDIDATE_POOL, hireCost, minViableNightCost } from '@/domain/staff';
 import type { ClubState, EventId, NightResult } from '@/domain/types';
 import { aggregateEffects, UPGRADES } from '@/domain/upgrades';
@@ -455,6 +456,14 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
     progress: clamp01(club.reputation / 40), status: done(club.reputation >= 40),
     benefit: 'Regulars steady your nights.',
   };
+  const localsBase = getRegularBase(club.regularBase).locals;
+  const winOverLocals: BoardGoal = {
+    id: 'win-over-locals', category: 'reputation',
+    title: 'Win over the locals',
+    instruction: 'Run fair, clean, well-served nights so the neighbourhood starts treating the room as theirs.',
+    progress: clamp01(localsBase / 30), status: done(localsBase >= 30),
+    benefit: 'Locals are your steady base.',
+  };
 
   // --- Venue -----------------------------------------------------------------
   const venue = getVenue(club.venue);
@@ -549,6 +558,7 @@ export function buildBoardGoals(club: ClubState, lastResult: NightResult | null)
       bigNight,             // business
       cleanNight,           // reputation
       buildRegularBase,     // reputation (crowd identity)
+      winOverLocals,        // reputation (regulars)
       buyBiggerFloor,       // venue
       hireAnotherBouncer,   // staff
       profitableNight,      // business
