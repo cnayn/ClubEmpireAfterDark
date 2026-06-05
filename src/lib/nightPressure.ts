@@ -9,6 +9,7 @@
  */
 
 import { crowdMix, topCrowd } from '@/domain/crowd';
+import { floorEmotes, type FloorBubble } from '@/lib/dashboard';
 import { DEFAULT_POLICIES } from '@/domain/policies';
 import { venueStats } from '@/domain/furniture';
 import { liveCrowdFraction } from '@/lib/nightClock';
@@ -75,4 +76,70 @@ export function pressureHeadline(p: NightPressures): PressureHeadline {
 /** When (0..1 progress) a zone-anchored encounter should interrupt the flow. */
 export function encounterTrigger(zone: ZoneKey): number {
   return zone === 'bar' ? 0.35 : zone === 'floor' ? 0.55 : 0.7;
+}
+
+/**
+ * Live guest emotes — same source as `floorEmotes`, but a per-zone bubble only
+ * surfaces once that zone's pressure has actually risen. The room talks itself
+ * into life as the night runs, instead of speaking all at once. Presentation
+ * only; deterministic for (preview, club, pressures).
+ */
+export function liveEmotes(preview: NightResult, club: ClubState, pressures: NightPressures): FloorBubble[] {
+  const all = floorEmotes(preview, club);
+  return all.filter((b) => {
+    if (b.zone === 'bar') return pressures.bar >= 0.4 || pressures.crowd >= 0.55;
+    if (b.zone === 'door') return pressures.door >= 0.35 || pressures.crowd >= 0.55;
+    return pressures.crowd >= 0.4; // floor
+  });
+}
+
+export type StreamTone = BeatTone;
+export interface StreamTick {
+  id: string;
+  /** 0..1 progress when this tick first surfaces. */
+  at: number;
+  text: string;
+  tone: StreamTone;
+  zone: ZoneKey;
+}
+
+/**
+ * Living-floor event stream — small ambient ticks the room produces as the night
+ * runs, derived from the deterministic preview + the live progress. Pure: no RNG,
+ * no resolver change, no save schema. The night's economic outcome is still the
+ * resolver's; these are presentation ticks so the floor narrates itself.
+ */
+export function livingStreamTicks(preview: NightResult, club: ClubState, progress: number): StreamTick[] {
+  const ticks: StreamTick[] = [];
+  const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
+  const top = topCrowd(crowdMix(club, club.lastConfig), 3);
+
+  ticks.push({ id: 'doors', at: 0.05, text: 'Doors open. First faces drift in.', tone: 'info', zone: 'door' });
+  if (top.includes('students')) {
+    ticks.push({ id: 'students', at: 0.2, text: 'Cheap rounds, loud table — the students are settling in.', tone: 'info', zone: 'floor' });
+  } else if (top.includes('musicheads')) {
+    ticks.push({ id: 'musicheads', at: 0.25, text: 'Heads at the booth. They want to be moved.', tone: 'info', zone: 'floor' });
+  } else if (top.includes('vipcurious')) {
+    ticks.push({ id: 'vipc', at: 0.25, text: 'A sharper crowd is clocking the entrance.', tone: 'info', zone: 'door' });
+  }
+  if (preview.serviceRatio < 0.85) {
+    ticks.push({ id: 'bar-deep', at: 0.45, text: "Bar's three deep — drinks crawling out.", tone: 'warn', zone: 'bar' });
+  }
+  if (preview.incidents > 0) {
+    ticks.push({ id: 'door-push', at: 0.55, text: 'A push at the door — it nearly tipped.', tone: 'bad', zone: 'door' });
+  }
+  if (fill >= 0.7) {
+    ticks.push({ id: 'packed', at: 0.6, text: 'The room hits the back wall — packed.', tone: 'info', zone: 'floor' });
+  } else if (fill < 0.3) {
+    ticks.push({ id: 'thin', at: 0.55, text: 'The floor never thickens. A thin one tonight.', tone: 'warn', zone: 'floor' });
+  }
+  if (preview.theft > 0) {
+    ticks.push({ id: 'theft', at: 0.7, text: 'Behind the bar, the till looks thinner than it should.', tone: 'bad', zone: 'bar' });
+  }
+  if (preview.regularLoyalty >= 60 && fill >= 0.4) {
+    ticks.push({ id: 'pocket', at: 0.75, text: 'Music, crowd, bar — in the pocket.', tone: 'good', zone: 'floor' });
+  }
+  ticks.push({ id: 'lastcall', at: 0.9, text: 'Last call. The floor starts to thin.', tone: 'info', zone: 'floor' });
+
+  return ticks.filter((t) => t.at <= progress).sort((a, b) => a.at - b.at);
 }

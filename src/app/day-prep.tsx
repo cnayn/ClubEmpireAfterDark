@@ -113,15 +113,21 @@ export default function DayPrepScreen() {
   // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
   const canAffordUpfront = upfront === 0 || club.cash >= upfront;
   // First-night gate: a brand-new owner must genuinely engage each area before
-  // opening blind. "Done" is DERIVED from real interaction (you can't fake a tick);
-  // the crowd readout counts as reviewed once the other three are set, since the
-  // expected crowd is shaped by them.
+  // opening blind. "Done" is DERIVED from real state where possible — crew reads
+  // from `validSchedule` (a real downstream check); bar / rules read engagement
+  // with that section (touching a control inside it); crowd ticks once those are
+  // honestly set, since the expected crowd is shaped by them.
   const firstNight = isFirstNight(club);
   const checklist = firstNightChecklist();
-  const isDone = (id: string) =>
-    id === 'crowd'
-      ? touched.has('crew') && touched.has('bar') && touched.has('rules')
-      : touched.has(id);
+  const crewDone = validSchedule; // real state: a bartender is on duty
+  const barDone = touched.has('bar');
+  const rulesDone = touched.has('rules');
+  const isDone = (id: string) => {
+    if (id === 'crew') return crewDone;
+    if (id === 'bar') return barDone;
+    if (id === 'rules') return rulesDone;
+    return crewDone && barDone && rulesDone; // crowd
+  };
   const doneCount = checklist.filter((i) => isDone(i.id)).length;
   const ready = !firstNight || doneCount >= checklist.length;
   const canOpen = validSchedule && canAffordUpfront && requirement.met && ready;

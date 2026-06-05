@@ -5,7 +5,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
-import { encounterTrigger, livePressures, pressureHeadline } from './nightPressure';
+import { encounterTrigger, liveEmotes, livePressures, livingStreamTicks, pressureHeadline } from './nightPressure';
 
 const ALL = STARTING_ROSTER.map((m) => m.id);
 const BARTENDERS = STARTING_ROSTER.filter((m) => m.role === 'bartender').map((m) => m.id);
@@ -70,5 +70,36 @@ describe('pressureHeadline', () => {
 describe('encounterTrigger', () => {
   it('fires earlier for the bar than the door', () => {
     expect(encounterTrigger('bar')).toBeLessThan(encounterTrigger('door'));
+  });
+});
+
+describe('liveEmotes — emotes surface only once a zone is under pressure', () => {
+  it('a calm room (no pressure) shows fewer emotes than a busy one', () => {
+    const c = club();
+    const r = result({ guests: 50, capacity: 60, serviceRatio: 0.5, incidents: 1 });
+    const calm = liveEmotes(r, c, { crowd: 0.1, bar: 0.1, door: 0.1, bathroom: 0.1, energy: 0.6 });
+    const busy = liveEmotes(r, c, { crowd: 0.9, bar: 0.9, door: 0.9, bathroom: 0.9, energy: 0.4 });
+    expect(busy.length).toBeGreaterThanOrEqual(calm.length);
+  });
+});
+
+describe('livingStreamTicks — the floor narrates itself as the clock runs', () => {
+  it('reveals more ticks as the night progresses, and is ordered + deterministic', () => {
+    const c = club();
+    const r = result();
+    const early = livingStreamTicks(r, c, 0.1);
+    const late = livingStreamTicks(r, c, 0.95);
+    expect(late.length).toBeGreaterThanOrEqual(early.length);
+    expect(late).toEqual(livingStreamTicks(r, c, 0.95)); // deterministic
+    const ats = late.map((t) => t.at);
+    expect([...ats].sort((a, b) => a - b)).toEqual(ats); // ordered
+    expect(late.some((t) => t.id === 'doors')).toBe(true);
+    expect(late.some((t) => t.id === 'lastcall')).toBe(true);
+  });
+
+  it('a strained bar produces a bar-pressure tick', () => {
+    const c = club();
+    const ticks = livingStreamTicks(result({ serviceRatio: 0.5 }), c, 1);
+    expect(ticks.some((t) => t.zone === 'bar' && t.tone === 'warn')).toBe(true);
   });
 });

@@ -147,6 +147,9 @@ export function FloorView({
   regularTags,
   djLabel,
   liveScale = 1,
+  headRight,
+  belowRoom,
+  hideFooter = false,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -169,6 +172,15 @@ export function FloorView({
   regularTags?: string[];
   /** The booked DJ act for the night, shown at the booth (e.g. "Hype DJ"). */
   djLabel?: string;
+  /** Replaces the right-hand Pill in the header (e.g. a play/speed control). */
+  headRight?: ReactNode;
+  /** Extra content rendered below the room, inside the same Card — used by the
+   *  live night to embed pressure meters, action chips, the event stream, and
+   *  the encounter overlay so the floor IS the surface (no stacked phase cards). */
+  belowRoom?: ReactNode;
+  /** Hide the trailing "last night / doors closed" footer line when the night
+   *  is live (the clock + meters already say where we are). */
+  hideFooter?: boolean;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -222,13 +234,18 @@ export function FloorView({
   const floorTint = zoneTint('floor');
 
   return (
-    <Card title={title}>
+    <Card title={title} accent={moodAccent}>
       <View style={styles.head}>
         <Text variant="label" muted>
           {floor.eventName}
         </Text>
-        <Pill label={moodLabel ?? VIBE_LABEL[floor.vibe]} color={accent} />
+        {headRight ?? <Pill label={moodLabel ?? VIBE_LABEL[floor.vibe]} color={accent} />}
       </View>
+      {headRight && moodLabel ? (
+        <Text variant="heading" color={accent} style={styles.moodLine}>
+          {moodLabel}
+        </Text>
+      ) : null}
 
       <View style={[styles.room, { borderColor: accent }]}>
         {/* DOOR — back of the room (inset for depth), with the VIP placeholder. */}
@@ -326,11 +343,15 @@ export function FloorView({
         {venueChips ? <FurnitureChips names={venueChips.bar} /> : null}
       </View>
 
-      <Text variant="label" muted>
-        {floor.hasPlayedNight
-          ? `Last night: ${floor.lastGuests}/${floor.capacity} guests`
-          : 'Doors closed — open the club tonight.'}
-      </Text>
+      {belowRoom ? <View style={styles.belowRoom}>{belowRoom}</View> : null}
+
+      {hideFooter ? null : (
+        <Text variant="label" muted>
+          {floor.hasPlayedNight
+            ? `Last night: ${floor.lastGuests}/${floor.capacity} guests`
+            : 'Doors closed — open the club tonight.'}
+        </Text>
+      )}
     </Card>
   );
 }
@@ -446,4 +467,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: colors.surface,
   },
+  moodLine: { marginTop: -spacing.xs, lineHeight: 22 },
+  belowRoom: { gap: spacing.md, marginTop: spacing.sm },
 });

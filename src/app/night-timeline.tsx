@@ -1,9 +1,18 @@
+/**
+ * Living Floor Loop v2 — the night IS the floor.
+ *
+ * One persistent surface: the clock runs at the top of the room, pressure meters
+ * sit under it, guests react in-zone, the boss-action chips dock below the floor,
+ * and a situation appears as an in-room banner (not a stacked card). The night's
+ * books still come from the deterministic resolver — every live read here is a
+ * pure projection of the no-intervention preview + the current progress.
+ */
+
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
 import { FloorView } from '@/components/FloorView';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
@@ -20,10 +29,18 @@ import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
 import { nightMentorLine } from '@/lib/mentor';
 import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
-import { buildFloorView, type FloorBubble, floorBubbles, floorEmotes, venueFloorChips } from '@/lib/dashboard';
+import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS } from '@/lib/nightClock';
-import { encounterTrigger, livePressures, type NightPressures, pressureHeadline } from '@/lib/nightPressure';
+import {
+  encounterTrigger,
+  liveEmotes,
+  livePressures,
+  livingStreamTicks,
+  type NightPressures,
+  pressureHeadline,
+  type StreamTick,
+} from '@/lib/nightPressure';
 import { nightZones, type ZoneKey } from '@/lib/venue';
 import type { ClubState, DayConfig } from '@/domain/types';
 import { useGameStore } from '@/state/store';
@@ -51,15 +68,18 @@ function meterColor(value: number, mode: MeterMode): string {
   return value >= 0.66 ? hi : value >= 0.33 ? colors.warning : lo;
 }
 
-function Meter({ label, value, mode }: { label: string; value: number; mode: MeterMode }) {
+/** Compact, single-row meter — small enough to stack four across the floor. */
+function MiniMeter({ label, value, mode }: { label: string; value: number; mode: MeterMode }) {
   return (
-    <View style={styles.meterRow}>
-      <Text variant="label" muted style={styles.meterLabel}>
+    <View style={styles.mini}>
+      <View style={styles.miniTrack}>
+        <View
+          style={[styles.miniFill, { width: `${Math.round(value * 100)}%`, backgroundColor: meterColor(value, mode) }]}
+        />
+      </View>
+      <Text variant="label" muted style={styles.miniLabel}>
         {label}
       </Text>
-      <View style={styles.meterTrack}>
-        <View style={[styles.meterFill, { width: `${Math.round(value * 100)}%`, backgroundColor: meterColor(value, mode) }]} />
-      </View>
     </View>
   );
 }
@@ -71,9 +91,13 @@ export default function NightTimelineScreen() {
     router.replace('/dashboard');
     return null;
   }
-  // Inner component owns all clock hooks with guaranteed-present props (so hook
-  // order is unconditional behind the guard).
   return <LivingNight club={club} plan={plan} />;
+}
+
+interface StreamEntry {
+  id: string;
+  text: string;
+  tone: BeatTone;
 }
 
 function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
@@ -82,12 +106,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const planClub = { ...club, lastConfig: plan };
 
-  // Tonight's transient situation + when (0..1) it interrupts the flow.
   const [encounter] = useState<Encounter | null>(() => (preview ? pickEncounter(preview, planClub) : null));
   const encTrigger = encounter ? encounterTrigger(encounter.zone) : null;
 
   // Real-time clock state.
-  const [progress, setProgress] = useState(0); // 0..1 across the whole night
+  const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [committed, setCommitted] = useState<ReturnType<typeof runNight>>(null);
@@ -96,7 +119,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [chosen, setChosen] = useState<BossActionId[]>([]);
   const [reactions, setReactions] = useState<FloorBubble[]>([]);
   const [mood, setMood] = useState<{ label: string; tone: MoodTone } | null>(null);
-  const [recap, setRecap] = useState<string[]>([]);
+  const [bossStream, setBossStream] = useState<StreamEntry[]>([]);
   const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
 
@@ -131,15 +154,24 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const headline = pressureHeadline(pressures);
   const atEnd = committed != null || progress >= 1;
   const encounterDue = !!encounter && !committed && encTrigger != null && progress >= encTrigger;
-  const encounterBlocking = encounterDue && !encChoice; // night paused on this call
+  const encounterBlocking = encounterDue && !encChoice;
 
   const floor = buildFloorView(planClub, shownResult);
   const zones = nightZones(shownResult);
-  const moodAccent = committed ? undefined : mood ? MOOD_COLOR[mood.tone] : TONE_COLOR[headline.tone];
-  const moodLabel = committed ? undefined : mood ? mood.label : headline.label;
-  const bubbles = committed ? floorBubbles(committed) : [...floorEmotes(preview, planClub), ...reactions];
+  const moodAccent = committed ? colors.neonViolet : mood ? MOOD_COLOR[mood.tone] : TONE_COLOR[headline.tone];
+  const moodLabel = committed ? "That's a wrap." : mood ? mood.label : headline.label;
+
+  // Bubbles fade in with the live pressure (room talks itself into life).
+  const liveBubbles = committed ? floorBubbles(committed) : liveEmotes(preview, planClub, pressures).concat(reactions);
   const liveFlash = committed ? undefined : flashZone ?? headline.zone;
   const liveScale = committed ? 1 : liveCrowdFraction(progress);
+
+  // The event stream: ambient ticks (progress-derived) merged with boss/encounter
+  // reactions. Newest first; capped to keep the floor reading like a room.
+  const ambient: StreamEntry[] = committed
+    ? []
+    : livingStreamTicks(preview, planClub, progress).map((t: StreamTick) => ({ id: `tk-${t.id}`, text: t.text, tone: t.tone }));
+  const stream: StreamEntry[] = [...bossStream].reverse().concat([...ambient].reverse()).slice(0, 4);
 
   const commit = () => {
     if (committed) return committed;
@@ -157,8 +189,8 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setEncChoice(ch);
     setReactions((b) => [...b.filter((x) => x.zone !== ch.bubble.zone), ch.bubble]);
     setFlashZone(ch.bubble.zone);
-    setRecap((r) => [...r, ch.outcome]);
-    setRunning(true); // resume the night after the call
+    setBossStream((r) => [...r, { id: `enc-${ch.id}`, text: ch.outcome, tone: ch.bubble.tone }]);
+    setRunning(true); // resume after the call
   };
 
   const onAction = (id: BossActionId) => {
@@ -168,7 +200,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
     setMood(outcome.mood);
     setFlashZone(outcome.bubble.zone);
-    setRecap((r) => [...r, outcome.call]);
+    setBossStream((r) => [...r, { id: `ba-${id}`, text: outcome.call, tone: outcome.bubble.tone }]);
   };
 
   const toResults = () => {
@@ -178,6 +210,143 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     }
     router.replace('/results');
   };
+
+  const headerRight = !committed ? (
+    <Pressable
+      onPress={() => {
+        if (encounterBlocking) return;
+        if (running) setSpeed((s) => (s === 1 ? 2 : 1));
+        else setRunning(true);
+      }}
+      onLongPress={() => !encounterBlocking && setRunning((r) => !r)}
+      accessibilityRole="button"
+      accessibilityLabel={running ? `${speed}× — long press to pause` : 'Resume'}
+      style={[styles.speed, encounterBlocking && styles.speedDisabled]}
+    >
+      <Text variant="label" color={encounterBlocking ? colors.textMuted : colors.neonCyan}>
+        {clockLabel(progress)} · {speed}× {running ? '▶' : '❚❚'}
+      </Text>
+    </Pressable>
+  ) : (
+    <View style={styles.speed}>
+      <Text variant="label" color={colors.neonViolet}>
+        02:30 · done
+      </Text>
+    </View>
+  );
+
+  const mentorHint = !committed && club.day <= 6 ? nightMentorLine(chosen.length) : null;
+
+  const belowRoom = (
+    <>
+      {/* Live progress bar — same color as the headline so the room reads as one signal. */}
+      <View style={styles.progressTrack}>
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round(liveProgress * 100)}%`, backgroundColor: moodAccent ?? TONE_COLOR[headline.tone] },
+          ]}
+        />
+      </View>
+
+      {/* The pressure strip — four mini meters in one row. */}
+      <View style={styles.meters}>
+        <MiniMeter label="Bar" value={pressures.bar} mode="strain" />
+        <MiniMeter label="Door" value={pressures.door} mode="strain" />
+        <MiniMeter label="Bath" value={pressures.bathroom} mode="strain" />
+        <MiniMeter label="Energy" value={pressures.energy} mode="good" />
+      </View>
+
+      {/* A situation in the room — pinned to the floor, not a stacked card. */}
+      {encounterDue && encounter ? (
+        <View style={styles.situation}>
+          <View style={styles.situationHead}>
+            <Text variant="label" color={colors.warning} style={styles.situationTag}>
+              SITUATION · {encounter.zone.toUpperCase()}
+            </Text>
+            {!encChoice ? (
+              <Text variant="label" muted>
+                Night paused
+              </Text>
+            ) : null}
+          </View>
+          <Text variant="heading">{encounter.situation}</Text>
+          {!encChoice ? (
+            <View style={styles.tray}>
+              {encounter.choices.map((ch) => (
+                <Pressable
+                  key={ch.id}
+                  onPress={() => onChoose(ch)}
+                  accessibilityRole="button"
+                  style={styles.choice}
+                >
+                  <Text variant="body" color={colors.neonMagenta}>
+                    {ch.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text variant="body" muted style={styles.choiceOutcome}>
+              {encChoice.outcome}
+            </Text>
+          )}
+        </View>
+      ) : null}
+
+      {/* Event stream — newest first, capped, so the floor narrates itself. */}
+      {stream.length > 0 ? (
+        <View style={styles.stream}>
+          {stream.map((line) => (
+            <View key={line.id} style={styles.streamRow}>
+              <View style={[styles.streamDot, { backgroundColor: TONE_COLOR[line.tone] }]} />
+              <Text variant="label" muted style={styles.streamText}>
+                {line.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Boss actions — docked inside the floor, chips that act in the room. */}
+      {!committed ? (
+        <View style={styles.bossBar}>
+          <View style={styles.bossHead}>
+            <Text variant="label" color={colors.neonMagenta} style={styles.bossLabel}>
+              YOUR CALL
+            </Text>
+            {mentorHint ? (
+              <Text variant="label" color={colors.neonCyan} style={styles.bossHint}>
+                {mentorHint}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.chipRow}>
+            {BOSS_ACTIONS.map((a) => {
+              const used = chosen.includes(a.id);
+              return (
+                <Pressable
+                  key={a.id}
+                  onPress={() => onAction(a.id)}
+                  disabled={used || encounterBlocking}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: used }}
+                  style={[styles.chip, used && styles.chipUsed, encounterBlocking && !used && styles.chipDim]}
+                >
+                  <Text variant="label" color={used ? colors.textMuted : colors.neonMagenta} style={styles.chipLabel}>
+                    {a.label}
+                  </Text>
+                  <Text variant="label" muted style={styles.chipHint}>
+                    {used ? 'Done' : a.hint}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+    </>
+  );
 
   return (
     <Screen
@@ -203,7 +372,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     >
       <FloorView
         floor={floor}
-        bubbles={bubbles}
+        bubbles={liveBubbles}
         moodAccent={moodAccent}
         moodLabel={moodLabel}
         title="Tonight"
@@ -212,98 +381,15 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         flashZone={liveFlash}
         venueChips={venueFloorChips(planClub)}
         crowdTags={topCrowd(crowdMix(planClub, plan), 3).map((id) => CROWD_SEGMENTS[id].name)}
-        regularTags={topRegulars(club.regularBase, 2).filter((r) => r.score >= 15).map((r) => `${r.name} back`)}
+        regularTags={topRegulars(club.regularBase, 2)
+          .filter((r) => r.score >= 15)
+          .map((r) => `${r.name} back`)}
         djLabel={DJ_FLOOR_LABEL[plan.dj ?? 'house']}
         liveScale={liveScale}
+        headRight={headerRight}
+        belowRoom={belowRoom}
+        hideFooter
       />
-
-      {/* The room, live — a clock + pressure meters, not a scene card. */}
-      <Card title={`The Room · ${committed ? '02:30' : clockLabel(progress)}`}>
-        <View style={styles.clockHead}>
-          <Text variant="heading" color={TONE_COLOR[headline.tone]}>
-            {headline.label}
-          </Text>
-          {!committed ? (
-            <Pressable onPress={() => setSpeed((s) => (s === 1 ? 2 : 1))} accessibilityRole="button" style={styles.speed}>
-              <Text variant="label" color={colors.neonCyan}>
-                {speed}× {running ? '▶' : '❚❚'}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${Math.round(liveProgress * 100)}%`, backgroundColor: TONE_COLOR[headline.tone] }]} />
-        </View>
-        <Meter label="Crowd" value={pressures.crowd} mode="crowd" />
-        <Meter label="Bar" value={pressures.bar} mode="strain" />
-        <Meter label="Door" value={pressures.door} mode="strain" />
-        <Meter label="Bathroom" value={pressures.bathroom} mode="strain" />
-        <Meter label="Energy" value={pressures.energy} mode="good" />
-      </Card>
-
-      {/* A situation on the floor — it pauses the night until you respond. */}
-      {encounterDue && encounter ? (
-        <Card title="Situation" accent={colors.warning}>
-          <Text variant="heading">{encounter.situation}</Text>
-          {!encChoice ? (
-            <View style={styles.tray}>
-              {encounter.choices.map((ch) => (
-                <Pressable key={ch.id} onPress={() => onChoose(ch)} accessibilityRole="button" style={styles.action}>
-                  <Text variant="heading" color={colors.neonMagenta}>
-                    {ch.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : (
-            <Text variant="body" muted style={styles.beatText}>
-              {encChoice.outcome}
-            </Text>
-          )}
-        </Card>
-      ) : null}
-
-      {/* Boss Actions — calls you make on the floor, anytime, once each. */}
-      {!committed ? (
-        <Card title="Your Call">
-          {club.day <= 6 && nightMentorLine(chosen.length) ? (
-            <Text variant="label" color={colors.neonCyan} style={{ lineHeight: 18 }}>
-              {nightMentorLine(chosen.length)}
-            </Text>
-          ) : null}
-          <View style={styles.tray}>
-            {BOSS_ACTIONS.map((a) => {
-              const used = chosen.includes(a.id);
-              return (
-                <Pressable
-                  key={a.id}
-                  onPress={() => onAction(a.id)}
-                  disabled={used}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: used }}
-                  style={[styles.action, used && styles.actionUsed]}
-                >
-                  <Text variant="heading" color={used ? colors.textMuted : colors.neonMagenta}>
-                    {a.label}
-                  </Text>
-                  <Text variant="label" muted>
-                    {used ? 'Done' : a.hint}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {recap.length > 0 ? (
-            <View style={styles.recap}>
-              {recap.map((line, i) => (
-                <Text key={i} variant="label" muted style={styles.recapLine}>
-                  • {line}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-        </Card>
-      ) : null}
     </Screen>
   );
 }
@@ -311,7 +397,6 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: spacing.sm },
   footerBtn: { flex: 1 },
-  clockHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   speed: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -320,25 +405,66 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
+  speedDisabled: { opacity: 0.5 },
   progressTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: radius.pill },
-  meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  meterLabel: { width: 68 },
-  meterTrack: { flex: 1, height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
-  meterFill: { height: 8, borderRadius: radius.pill },
-  beatText: { lineHeight: 22 },
+  meters: { flexDirection: 'row', gap: spacing.sm },
+  mini: { flex: 1, gap: 2 },
+  miniTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  miniFill: { height: 6, borderRadius: radius.pill },
+  miniLabel: { textAlign: 'center', fontSize: 11 },
+  situation: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  situationHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  situationTag: { letterSpacing: 1 },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  action: {
+  choice: {
     flexGrow: 1,
     flexBasis: '47%',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  choiceOutcome: { lineHeight: 22 },
+  stream: { gap: 4, paddingHorizontal: spacing.xs },
+  streamRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  streamDot: { width: 6, height: 6, borderRadius: radius.pill, marginTop: 6 },
+  streamText: { flex: 1, lineHeight: 18 },
+  bossBar: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.sm,
+    gap: spacing.sm,
+  },
+  bossHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  bossLabel: { letterSpacing: 1 },
+  bossHint: { flex: 1, lineHeight: 16 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     gap: 2,
   },
-  actionUsed: { opacity: 0.5 },
-  recap: { gap: 2, marginTop: spacing.sm },
-  recapLine: { lineHeight: 18 },
+  chipUsed: { opacity: 0.45 },
+  chipDim: { opacity: 0.6 },
+  chipLabel: { fontWeight: '600' },
+  chipHint: { lineHeight: 14 },
 });
