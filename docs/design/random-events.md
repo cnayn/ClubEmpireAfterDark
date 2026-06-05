@@ -50,6 +50,28 @@ Every beat below is a pressure moment, not a lore dump.
 - `docs/roadmap.md` — Phase 3 / Phase 4 ordering; this file lives behind
   both gates.
 
+### Companion content banks (split by surface)
+
+This file is the **engine** (Layer A × B × C, sim signals, effect
+vocabulary, authoring rules). The raw content pool is split by surface so
+authors can pick a surface and write without context-switching:
+
+- [`night-encounters.md`](night-encounters.md) — **on-floor** pressure
+  moments: door tension, bar backlog, bathroom complaints, DJ/music dip,
+  guest special-treatment asks, staff warnings, regular complaints,
+  smoking-policy situations, ID issues, furniture complaints, rough-crowd
+  moments.
+- [`phone-messages.md`](phone-messages.md) — **off-floor** beats delivered
+  by phone: crew texts, venue booking inquiries, supplier offers,
+  inspection / sweep rumors.
+
+Both banks use a player-facing format (`Status / Trigger / Location /
+Characters / Situation / Dialogue / Player Choices / Outcome Direction /
+Visual Cue / Implementation Note`). The compact engine-format examples
+below in **Banked situations** are the build-time format that the
+encounter framework would consume; the split files are the author-time
+format that creative writers reach for. Both feed the same future system.
+
 ---
 
 ## Hard scope rules
