@@ -8,7 +8,7 @@ import { REPUTATION_TIERS, START_CAPACITY } from '@/domain/balance';
 import { crowdMix, topCrowd } from '@/domain/crowd';
 import { getEvent } from '@/domain/events';
 import { equippedIn, getFurniture, getVenue, venueStats } from '@/domain/furniture';
-import { getRegularBase } from '@/domain/regulars';
+import { getRegularBase, topRegulars } from '@/domain/regulars';
 import { CANDIDATE_POOL, hireCost, minViableNightCost } from '@/domain/staff';
 import type { ClubState, EventId, NightResult } from '@/domain/types';
 import { aggregateEffects, UPGRADES } from '@/domain/upgrades';
@@ -107,6 +107,106 @@ export function venueFloorChips(club: ClubState): VenueFloorChips {
       .map((id) => getFurniture(id)?.name ?? '')
       .filter(Boolean);
   return { door: names('entrance'), bar: names('bar'), floor: names('dancefloor') };
+}
+
+// --- Guest clusters (room identity — Floor Identity Pass) --------------------
+//
+// The room is the game surface, so the floor needs more than a single dance
+// crowd: it needs READABLE clusters at each zone — a bar queue when the bar is
+// strained, a door line when arrivals are heavy, a bathroom queue when hygiene
+// is overrun, a returning-regulars knot when a base has formed. Pure reads of
+// existing state (preview + pressures + regulars + venue). No RNG, no new save
+// schema, no per-guest simulation.
+//
+// A "mood" word tags the cluster so the UI can color tokens by feeling — angry
+// at the bar, dancing on the floor, tired in the bathroom line, impressed near
+// the door. The component picks the colors; this lib only names them.
+
+export type GuestMood =
+  | 'dancing'
+  | 'waiting'
+  | 'happy'
+  | 'angry'
+  | 'tired'
+  | 'impressed'
+  | 'confused';
+
+export type ClusterZone = 'door' | 'bar' | 'floor' | 'bath' | 'regulars';
+
+export interface GuestCluster {
+  zone: ClusterZone;
+  /** how many tokens to render (capped — phones are small) */
+  count: number;
+  mood: GuestMood;
+  /** short status word the UI can render under the cluster ("queue", "line", "dancing"). */
+  label: string;
+}
+
+interface FloorPressureRead {
+  /** 0..1 — room fill (live or final). */
+  crowd: number;
+  /** 0..1 — bar strain. */
+  bar: number;
+  /** 0..1 — door strain. */
+  door: number;
+  /** 0..1 — bathroom strain. */
+  bathroom: number;
+  /** 0..1 — floor energy (HIGH = good). */
+  energy: number;
+}
+
+const clampInt = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(n)));
+
+/**
+ * Derive READABLE guest clusters per zone from existing pressures + state. Pure
+ * presentation — no per-guest sim. A cluster only appears once its zone's
+ * pressure crosses a small threshold, so a calm room reads calm.
+ */
+export function floorClusters(club: ClubState, pressures: FloorPressureRead): GuestCluster[] {
+  const clusters: GuestCluster[] = [];
+
+  // --- Door line — grows with door strain, peaks at a packed room. -----------
+  if (pressures.door >= 0.3 || pressures.crowd >= 0.7) {
+    const count = clampInt(2 + pressures.door * 4 + pressures.crowd * 2, 2, 7);
+    const mood: GuestMood = pressures.door >= 0.7 ? 'angry' : pressures.door >= 0.45 ? 'confused' : 'waiting';
+    clusters.push({ zone: 'door', count, mood, label: 'line' });
+  }
+
+  // --- Bar queue — grows with bar strain. ------------------------------------
+  if (pressures.bar >= 0.4) {
+    const count = clampInt(2 + pressures.bar * 5, 2, 7);
+    const mood: GuestMood = pressures.bar >= 0.7 ? 'angry' : 'waiting';
+    clusters.push({ zone: 'bar', count, mood, label: 'queue' });
+  }
+
+  // --- Floor / dance — the hero (always shows when there is a room). ---------
+  if (pressures.crowd >= 0.05) {
+    // The dance count scales with crowd; mood reads off ENERGY (good = dancing).
+    const count = clampInt(4 + pressures.crowd * 10, 3, 14);
+    const mood: GuestMood =
+      pressures.energy >= 0.65 ? 'dancing' : pressures.energy < 0.4 ? 'tired' : 'happy';
+    clusters.push({ zone: 'floor', count, mood, label: mood === 'dancing' ? 'dancing' : 'on the floor' });
+  }
+
+  // --- Bathroom queue — only when overrun (the warning, not the constant). ---
+  if (pressures.bathroom >= 0.55) {
+    const count = clampInt(1 + pressures.bathroom * 4, 2, 5);
+    const mood: GuestMood = pressures.bathroom >= 0.8 ? 'angry' : 'tired';
+    clusters.push({ zone: 'bath', count, mood, label: 'queue' });
+  }
+
+  // --- Regulars — a small knot when a base has formed (read off RegularBase). -
+  const top = topRegulars(club.regularBase, 1)[0];
+  if (top && top.score >= 20 && pressures.crowd >= 0.25) {
+    clusters.push({
+      zone: 'regulars',
+      count: clampInt(2 + top.score / 25, 2, 4),
+      mood: 'impressed',
+      label: `${top.name} back`,
+    });
+  }
+
+  return clusters;
 }
 
 // --- Floor bubbles (interpretations of EXISTING aggregate signals) ------------

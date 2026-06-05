@@ -29,7 +29,7 @@ import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
 import { nightMentorLine } from '@/lib/mentor';
 import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
-import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
+import { buildFloorView, type FloorBubble, floorBubbles, floorClusters, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS } from '@/lib/nightClock';
 import {
@@ -165,6 +165,8 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const liveBubbles = committed ? floorBubbles(committed) : liveEmotes(preview, planClub, pressures).concat(reactions);
   const liveFlash = committed ? undefined : flashZone ?? headline.zone;
   const liveScale = committed ? 1 : liveCrowdFraction(progress);
+  // Readable guest clusters per zone — the room reads as a club, not just dots.
+  const liveClusters = committed ? undefined : floorClusters(planClub, pressures);
 
   // The event stream: ambient ticks (progress-derived) merged with boss/encounter
   // reactions. Newest first; capped to keep the floor reading like a room.
@@ -308,45 +310,60 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         </View>
       ) : null}
 
-      {/* Boss actions — docked inside the floor, chips that act in the room. */}
-      {!committed ? (
-        <View style={styles.bossBar}>
-          <View style={styles.bossHead}>
-            <Text variant="label" color={colors.neonMagenta} style={styles.bossLabel}>
-              YOUR CALL
-            </Text>
-            {mentorHint ? (
-              <Text variant="label" color={colors.neonCyan} style={styles.bossHint}>
-                {mentorHint}
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.chipRow}>
-            {BOSS_ACTIONS.map((a) => {
-              const used = chosen.includes(a.id);
-              return (
-                <Pressable
-                  key={a.id}
-                  onPress={() => onAction(a.id)}
-                  disabled={used || encounterBlocking}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: used }}
-                  style={[styles.chip, used && styles.chipUsed, encounterBlocking && !used && styles.chipDim]}
-                >
-                  <Text variant="label" color={used ? colors.textMuted : colors.neonMagenta} style={styles.chipLabel}>
-                    {a.label}
-                  </Text>
-                  <Text variant="label" muted style={styles.chipHint}>
-                    {used ? 'Done' : a.hint}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
     </>
   );
+
+  /** A short glyph + zone hint per boss action — the dock reads as commands on
+   *  the room, not as full-width buttons. Glyphs avoid emoji licensing risk. */
+  const ACTION_GLYPH: Record<BossActionId, string> = {
+    'push-dj': '♪',
+    'check-bar': '◍',
+    'send-bouncer': '◆',
+    'work-room': '◉',
+  };
+  const ACTION_SHORT: Record<BossActionId, string> = {
+    'push-dj': 'Push DJ',
+    'check-bar': 'Check Bar',
+    'send-bouncer': 'Door',
+    'work-room': 'Work Room',
+  };
+
+  const bossDock = !committed ? (
+    <View style={styles.dock}>
+      {mentorHint ? (
+        <Text variant="label" color={colors.neonCyan} style={styles.dockHint} numberOfLines={1}>
+          {mentorHint}
+        </Text>
+      ) : null}
+      <View style={styles.dockRow}>
+        {BOSS_ACTIONS.map((a) => {
+          const used = chosen.includes(a.id);
+          return (
+            <Pressable
+              key={a.id}
+              onPress={() => onAction(a.id)}
+              disabled={used || encounterBlocking}
+              accessibilityRole="button"
+              accessibilityLabel={a.label}
+              accessibilityState={{ disabled: used }}
+              style={[
+                styles.dockBtn,
+                used && styles.dockBtnUsed,
+                encounterBlocking && !used && styles.dockBtnDim,
+              ]}
+            >
+              <Text variant="heading" color={used ? colors.textMuted : colors.neonMagenta} style={styles.dockGlyph}>
+                {ACTION_GLYPH[a.id]}
+              </Text>
+              <Text variant="label" color={used ? colors.textMuted : colors.textPrimary} style={styles.dockLabel} numberOfLines={1}>
+                {ACTION_SHORT[a.id]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  ) : null;
 
   return (
     <Screen
@@ -354,17 +371,20 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         atEnd ? (
           <Button label="See the books" onPress={toResults} />
         ) : (
-          <View style={styles.footerRow}>
-            <View style={styles.footerBtn}>
-              <Button
-                label={encounterBlocking ? 'Make the call ↑' : running ? 'Pause' : 'Resume'}
-                variant={encounterBlocking ? 'secondary' : 'primary'}
-                onPress={() => !encounterBlocking && setRunning((r) => !r)}
-                disabled={encounterBlocking}
-              />
-            </View>
-            <View style={styles.footerBtn}>
-              <Button label="Skip to the books" variant="secondary" onPress={toResults} />
+          <View style={styles.footerStack}>
+            {bossDock}
+            <View style={styles.footerRow}>
+              <View style={styles.footerBtn}>
+                <Button
+                  label={encounterBlocking ? 'Make the call ↑' : running ? 'Pause' : 'Resume'}
+                  variant={encounterBlocking ? 'secondary' : 'primary'}
+                  onPress={() => !encounterBlocking && setRunning((r) => !r)}
+                  disabled={encounterBlocking}
+                />
+              </View>
+              <View style={styles.footerBtn}>
+                <Button label="Skip to the books" variant="secondary" onPress={toResults} />
+              </View>
             </View>
           </View>
         )
@@ -389,14 +409,44 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         headRight={headerRight}
         belowRoom={belowRoom}
         hideFooter
+        clusters={liveClusters}
+        pressures={pressures}
       />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  footerStack: { gap: spacing.sm },
   footerRow: { flexDirection: 'row', gap: spacing.sm },
   footerBtn: { flex: 1 },
+  // HUD-style command dock for boss actions — sits above the primary CTAs.
+  dock: {
+    gap: 4,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  dockHint: { textAlign: 'center', lineHeight: 16 },
+  dockRow: { flexDirection: 'row', gap: spacing.xs },
+  dockBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    gap: 2,
+  },
+  dockBtnUsed: { opacity: 0.4 },
+  dockBtnDim: { opacity: 0.6 },
+  dockGlyph: { fontSize: 22, lineHeight: 24 },
+  dockLabel: { fontSize: 11 },
   speed: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -440,31 +490,4 @@ const styles = StyleSheet.create({
   streamRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   streamDot: { width: 6, height: 6, borderRadius: radius.pill, marginTop: 6 },
   streamText: { flex: 1, lineHeight: 18 },
-  bossBar: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    padding: spacing.sm,
-    gap: spacing.sm,
-  },
-  bossHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  bossLabel: { letterSpacing: 1 },
-  bossHint: { flex: 1, lineHeight: 16 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: {
-    flexGrow: 1,
-    flexBasis: '47%',
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    gap: 2,
-  },
-  chipUsed: { opacity: 0.45 },
-  chipDim: { opacity: 0.6 },
-  chipLabel: { fontWeight: '600' },
-  chipHint: { lineHeight: 14 },
 });

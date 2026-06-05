@@ -5,7 +5,15 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, NightResult } from '@/domain/types';
-import { buildBoardGoals, buildFloorView, floorBubbles, floorEmotes, goalBoard, nextGoal } from './dashboard';
+import {
+  buildBoardGoals,
+  buildFloorView,
+  floorBubbles,
+  floorClusters,
+  floorEmotes,
+  goalBoard,
+  nextGoal,
+} from './dashboard';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -111,6 +119,57 @@ describe('floorEmotes — ambient guest voices from aggregate signals', () => {
     const emotes = floorEmotes(result({ guests: 58, capacity: 60, serviceRatio: 0.5, incidents: 1 }), club());
     expect(emotes.some((e) => e.zone === 'door' && e.tone === 'bad')).toBe(true);
     expect(emotes.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('floorClusters — readable guest clusters per zone', () => {
+  const quiet = { crowd: 0.1, bar: 0.1, door: 0.1, bathroom: 0.1, energy: 0.6 };
+  const packed = { crowd: 0.95, bar: 0.7, door: 0.7, bathroom: 0.7, energy: 0.8 };
+
+  it('a calm room shows only the floor crowd (no queues yet)', () => {
+    const cs = floorClusters(club(), quiet);
+    const zones = cs.map((c) => c.zone);
+    expect(zones).toContain('floor');
+    expect(zones).not.toContain('bar');
+    expect(zones).not.toContain('door');
+    expect(zones).not.toContain('bath');
+  });
+
+  it('a packed, strained room grows queues at every strained zone', () => {
+    const cs = floorClusters(club(), packed);
+    const zones = new Set(cs.map((c) => c.zone));
+    expect(zones.has('bar')).toBe(true);
+    expect(zones.has('door')).toBe(true);
+    expect(zones.has('bath')).toBe(true);
+    expect(zones.has('floor')).toBe(true);
+  });
+
+  it('bar mood escalates from waiting → angry as pressure rises', () => {
+    const mild = floorClusters(club(), { ...quiet, bar: 0.5 }).find((c) => c.zone === 'bar');
+    const heavy = floorClusters(club(), { ...quiet, bar: 0.85 }).find((c) => c.zone === 'bar');
+    expect(mild?.mood).toBe('waiting');
+    expect(heavy?.mood).toBe('angry');
+  });
+
+  it('floor mood reflects energy (dancing high / tired low)', () => {
+    const tired = floorClusters(club(), { ...quiet, crowd: 0.5, energy: 0.2 }).find((c) => c.zone === 'floor');
+    const dancing = floorClusters(club(), { ...quiet, crowd: 0.5, energy: 0.9 }).find((c) => c.zone === 'floor');
+    expect(tired?.mood).toBe('tired');
+    expect(dancing?.mood).toBe('dancing');
+  });
+
+  it('cluster counts stay bounded (phones are small)', () => {
+    const cs = floorClusters(club(), packed);
+    for (const c of cs) {
+      expect(c.count).toBeGreaterThanOrEqual(1);
+      expect(c.count).toBeLessThanOrEqual(14);
+    }
+  });
+
+  it('a regular base surfaces a small regulars cluster when the room has bodies', () => {
+    const c = club({ regularBase: { locals: 30, students: 0, regulars: 28, musicheads: 0, vipcurious: 0, rough: 0 } });
+    const cs = floorClusters(c, { ...quiet, crowd: 0.5 });
+    expect(cs.some((x) => x.zone === 'regulars')).toBe(true);
   });
 });
 
