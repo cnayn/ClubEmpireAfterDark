@@ -160,14 +160,45 @@ export function isFirstNight(club: ClubState): boolean {
   return club.day <= 1;
 }
 
-/** The four things a new owner should review before opening the doors. Static. */
+/** The four things a new owner must genuinely DO before opening the doors. */
 export function firstNightChecklist(): ChecklistItem[] {
   return [
-    { id: 'crew', label: 'Check your crew', hint: 'Who works the bar and the door tonight.' },
-    { id: 'bar', label: 'Set your bar stock', hint: 'Stock and drink quality for the night.' },
-    { id: 'rules', label: 'Set your house rules', hint: 'Smoking, ID, security, bar service.' },
-    { id: 'crowd', label: "Read tonight's crowd", hint: 'Who your plan is pulling in.' },
+    { id: 'crew', label: 'Confirm crew', hint: 'Set who works the bar and door, then confirm.' },
+    { id: 'bar', label: 'Review bar stock', hint: 'Choose stock amount and quality.' },
+    { id: 'rules', label: 'Set house rules', hint: 'Smoking, ID, security, bar service.' },
+    { id: 'crowd', label: "Read tonight's crowd", hint: 'Check who your plan is pulling in.' },
   ];
+}
+
+export type ChecklistId = ChecklistItem['id'];
+
+/**
+ * Which first-night steps are genuinely done — derived ONLY from sections the
+ * owner has actually interacted with/confirmed (`touched`), never from default
+ * values. A fresh game (empty set) returns all-false, so nothing is pre-ticked.
+ */
+export function checklistDone(touched: ReadonlySet<string>): Record<ChecklistId, boolean> {
+  return {
+    crew: touched.has('crew'),
+    bar: touched.has('bar'),
+    rules: touched.has('rules'),
+    crowd: touched.has('crowd'),
+  };
+}
+
+/**
+ * The crowd readout can only be confirmed once crew, bar, and rules are set — the
+ * expected crowd is shaped by them, so there is something real to read.
+ */
+export function canConfirmCrowd(touched: ReadonlySet<string>): boolean {
+  const d = checklistDone(touched);
+  return d.crew && d.bar && d.rules;
+}
+
+/** Ready to open: every first-night step genuinely done (not from defaults). */
+export function firstNightReady(touched: ReadonlySet<string>): boolean {
+  const d = checklistDone(touched);
+  return d.crew && d.bar && d.rules && d.crowd;
 }
 
 /**

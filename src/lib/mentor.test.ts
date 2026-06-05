@@ -4,7 +4,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
-import { firstNightChecklist, isFirstNight, MENTOR_LABEL, mentorNote, nightMentorLine, prepMentorLine, resultMentorLine } from './mentor';
+import { canConfirmCrowd, checklistDone, firstNightChecklist, firstNightReady, isFirstNight, MENTOR_LABEL, mentorNote, nightMentorLine, prepMentorLine, resultMentorLine } from './mentor';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -97,6 +97,39 @@ describe('prepMentorLine', () => {
       expect(it.label.length).toBeGreaterThan(0);
       expect(it.hint.length).toBeGreaterThan(0);
     }
+  });
+
+  describe('first-night checklist requires real interaction (no fake/default ticks)', () => {
+    it('a fresh game starts with every step incomplete and not ready', () => {
+      const fresh = new Set<string>();
+      const d = checklistDone(fresh);
+      expect(d).toEqual({ crew: false, bar: false, rules: false, crowd: false });
+      expect(firstNightReady(fresh)).toBe(false);
+    });
+
+    it('default values / a valid schedule alone do NOT complete any step', () => {
+      // checklist truth is derived only from `touched`, never from config defaults.
+      expect(checklistDone(new Set()).crew).toBe(false);
+      expect(checklistDone(new Set()).bar).toBe(false);
+      expect(checklistDone(new Set()).rules).toBe(false);
+    });
+
+    it('interacting with a section completes only that step', () => {
+      expect(checklistDone(new Set(['bar'])).bar).toBe(true);
+      expect(checklistDone(new Set(['bar'])).rules).toBe(false);
+      expect(checklistDone(new Set(['rules'])).rules).toBe(true);
+      expect(checklistDone(new Set(['crew'])).crew).toBe(true);
+    });
+
+    it('crowd can be confirmed only after crew, bar, and rules are set', () => {
+      expect(canConfirmCrowd(new Set(['crew', 'bar']))).toBe(false);
+      expect(canConfirmCrowd(new Set(['crew', 'bar', 'rules']))).toBe(true);
+    });
+
+    it('is ready to open only when all four steps are genuinely done', () => {
+      expect(firstNightReady(new Set(['crew', 'bar', 'rules']))).toBe(false);
+      expect(firstNightReady(new Set(['crew', 'bar', 'rules', 'crowd']))).toBe(true);
+    });
   });
 
   it('works on an old config missing optional policy/drink/venue fields', () => {

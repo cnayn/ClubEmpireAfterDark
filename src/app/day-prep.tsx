@@ -18,7 +18,7 @@ import {
 } from '@/domain/drinks';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_BLURB, DJ_OPTIONS, djCost } from '@/domain/dj';
-import { firstNightChecklist, isFirstNight, MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
+import { canConfirmCrowd, checklistDone, firstNightChecklist, firstNightReady, isFirstNight, MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
 import { aggregateEffects } from '@/domain/upgrades';
 import {
@@ -112,24 +112,16 @@ export default function DayPrepScreen() {
   // Upfront = event fee + stock order; crew wages settle after the night. A free
   // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
   const canAffordUpfront = upfront === 0 || club.cash >= upfront;
-  // First-night gate: a brand-new owner must genuinely engage each area before
-  // opening blind. "Done" is DERIVED from real state where possible — crew reads
-  // from `validSchedule` (a real downstream check); bar / rules read engagement
-  // with that section (touching a control inside it); crowd ticks once those are
-  // honestly set, since the expected crowd is shaped by them.
+  // First-night gate: a brand-new owner must genuinely DO each setup step before
+  // opening blind. "Done" is derived ONLY from real interaction/confirmation
+  // (`touched`), never from default values — so nothing is pre-ticked on a fresh
+  // game and the player completes each task by actually doing it.
   const firstNight = isFirstNight(club);
   const checklist = firstNightChecklist();
-  const crewDone = validSchedule; // real state: a bartender is on duty
-  const barDone = touched.has('bar');
-  const rulesDone = touched.has('rules');
-  const isDone = (id: string) => {
-    if (id === 'crew') return crewDone;
-    if (id === 'bar') return barDone;
-    if (id === 'rules') return rulesDone;
-    return crewDone && barDone && rulesDone; // crowd
-  };
+  const done = checklistDone(touched);
+  const isDone = (id: string) => (done as Record<string, boolean>)[id] ?? false;
   const doneCount = checklist.filter((i) => isDone(i.id)).length;
-  const ready = !firstNight || doneCount >= checklist.length;
+  const ready = !firstNight || firstNightReady(touched);
   const canOpen = validSchedule && canAffordUpfront && requirement.met && ready;
 
   // Derived readouts (rendered at the BOTTOM, below every selector, so changing a
@@ -182,7 +174,7 @@ export default function DayPrepScreen() {
             </Text>
           ) : !ready ? (
             <Text variant="label" color={colors.warning}>
-              Don't open blind — set crew, bar, and house rules first ({doneCount}/{checklist.length}).
+              Don't open blind — work through the setup steps first ({doneCount}/{checklist.length}).
             </Text>
           ) : null}
           <Button label={ready ? 'Open the Doors' : 'Review setup first'} onPress={onOpen} disabled={!canOpen} />
@@ -197,7 +189,8 @@ export default function DayPrepScreen() {
       {firstNight ? (
         <Card title="Before You Open" accent={colors.neonCyan}>
           <Text variant="label" muted>
-            {MENTOR_LABEL}: Don't open blind. Each step ticks itself once you've actually set it.
+            {MENTOR_LABEL}: Don't open blind. Each step ticks only when you actually do it — confirm
+            your crew, set the bar and house rules, then read the crowd.
           </Text>
           {checklist.map((item) => {
             const done = isDone(item.id);
@@ -326,6 +319,13 @@ export default function DayPrepScreen() {
           );
         })}
         <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
+        {firstNight ? (
+          done.crew ? (
+            <Text variant="label" color={colors.success}>✓ Crew confirmed</Text>
+          ) : (
+            <Button label="Confirm crew" onPress={() => touch('crew')} />
+          )
+        ) : null}
       </Card>
 
       <Card title="House Rules">
@@ -386,6 +386,18 @@ export default function DayPrepScreen() {
             {m.text}
           </Text>
         ))}
+        {firstNight ? (
+          <>
+            <View style={styles.planDivider} />
+            {done.crowd ? (
+              <Text variant="label" color={colors.success}>✓ Crowd reviewed</Text>
+            ) : canConfirmCrowd(touched) ? (
+              <Button label="Mark crowd reviewed" variant="secondary" onPress={() => touch('crowd')} />
+            ) : (
+              <Text variant="label" muted>Confirm crew and set the bar and house rules first.</Text>
+            )}
+          </>
+        ) : null}
       </Card>
     </Screen>
   );
