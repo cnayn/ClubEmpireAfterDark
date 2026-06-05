@@ -146,6 +146,7 @@ export function FloorView({
   crowdTags,
   regularTags,
   djLabel,
+  liveScale = 1,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -154,6 +155,8 @@ export function FloorView({
   title?: string;
   /** Subtle crowd movement during the live night — presentation only. */
   pulse?: boolean;
+  /** 0..1 live crowd fill for the real-time night (the room fills then thins). */
+  liveScale?: number;
   /** Per-zone pressure states (door/bar/floor) to glow the venue. */
   zones?: NightZones;
   /** A zone to briefly highlight after a boss action (door/bar/floor). */
@@ -195,15 +198,17 @@ export function FloorView({
     return zoneColor(zones?.[key], accent);
   };
 
+  const liveDots = Math.max(0, Math.round(floor.dots * Math.max(0, Math.min(1, liveScale))));
+
   const renderDots = () => {
-    if (floor.dots <= 0) {
+    if (liveDots <= 0) {
       return (
         <Text variant="label" muted>
           The floor is quiet.
         </Text>
       );
     }
-    return Array.from({ length: floor.dots }).map((_, i) => {
+    return Array.from({ length: liveDots }).map((_, i) => {
       if (!pulse) {
         return <View key={i} style={[styles.dot, { backgroundColor: accent, opacity: dotOpacity }]} />;
       }
