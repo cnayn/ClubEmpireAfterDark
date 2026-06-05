@@ -133,15 +133,15 @@ export default function VenueScreen() {
         const owned = venue.owned.includes(item.id);
         const equippedZone = zoneOf(item.id);
         const canBuy = !owned && club.cash - item.cost >= reserve;
-        const equippable = owned && !equippedZone && canEquip(venue, item.id, item.zone);
-        const zoneFull = owned && !equippedZone && !equippable;
+        // Compatible zones that currently have a free slot.
+        const openZones = item.zones.filter((z) => canEquip(venue, item.id, z));
         return (
           <Card key={item.id} accent={equippedZone ? colors.success : undefined}>
             <View style={styles.itemHead}>
               <Text variant="heading" style={{ flex: 1 }}>
                 {item.name}
               </Text>
-              <Pill label={ZONE_LABEL[item.zone]} color={colors.neonCyan} />
+              <Pill label={item.zones.map((z) => ZONE_LABEL[z]).join(' / ')} color={colors.neonCyan} />
             </View>
             <Text variant="label" color={colors.neonMagenta}>
               {statLine(item.stats)}
@@ -158,11 +158,15 @@ export default function VenueScreen() {
               />
             ) : equippedZone ? (
               <Button label={`Equipped · ${ZONE_LABEL[equippedZone]}`} variant="secondary" disabled onPress={() => {}} />
-            ) : equippable ? (
-              <Button label={`Equip to ${ZONE_LABEL[item.zone]}`} onPress={() => equipFurniture(item.id, item.zone)} />
-            ) : zoneFull ? (
-              <Button label={`${ZONE_LABEL[item.zone]} full — remove something first`} variant="secondary" disabled onPress={() => {}} />
-            ) : null}
+            ) : openZones.length > 0 ? (
+              <View style={styles.equipRow}>
+                {openZones.map((z) => (
+                  <Button key={z} label={`Equip → ${ZONE_LABEL[z]}`} onPress={() => equipFurniture(item.id, z)} style={{ flexGrow: 1 }} />
+                ))}
+              </View>
+            ) : (
+              <Button label="All its zones are full — remove something first" variant="secondary" disabled onPress={() => {}} />
+            )}
           </Card>
         );
       })}
@@ -180,4 +184,5 @@ const styles = StyleSheet.create({
   catalogHead: { marginTop: spacing.sm },
   itemHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   itemDesc: { lineHeight: 20, marginTop: 2 },
+  equipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

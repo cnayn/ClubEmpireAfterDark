@@ -148,7 +148,8 @@ export interface FurnitureStats {
 export interface FurnitureDef {
   id: string;
   name: string;
-  zone: VenueZone;
+  /** Zones this item can be equipped into (v1 allows multi-zone items). */
+  zones: VenueZone[];
   cost: number;
   stats: FurnitureStats;
   description: string;

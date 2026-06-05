@@ -26,16 +26,19 @@ export const ZONE_SLOTS: Record<VenueZone, number> = {
   vip: 0,
 };
 
-/** Original starter catalog — one copy of each is enough for v1. */
+/** Original starter catalog — one copy of each is enough for v1. Some items fit
+ *  more than one zone (the player chooses where it lands). */
 export const FURNITURE: FurnitureDef[] = [
-  { id: 'neon-sign', name: 'Cheap Neon Sign', zone: 'entrance', cost: 200, stats: { style: 2, doorAppeal: 3 }, description: 'Cheap neon over the door — but it says you’re open for business.' },
-  { id: 'velvet-rope', name: 'Velvet Rope', zone: 'entrance', cost: 350, stats: { doorAppeal: 4, style: 1 }, description: 'A rope and a line — implies you’re worth the wait.' },
-  { id: 'backbar-glow', name: 'Backbar Glow Strip', zone: 'bar', cost: 300, stats: { style: 3 }, description: 'A glow behind the bottles. Every drink looks better lit.' },
-  { id: 'poster-wall', name: 'Poster Wall', zone: 'bar', cost: 150, stats: { style: 2 }, description: 'Gig posters and old flyers — cheap character.' },
-  { id: 'wall-speakers', name: 'Wall Speakers', zone: 'bar', cost: 450, stats: { sound: 4 }, description: 'Push the sound to the bar so nobody shouts their order.' },
-  { id: 'dance-lights', name: 'Basic Dance Lights', zone: 'dancefloor', cost: 400, stats: { style: 2, sound: 2 }, description: 'Movement and colour — the floor stops feeling like a room.' },
-  { id: 'leather-couch', name: 'Worn Leather Couch', zone: 'dancefloor', cost: 300, stats: { comfort: 4 }, description: 'Somewhere to land between dances. Worn, but inviting.' },
-  { id: 'bathroom-mirrors', name: 'Better Bathroom Mirrors', zone: 'toilets', cost: 250, stats: { hygiene: 4 }, description: 'Nobody praises good toilets — but bad ones spread fast.' },
+  { id: 'neon-sign', name: 'Cheap Neon Sign', zones: ['entrance', 'dancefloor'], cost: 200, stats: { style: 2, doorAppeal: 1 }, description: 'Cheap neon glow — but it says the place is open and alive.' },
+  { id: 'velvet-rope', name: 'Velvet Rope', zones: ['entrance'], cost: 350, stats: { doorAppeal: 2, style: 1 }, description: 'A rope and a line — implies you’re worth the wait.' },
+  { id: 'leather-couch', name: 'Worn Leather Couch', zones: ['entrance'], cost: 300, stats: { comfort: 2, style: 1 }, description: 'Somewhere to land near the door. Worn, but inviting.' },
+  { id: 'backbar-glow', name: 'Backbar Glow Strip', zones: ['bar'], cost: 300, stats: { style: 2 }, description: 'A glow behind the bottles. Every drink looks better lit.' },
+  { id: 'wall-speakers', name: 'Wall Speakers', zones: ['dancefloor', 'bar'], cost: 450, stats: { sound: 2 }, description: 'Push the sound out so nobody has to shout their order.' },
+  { id: 'dance-lights', name: 'Basic Dance Lights', zones: ['dancefloor'], cost: 400, stats: { style: 1, sound: 1 }, description: 'Movement and colour — the floor stops feeling like a room.' },
+  { id: 'poster-wall', name: 'Poster Wall', zones: ['entrance', 'dancefloor'], cost: 150, stats: { style: 1, comfort: 1 }, description: 'Gig posters and old flyers — cheap character.' },
+  { id: 'smoke-machine', name: 'Small Smoke Machine', zones: ['dancefloor'], cost: 380, stats: { style: 2, sound: 1, hygiene: -1 }, description: 'A little haze hides a lot — the floor reads bigger, the air reads thicker.' },
+  { id: 'bathroom-mirrors', name: 'Better Bathroom Mirrors', zones: ['toilets'], cost: 250, stats: { hygiene: 2, style: 1 }, description: 'Nobody praises good toilets — but bad ones spread fast.' },
+  { id: 'utility-mats', name: 'Utility Floor Mats', zones: ['bar', 'toilets'], cost: 180, stats: { hygiene: 1, comfort: 1 }, description: 'Unglamorous, but the floor stays dry and nobody slips.' },
 ];
 
 export function getFurniture(id: string): FurnitureDef | undefined {
@@ -55,7 +58,7 @@ export function equippedIn(venue: VenueState | undefined, zone: VenueZone): stri
 
 export function canEquip(venue: VenueState | undefined, id: string, zone: VenueZone): boolean {
   const item = getFurniture(id);
-  if (!item || item.zone !== zone) return false; // wrong zone
+  if (!item || !item.zones.includes(zone)) return false; // not compatible with this zone
   const v = getVenue(venue);
   if (!v.owned.includes(id)) return false; // must own it
   const inZone = v.equipped[zone] ?? [];

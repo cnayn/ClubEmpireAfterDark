@@ -25,10 +25,13 @@ function club(over: Partial<ClubState> = {}): ClubState {
 const cfg = (): DayConfig => ({ ...defaultDayConfig(STARTING_ROSTER), coverLevel: 'low', drinkLevel: 'low' });
 
 describe('catalog', () => {
-  it('every item targets a real zone with at least one slot (never VIP/locked)', () => {
+  it('every item lists ≥1 compatible zone, all real and with slots (never VIP/locked)', () => {
     for (const item of FURNITURE) {
-      expect(VENUE_ZONES).toContain(item.zone);
-      expect(ZONE_SLOTS[item.zone]).toBeGreaterThan(0);
+      expect(item.zones.length).toBeGreaterThan(0);
+      for (const z of item.zones) {
+        expect(VENUE_ZONES).toContain(z);
+        expect(ZONE_SLOTS[z]).toBeGreaterThan(0);
+      }
     }
   });
 });
@@ -41,17 +44,20 @@ describe('venueStats + equip rules', () => {
   it('aggregates equipped items correctly', () => {
     const venue: VenueState = { owned: ['neon-sign', 'velvet-rope'], equipped: { entrance: ['neon-sign', 'velvet-rope'] } };
     const s = venueStats(venue);
-    expect(s.doorAppeal).toBe(3 + 4); // neon 3 + velvet 4
-    expect(s.style).toBe(2 + 1);
+    expect(s.doorAppeal).toBe(1 + 2); // neon 1 + velvet 2
+    expect(s.style).toBe(2 + 1); // neon 2 + velvet 1
   });
 
-  it('cannot equip into the wrong zone, when unowned, or into a full zone', () => {
+  it('respects multi-zone compatibility, ownership, and full zones', () => {
+    // neon-sign is compatible with entrance OR dancefloor
     const owned: VenueState = { owned: ['neon-sign'], equipped: {} };
-    expect(canEquip(owned, 'neon-sign', 'bar')).toBe(false); // wrong zone
-    expect(canEquip(owned, 'neon-sign', 'entrance')).toBe(true); // ok
+    expect(canEquip(owned, 'neon-sign', 'bar')).toBe(false); // not a compatible zone
+    expect(canEquip(owned, 'neon-sign', 'entrance')).toBe(true);
+    expect(canEquip(owned, 'neon-sign', 'dancefloor')).toBe(true); // second compatible zone
     expect(canEquip({ owned: [], equipped: {} }, 'neon-sign', 'entrance')).toBe(false); // not owned
-    const full: VenueState = { owned: ['neon-sign', 'velvet-rope'], equipped: { entrance: ['neon-sign', 'velvet-rope'] } };
-    expect(canEquip(full, 'neon-sign', 'entrance')).toBe(false); // entrance full (2 slots) + already in
+    const full: VenueState = { owned: ['velvet-rope', 'leather-couch', 'neon-sign'], equipped: { entrance: ['velvet-rope', 'leather-couch'] } };
+    expect(canEquip(full, 'neon-sign', 'entrance')).toBe(false); // entrance full (2 slots)
+    expect(canEquip(full, 'neon-sign', 'dancefloor')).toBe(true); // but its other zone is free
   });
 });
 
@@ -68,8 +74,8 @@ describe('venueEffects — bounded + neutral', () => {
 
 describe('venue in resolveNight', () => {
   const equippedVenue: VenueState = {
-    owned: ['neon-sign', 'velvet-rope', 'dance-lights', 'leather-couch'],
-    equipped: { entrance: ['neon-sign', 'velvet-rope'], dancefloor: ['dance-lights', 'leather-couch'] },
+    owned: ['neon-sign', 'velvet-rope', 'dance-lights', 'poster-wall'],
+    equipped: { entrance: ['neon-sign', 'velvet-rope'], dancefloor: ['dance-lights', 'poster-wall'] },
   };
 
   it('an empty venue resolves identically to no venue at all', () => {
