@@ -18,7 +18,7 @@ import {
 } from '@/domain/drinks';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_BLURB, DJ_OPTIONS, djCost } from '@/domain/dj';
-import { MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
+import { firstNightChecklist, isFirstNight, MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
 import { aggregateEffects } from '@/domain/upgrades';
 import {
@@ -58,6 +58,8 @@ export default function DayPrepScreen() {
     policies: club!.lastConfig.policies ?? DEFAULT_POLICIES,
     drinkPrep: club!.lastConfig.drinkPrep ?? DEFAULT_DRINK_PREP,
   }));
+  // First-night tutorial gate: which basics the owner has reviewed (in-screen only).
+  const [acked, setAcked] = useState<Set<string>>(() => new Set());
 
   if (!club) {
     router.replace('/');
@@ -101,7 +103,12 @@ export default function DayPrepScreen() {
   // Upfront = event fee + stock order; crew wages settle after the night. A free
   // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
   const canAffordUpfront = upfront === 0 || club.cash >= upfront;
-  const canOpen = validSchedule && canAffordUpfront && requirement.met;
+  // First-night gate: a brand-new owner reviews the basics before opening blind.
+  const firstNight = isFirstNight(club);
+  const checklist = firstNightChecklist();
+  const ready = !firstNight || acked.size >= checklist.length;
+  const ackItem = (id: string) => setAcked((s) => new Set(s).add(id));
+  const canOpen = validSchedule && canAffordUpfront && requirement.met && ready;
 
   // Derived readouts (rendered at the BOTTOM, below every selector, so changing a
   // selector never reflows content above the control you just tapped — this is the
@@ -151,8 +158,12 @@ export default function DayPrepScreen() {
               You can't cover tonight's upfront {money(upfront)} ({money(club.cash)} in the bank). Try
               Lean stock or a Quiet Night.
             </Text>
+          ) : !ready ? (
+            <Text variant="label" color={colors.warning}>
+              Don't open blind — review the basics above first ({acked.size}/{checklist.length}).
+            </Text>
           ) : null}
-          <Button label="Open the Doors" onPress={onOpen} disabled={!canOpen} />
+          <Button label={ready ? 'Open the Doors' : 'Review setup first'} onPress={onOpen} disabled={!canOpen} />
         </View>
       }
     >
@@ -160,6 +171,40 @@ export default function DayPrepScreen() {
       <Text variant="label" muted style={styles.subhead}>
         Set the room before you open. Your plan for the night lives at the bottom.
       </Text>
+
+      {firstNight ? (
+        <Card title="Before You Open" accent={colors.neonCyan}>
+          <Text variant="label" muted>
+            {MENTOR_LABEL}: Don't open blind. Tap each as you set it — then the doors are yours.
+          </Text>
+          {checklist.map((item) => {
+            const done = acked.has(item.id);
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => ackItem(item.id)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: done }}
+                style={styles.checkRow}
+              >
+                <View style={[styles.checkBox, done && styles.checkBoxOn]}>
+                  <Text variant="label" color={done ? colors.bg : colors.textMuted}>
+                    {done ? '✓' : ''}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" color={done ? colors.success : colors.textPrimary}>
+                    {item.label}
+                  </Text>
+                  <Text variant="label" muted>
+                    {item.hint}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </Card>
+      ) : null}
 
       <Card title="Tonight's Booking">
         {available.map((e) => {
@@ -342,4 +387,16 @@ const styles = StyleSheet.create({
   eventRowSel: { borderColor: colors.neonMagenta },
   crowdTags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   planDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.xs },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
+  checkBox: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  checkBoxOn: { backgroundColor: colors.success, borderColor: colors.success },
 });

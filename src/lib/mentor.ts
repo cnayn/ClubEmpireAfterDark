@@ -144,6 +144,33 @@ export function resultMentorLine(result: NightResult): string {
 }
 
 /**
+ * First-Night Readiness — a tiny tutorial gate so a brand-new owner reviews the
+ * basics before opening blind, instead of pressing through colored text. Pure +
+ * derived (no persistence): the gate only applies to the very first night, and
+ * the items are acknowledged in-screen, never saved.
+ */
+export interface ChecklistItem {
+  id: 'crew' | 'bar' | 'rules' | 'crowd';
+  label: string;
+  hint: string;
+}
+
+/** True only before the first night has ever been played (day 1). */
+export function isFirstNight(club: ClubState): boolean {
+  return club.day <= 1;
+}
+
+/** The four things a new owner should review before opening the doors. Static. */
+export function firstNightChecklist(): ChecklistItem[] {
+  return [
+    { id: 'crew', label: 'Check your crew', hint: 'Who works the bar and the door tonight.' },
+    { id: 'bar', label: 'Set your bar stock', hint: 'Stock and drink quality for the night.' },
+    { id: 'rules', label: 'Set your house rules', hint: 'Smoking, ID, security, bar service.' },
+    { id: 'crowd', label: "Read tonight's crowd", hint: 'Who your plan is pulling in.' },
+  ];
+}
+
+/**
  * A focused, pre-open warning for the Day Prep screen (or null). Reads the prep
  * the player is currently assembling.
  */

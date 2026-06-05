@@ -4,7 +4,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, NightResult } from '@/domain/types';
-import { MENTOR_LABEL, mentorNote, nightMentorLine, prepMentorLine, resultMentorLine } from './mentor';
+import { firstNightChecklist, isFirstNight, MENTOR_LABEL, mentorNote, nightMentorLine, prepMentorLine, resultMentorLine } from './mentor';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -86,6 +86,17 @@ describe('prepMentorLine', () => {
     expect(resultMentorLine(result({ incidents: 0, net: -50 })).toLowerCase()).toContain('red night');
     expect(resultMentorLine(result({ incidents: 0, net: 50, serviceRatio: 0.6 })).toLowerCase()).toContain('bar line');
     expect(resultMentorLine(result()).toLowerCase()).toContain('debrief');
+  });
+
+  it('first-night gate applies only on day 1 and lists the four basics', () => {
+    expect(isFirstNight(club({ day: 1 }))).toBe(true);
+    expect(isFirstNight(club({ day: 2 }))).toBe(false);
+    const items = firstNightChecklist();
+    expect(items.map((i) => i.id).sort()).toEqual(['bar', 'crew', 'crowd', 'rules']);
+    for (const it of items) {
+      expect(it.label.length).toBeGreaterThan(0);
+      expect(it.hint.length).toBeGreaterThan(0);
+    }
   });
 
   it('works on an old config missing optional policy/drink/venue fields', () => {
