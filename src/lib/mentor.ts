@@ -150,7 +150,7 @@ export function resultMentorLine(result: NightResult): string {
  * the items are acknowledged in-screen, never saved.
  */
 export interface ChecklistItem {
-  id: 'crew' | 'bar' | 'rules' | 'crowd';
+  id: 'crew' | 'bar' | 'rules';
   label: string;
   hint: string;
 }
@@ -160,13 +160,13 @@ export function isFirstNight(club: ClubState): boolean {
   return club.day <= 1;
 }
 
-/** The four things a new owner must genuinely DO before opening the doors. */
+/** The three things a new owner must genuinely DO before opening the doors,
+ *  walked one step at a time. (Order = the guided wizard order.) */
 export function firstNightChecklist(): ChecklistItem[] {
   return [
-    { id: 'crew', label: 'Confirm crew', hint: 'Set who works the bar and door, then confirm.' },
-    { id: 'bar', label: 'Review bar stock', hint: 'Choose stock amount and quality.' },
+    { id: 'crew', label: 'Pick your crew', hint: 'Spend your starting cash on the right staff, then confirm.' },
+    { id: 'bar', label: 'Set the bar', hint: 'Choose tonight’s stock amount and quality.' },
     { id: 'rules', label: 'Set house rules', hint: 'Smoking, ID, security, bar service.' },
-    { id: 'crowd', label: "Read tonight's crowd", hint: 'Check who your plan is pulling in.' },
   ];
 }
 
@@ -182,23 +182,13 @@ export function checklistDone(touched: ReadonlySet<string>): Record<ChecklistId,
     crew: touched.has('crew'),
     bar: touched.has('bar'),
     rules: touched.has('rules'),
-    crowd: touched.has('crowd'),
   };
-}
-
-/**
- * The crowd readout can only be confirmed once crew, bar, and rules are set — the
- * expected crowd is shaped by them, so there is something real to read.
- */
-export function canConfirmCrowd(touched: ReadonlySet<string>): boolean {
-  const d = checklistDone(touched);
-  return d.crew && d.bar && d.rules;
 }
 
 /** Ready to open: every first-night step genuinely done (not from defaults). */
 export function firstNightReady(touched: ReadonlySet<string>): boolean {
   const d = checklistDone(touched);
-  return d.crew && d.bar && d.rules && d.crowd;
+  return d.crew && d.bar && d.rules;
 }
 
 /**

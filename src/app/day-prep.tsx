@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -18,7 +18,7 @@ import {
 } from '@/domain/drinks';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_BLURB, DJ_OPTIONS, djCost } from '@/domain/dj';
-import { canConfirmCrowd, checklistDone, firstNightChecklist, firstNightReady, isFirstNight, MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
+import { checklistDone, firstNightChecklist, firstNightReady, isFirstNight, MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
 import { aggregateEffects } from '@/domain/upgrades';
 import {
@@ -61,6 +61,8 @@ export default function DayPrepScreen() {
   // First-night tutorial gate: which setup areas the owner has ACTUALLY engaged
   // (derived from real interaction, never a fakeable manual tick). In-screen only.
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
+  // Guided first-night wizard: the current step (0=crew, 1=bar, 2=rules).
+  const [wizardStep, setWizardStep] = useState(0);
 
   if (!club) {
     router.replace('/');
@@ -109,34 +111,190 @@ export default function DayPrepScreen() {
   const djFee = djCost(config.dj); // upfront, like the event fee
   const upfront = event.cost + stock + djFee;
   const validSchedule = isValidSchedule(club.staff, onDuty);
-  // Upfront = event fee + stock order; crew wages settle after the night. A free
-  // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
   const canAffordUpfront = upfront === 0 || club.cash >= upfront;
-  // First-night gate: a brand-new owner must genuinely DO each setup step before
-  // opening blind. "Done" is derived ONLY from real interaction/confirmation
-  // (`touched`), never from default values — so nothing is pre-ticked on a fresh
-  // game and the player completes each task by actually doing it.
+
+  // First-night gate: a brand-new owner is walked through three steps, one at a
+  // time. "Done" is derived ONLY from real interaction (`touched`), never from
+  // default values — nothing is pre-ticked, and each step needs a real choice.
   const firstNight = isFirstNight(club);
-  const checklist = firstNightChecklist();
   const done = checklistDone(touched);
-  const isDone = (id: string) => (done as Record<string, boolean>)[id] ?? false;
-  const doneCount = checklist.filter((i) => isDone(i.id)).length;
   const ready = !firstNight || firstNightReady(touched);
   const canOpen = validSchedule && canAffordUpfront && requirement.met && ready;
 
-  // Derived readouts (rendered at the BOTTOM, below every selector, so changing a
-  // selector never reflows content above the control you just tapped — this is the
-  // scroll-jump fix).
   const crowdTags = topCrowd(crowdMix(club, { ...config, eventId, staffOnDuty: onDuty }), 3);
   const mentorTip = prepMentorLine(club, { ...config, eventId, staffOnDuty: onDuty });
 
   const onOpen = () => {
-    // Defer resolution: the night resolves during playback (after the live
-    // intervention beat), so we only stash tonight's prep here.
     planNight({ ...config, eventId, staffOnDuty: onDuty });
     router.replace('/night-timeline');
   };
 
+  // --- Section cards (reused by the wizard and the full prep screen) ----------
+  const crewCard = (
+    <Card title="Crew on Duty">
+      <Text variant="label" muted>
+        Toggle off to rest someone — they stay hired, and you only pay who works.
+      </Text>
+      {club.staff.map((m) => {
+        const working = onDuty.includes(m.id);
+        const trait = m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : '';
+        return (
+          <Toggle
+            key={m.id}
+            label={`${m.name} · ${ROLE_LABEL[m.role]}`}
+            description={
+              working
+                ? `On duty · paid ${money(m.salary)} tonight · ${strengthLabel(m.skill)}${trait}`
+                : `Off duty · no wage tonight · ${strengthLabel(m.skill)}${trait}`
+            }
+            value={working}
+            onChange={() => toggleStaff(m.id)}
+            accent={m.role === 'bouncer' ? colors.neonCyan : colors.neonViolet}
+          />
+        );
+      })}
+      <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
+      {firstNight ? (
+        done.crew ? (
+          <Text variant="label" color={colors.success}>✓ Crew confirmed</Text>
+        ) : (
+          <>
+            <Button label="Confirm crew" onPress={() => touch('crew')} disabled={!validSchedule} />
+            {!validSchedule ? (
+              <Text variant="label" color={colors.warning}>Put at least one bartender on duty first.</Text>
+            ) : null}
+          </>
+        )
+      ) : null}
+    </Card>
+  );
+
+  const barCard = (
+    <Card title="Bar Stock">
+      <SegmentedControl
+        label="Stock amount"
+        value={drink.stock}
+        options={STOCK_OPTIONS}
+        onChange={(v) => setDrink('stock', v)}
+        accent={colors.warning}
+      />
+      <Text variant="label" muted>{STOCK_BLURB[drink.stock]}</Text>
+      <SegmentedControl
+        label="Stock quality"
+        value={drink.quality}
+        options={QUALITY_OPTIONS}
+        onChange={(v) => setDrink('quality', v)}
+      />
+      <Text variant="label" muted>{QUALITY_BLURB[drink.quality]}</Text>
+      <Text variant="label" muted>
+        This is what you pour. Premium pours need premium stock — the Menu Price (in Pricing) is
+        separate, and charging premium for cheap stock will be noticed.
+      </Text>
+    </Card>
+  );
+
+  const rulesCard = (
+    <Card title="House Rules">
+      <SegmentedControl
+        label="Smoking"
+        value={policies.smoking}
+        options={POLICY_OPTIONS.smoking}
+        onChange={(v) => setPolicy('smoking', v)}
+        accent={colors.warning}
+      />
+      <Text variant="label" muted>{POLICY_BLURB.smoking[policies.smoking]}</Text>
+
+      <SegmentedControl
+        label="ID Strictness"
+        value={policies.idCheck}
+        options={POLICY_OPTIONS.idCheck}
+        onChange={(v) => setPolicy('idCheck', v)}
+      />
+      <Text variant="label" muted>{POLICY_BLURB.idCheck[policies.idCheck]}</Text>
+
+      <SegmentedControl
+        label="Security Posture"
+        value={policies.security}
+        options={POLICY_OPTIONS.security}
+        onChange={(v) => setPolicy('security', v)}
+      />
+      <Text variant="label" muted>{POLICY_BLURB.security[policies.security]}</Text>
+
+      <SegmentedControl
+        label="Bar Service"
+        value={policies.barService}
+        options={POLICY_OPTIONS.barService}
+        onChange={(v) => setPolicy('barService', v)}
+      />
+      <Text variant="label" muted>{POLICY_BLURB.barService[policies.barService]}</Text>
+
+      <Toggle
+        label="VIP focus"
+        description="Court the big spenders. Pays off once you have a name."
+        value={config.vipFocus}
+        onChange={(v) => { touch('rules'); set('vipFocus', v); }}
+      />
+    </Card>
+  );
+
+  // --- Guided first-night wizard: one step at a time --------------------------
+  const steps: { id: keyof typeof done; n: number; title: string; guide: string; card: ReactNode; done: boolean }[] = [
+    { id: 'crew', n: 1, title: 'Pick your crew', guide: 'Spend your starting cash on the right crew — good staff decide how the night goes. Set who works tonight, then confirm.', card: crewCard, done: done.crew },
+    { id: 'bar', n: 2, title: 'Set the bar', guide: 'Order tonight’s stock. Tap an option for amount and quality to lock each in.', card: barCard, done: done.bar },
+    { id: 'rules', n: 3, title: 'Set house rules', guide: 'Choose your door and bar rules. Tap an option for each to set it on purpose.', card: rulesCard, done: done.rules },
+  ];
+  const inWizard = firstNight && wizardStep < steps.length;
+
+  if (inWizard) {
+    const cur = steps[wizardStep];
+    const last = wizardStep === steps.length - 1;
+    return (
+      <Screen
+        footer={
+          <View style={{ gap: spacing.sm }}>
+            {!cur.done ? (
+              <Text variant="label" color={colors.warning}>
+                {cur.id === 'crew' ? 'Set your crew, then tap Confirm crew.' : 'Tap an option to set this step.'}
+              </Text>
+            ) : null}
+            <View style={styles.wizardNav}>
+              {wizardStep > 0 ? (
+                <View style={{ flex: 1 }}>
+                  <Button label="Back" variant="secondary" onPress={() => setWizardStep((s) => Math.max(0, s - 1))} />
+                </View>
+              ) : null}
+              <View style={{ flex: 2 }}>
+                <Button
+                  label={last ? 'Finish setup' : 'Next step'}
+                  onPress={() => setWizardStep((s) => s + 1)}
+                  disabled={!cur.done}
+                />
+              </View>
+            </View>
+          </View>
+        }
+      >
+        <Text variant="title">Before You Open</Text>
+        <Card title={`Step ${cur.n} of ${steps.length}`} accent={colors.neonCyan}>
+          <Text variant="heading">{cur.title}</Text>
+          <Text variant="body" muted style={styles.wizardGuide}>
+            {MENTOR_LABEL}: {cur.guide}
+          </Text>
+          <View style={styles.dots}>
+            {steps.map((s, i) => (
+              <View
+                key={s.id}
+                style={[styles.dot, s.done ? styles.dotDone : i === wizardStep ? styles.dotCur : null]}
+              />
+            ))}
+          </View>
+        </Card>
+        {cur.card}
+      </Screen>
+    );
+  }
+
+  // --- Full prep screen (post-tutorial, or after the wizard) ------------------
   return (
     <Screen
       footer={
@@ -172,12 +330,8 @@ export default function DayPrepScreen() {
               You can't cover tonight's upfront {money(upfront)} ({money(club.cash)} in the bank). Try
               Lean stock or a Quiet Night.
             </Text>
-          ) : !ready ? (
-            <Text variant="label" color={colors.warning}>
-              Don't open blind — work through the setup steps first ({doneCount}/{checklist.length}).
-            </Text>
           ) : null}
-          <Button label={ready ? 'Open the Doors' : 'Review setup first'} onPress={onOpen} disabled={!canOpen} />
+          <Button label="Open the Doors" onPress={onOpen} disabled={!canOpen} />
         </View>
       }
     >
@@ -185,35 +339,6 @@ export default function DayPrepScreen() {
       <Text variant="label" muted style={styles.subhead}>
         Set the room before you open. Your plan for the night lives at the bottom.
       </Text>
-
-      {firstNight ? (
-        <Card title="Before You Open" accent={colors.neonCyan}>
-          <Text variant="label" muted>
-            {MENTOR_LABEL}: Don't open blind. Each step ticks only when you actually do it — confirm
-            your crew, set the bar and house rules, then read the crowd.
-          </Text>
-          {checklist.map((item) => {
-            const done = isDone(item.id);
-            return (
-              <View key={item.id} style={styles.checkRow}>
-                <View style={[styles.checkBox, done && styles.checkBoxOn]}>
-                  <Text variant="label" color={done ? colors.bg : colors.textMuted}>
-                    {done ? '✓' : ''}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text variant="body" color={done ? colors.success : colors.textPrimary}>
-                    {item.label}
-                  </Text>
-                  <Text variant="label" muted>
-                    {item.hint}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </Card>
-      ) : null}
 
       <Card title="Tonight's Booking">
         {available.map((e) => {
@@ -274,101 +399,9 @@ export default function DayPrepScreen() {
         </Text>
       </Card>
 
-      <Card title="Bar Stock">
-        <SegmentedControl
-          label="Stock amount"
-          value={drink.stock}
-          options={STOCK_OPTIONS}
-          onChange={(v) => setDrink('stock', v)}
-          accent={colors.warning}
-        />
-        <Text variant="label" muted>{STOCK_BLURB[drink.stock]}</Text>
-        <SegmentedControl
-          label="Stock quality"
-          value={drink.quality}
-          options={QUALITY_OPTIONS}
-          onChange={(v) => setDrink('quality', v)}
-        />
-        <Text variant="label" muted>{QUALITY_BLURB[drink.quality]}</Text>
-        <Text variant="label" muted>
-          This is what you pour. Premium pours need premium stock — the Menu Price (in Pricing)
-          is separate, and charging premium for cheap stock will be noticed.
-        </Text>
-      </Card>
-
-      <Card title="Crew on Duty">
-        <Text variant="label" muted>
-          Toggle off to rest someone — they stay hired, and you only pay who works.
-        </Text>
-        {club.staff.map((m) => {
-          const working = onDuty.includes(m.id);
-          const trait = m.visibleTrait !== 'none' ? ` · ${TRAIT_LABEL[m.visibleTrait]}` : '';
-          return (
-            <Toggle
-              key={m.id}
-              label={`${m.name} · ${ROLE_LABEL[m.role]}`}
-              description={
-                working
-                  ? `On duty · paid ${money(m.salary)} tonight · ${strengthLabel(m.skill)}${trait}`
-                  : `Off duty · no wage tonight · ${strengthLabel(m.skill)}${trait}`
-              }
-              value={working}
-              onChange={() => toggleStaff(m.id)}
-              accent={m.role === 'bouncer' ? colors.neonCyan : colors.neonViolet}
-            />
-          );
-        })}
-        <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
-        {firstNight ? (
-          done.crew ? (
-            <Text variant="label" color={colors.success}>✓ Crew confirmed</Text>
-          ) : (
-            <Button label="Confirm crew" onPress={() => touch('crew')} />
-          )
-        ) : null}
-      </Card>
-
-      <Card title="House Rules">
-        <SegmentedControl
-          label="Smoking"
-          value={policies.smoking}
-          options={POLICY_OPTIONS.smoking}
-          onChange={(v) => setPolicy('smoking', v)}
-          accent={colors.warning}
-        />
-        <Text variant="label" muted>{POLICY_BLURB.smoking[policies.smoking]}</Text>
-
-        <SegmentedControl
-          label="ID Strictness"
-          value={policies.idCheck}
-          options={POLICY_OPTIONS.idCheck}
-          onChange={(v) => setPolicy('idCheck', v)}
-        />
-        <Text variant="label" muted>{POLICY_BLURB.idCheck[policies.idCheck]}</Text>
-
-        <SegmentedControl
-          label="Security Posture"
-          value={policies.security}
-          options={POLICY_OPTIONS.security}
-          onChange={(v) => setPolicy('security', v)}
-        />
-        <Text variant="label" muted>{POLICY_BLURB.security[policies.security]}</Text>
-
-        <SegmentedControl
-          label="Bar Service"
-          value={policies.barService}
-          options={POLICY_OPTIONS.barService}
-          onChange={(v) => setPolicy('barService', v)}
-        />
-        <Text variant="label" muted>{POLICY_BLURB.barService[policies.barService]}</Text>
-
-        <Toggle
-          label="VIP focus"
-          description="Court the big spenders. Pays off once you have a name."
-          value={config.vipFocus}
-          onChange={(v) => { touch('rules'); set('vipFocus', v); }}
-        />
-      </Card>
+      {barCard}
+      {crewCard}
+      {rulesCard}
 
       {/* Derived readouts — kept LAST so a selector change never pushes a control
           above it up the page (the scroll-jump fix). */}
@@ -386,18 +419,6 @@ export default function DayPrepScreen() {
             {m.text}
           </Text>
         ))}
-        {firstNight ? (
-          <>
-            <View style={styles.planDivider} />
-            {done.crowd ? (
-              <Text variant="label" color={colors.success}>✓ Crowd reviewed</Text>
-            ) : canConfirmCrowd(touched) ? (
-              <Button label="Mark crowd reviewed" variant="secondary" onPress={() => touch('crowd')} />
-            ) : (
-              <Text variant="label" muted>Confirm crew and set the bar and house rules first.</Text>
-            )}
-          </>
-        ) : null}
       </Card>
     </Screen>
   );
@@ -419,16 +440,10 @@ const styles = StyleSheet.create({
   eventRowSel: { borderColor: colors.neonMagenta },
   crowdTags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   planDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.xs },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
-  checkBox: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceAlt,
-  },
-  checkBoxOn: { backgroundColor: colors.success, borderColor: colors.success },
+  wizardNav: { flexDirection: 'row', gap: spacing.sm },
+  wizardGuide: { lineHeight: 21 },
+  dots: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  dot: { width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  dotCur: { borderColor: colors.neonCyan },
+  dotDone: { backgroundColor: colors.success, borderColor: colors.success },
 });
