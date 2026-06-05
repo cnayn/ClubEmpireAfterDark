@@ -18,7 +18,7 @@ import { effectiveBookingFee, eventResultNotes, getEvent } from '@/domain/events
 import { crowdEffects, crowdMix } from '@/domain/crowd';
 import { regularBaseEffects, updateRegularBase } from '@/domain/regulars';
 import { djCost, djEffects } from '@/domain/dj';
-import { drinkPrepEffects, stockCost } from '@/domain/drinks';
+import { DEFAULT_DRINK_PREP, drinkMismatch, drinkPrepEffects, stockCost } from '@/domain/drinks';
 import { policyEffects } from '@/domain/policies';
 import { venueEffects, venueStats } from '@/domain/furniture';
 import { aggregateOnDuty, resolveTheft, wagesForOnDuty } from '@/domain/staff';
@@ -110,6 +110,9 @@ export function resolveNight(
   const fillForStock = capacity > 0 ? guests / capacity : 0;
   const dp = drinkPrepEffects(config.drinkPrep, fillForStock);
   const stock = stockCost(config.drinkPrep, capacity); // upfront, like an event fee
+  // Charging out of step with the stock you bought nudges vibe. Neutral at the
+  // default House quality, so the baseline night is byte-identical.
+  const drinkMis = drinkMismatch((config.drinkPrep ?? DEFAULT_DRINK_PREP).quality, config.drinkLevel);
 
   // Bartender QUALITY lifts (or dents) bar revenue beyond raw throughput — a
   // sharper crew gets more value per guest even when service isn't the cap.
@@ -179,7 +182,7 @@ export function resolveNight(
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd + ce.vibeAdd + re.vibeAdd + dj.vibeAdd + serviceHeadroom * B.SERVICE_HEADROOM_VIBE, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd + ce.vibeAdd + re.vibeAdd + dj.vibeAdd + drinkMis + serviceHeadroom * B.SERVICE_HEADROOM_VIBE, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;

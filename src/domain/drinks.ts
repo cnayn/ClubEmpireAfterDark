@@ -5,7 +5,7 @@
  * reuse existing night quantities (bar revenue, vibe) + a single upfront cost.
  */
 
-import type { DrinkPrep, DrinkQuality, StockLevel } from './types';
+import type { DrinkPrep, DrinkQuality, Level, StockLevel } from './types';
 
 export const DEFAULT_DRINK_PREP: DrinkPrep = { stock: 'standard', quality: 'house' };
 
@@ -46,6 +46,19 @@ export function drinkPrepEffects(prep: DrinkPrep | undefined, fill: number): Dri
   }
 
   return { barRevenueMod, vibeAdd };
+}
+
+/**
+ * What you POUR is the stock quality you bought — you can't serve premium from
+ * cheap bottles. The only thing the menu PRICE changes here is whether the room
+ * feels cheated or rewarded: charging premium prices on cheap stock stings, while
+ * premium stock at a low price quietly wins trust. Bounded; neutral for default
+ * House quality (and for matched price tiers), so a default night is unchanged.
+ */
+export function drinkMismatch(quality: DrinkQuality, menuPrice: Level): number {
+  if (quality === 'cheap' && menuPrice === 'high') return -4; // charged premium for cheap pours
+  if (quality === 'premium' && menuPrice === 'low') return 3; // a genuine steal
+  return 0;
 }
 
 // --- UI metadata (Day Prep) ---------------------------------------------------

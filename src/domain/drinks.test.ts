@@ -5,7 +5,7 @@
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, DrinkPrep } from '@/domain/types';
 import { resolveNight } from '@/sim/night';
-import { DEFAULT_DRINK_PREP, drinkPrepEffects, stockCost } from './drinks';
+import { DEFAULT_DRINK_PREP, drinkMismatch, drinkPrepEffects, stockCost } from './drinks';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -16,6 +16,31 @@ function club(over: Partial<ClubState> = {}): ClubState {
 }
 const packed = (): DayConfig => ({ ...defaultDayConfig(STARTING_ROSTER), coverLevel: 'low', drinkLevel: 'low' });
 const withPrep = (p: Partial<DrinkPrep>): DayConfig => ({ ...packed(), drinkPrep: { ...DEFAULT_DRINK_PREP, ...p } });
+
+describe('drinkMismatch — price vs the stock you actually bought', () => {
+  it('is neutral for House quality and matched tiers', () => {
+    expect(drinkMismatch('house', 'high')).toBe(0);
+    expect(drinkMismatch('house', 'low')).toBe(0);
+    expect(drinkMismatch('cheap', 'low')).toBe(0);
+    expect(drinkMismatch('premium', 'high')).toBe(0);
+  });
+
+  it('stings when you charge premium for cheap stock, rewards a premium steal', () => {
+    expect(drinkMismatch('cheap', 'high')).toBeLessThan(0);
+    expect(drinkMismatch('premium', 'low')).toBeGreaterThan(0);
+  });
+
+  it('a cheap-stock/high-price night resolves worse than a matched one (and House is unchanged)', () => {
+    const c = club();
+    const matched = resolveNight(c, withPrep({ quality: 'cheap' }), 7).result; // cheap stock, low price (packed())
+    const gouge = resolveNight(c, { ...withPrep({ quality: 'cheap' }), drinkLevel: 'high' }, 7).result;
+    expect(gouge.reputationDelta).toBeLessThanOrEqual(matched.reputationDelta);
+    // House quality at any price is byte-identical to the no-mismatch baseline.
+    const houseHigh = resolveNight(c, { ...packed(), drinkLevel: 'high' }, 7).result;
+    const houseHighPrep = resolveNight(c, { ...withPrep({ quality: 'house' }), drinkLevel: 'high' }, 7).result;
+    expect(houseHighPrep.reputationAfter).toBe(houseHigh.reputationAfter);
+  });
+});
 
 describe('stockCost + drinkPrepEffects', () => {
   it('default / standard / absent is neutral and free', () => {

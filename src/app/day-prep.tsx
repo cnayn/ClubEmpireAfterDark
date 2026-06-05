@@ -277,7 +277,7 @@ export default function DayPrepScreen() {
 
       <Card title="Bar Stock">
         <SegmentedControl
-          label="Stock level"
+          label="Stock amount"
           value={drink.stock}
           options={STOCK_OPTIONS}
           onChange={(v) => setDrink('stock', v)}
@@ -285,12 +285,16 @@ export default function DayPrepScreen() {
         />
         <Text variant="label" muted>{STOCK_BLURB[drink.stock]}</Text>
         <SegmentedControl
-          label="Drink quality"
+          label="Stock quality"
           value={drink.quality}
           options={QUALITY_OPTIONS}
           onChange={(v) => setDrink('quality', v)}
         />
         <Text variant="label" muted>{QUALITY_BLURB[drink.quality]}</Text>
+        <Text variant="label" muted>
+          This is what you pour. Premium pours need premium stock — the Menu Price (in Pricing)
+          is separate, and charging premium for cheap stock will be noticed.
+        </Text>
       </Card>
 
       <Card title="Crew on Duty">

@@ -158,6 +158,13 @@ function drinkPrepLines(result: NightResult, club: ClubState | undefined): Debri
   if (!dp) return [];
   const out: DebriefLine[] = [];
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
+  // Price-vs-stock mismatch first, so it survives the line cap when it matters.
+  const price = club?.lastConfig.drinkLevel;
+  if (dp.quality === 'cheap' && price === 'high') {
+    out.push({ key: 'dp-mismatch', label: 'Bar prep', tone: 'warn', text: 'You charged premium for cheap bottles. People noticed.' });
+  } else if (dp.quality === 'premium' && price === 'low') {
+    out.push({ key: 'dp-mismatch', label: 'Bar prep', tone: 'good', text: 'Premium stock at a fair price — the room trusted the bar.' });
+  }
   if (dp.stock === 'lean' && fill >= 0.7) {
     out.push({ key: 'dp-stock', label: 'Bar prep', tone: 'warn', text: 'Lean stock saved cash up front, but the bar ran thin when the room filled.' });
   } else if (dp.stock === 'heavy' && fill >= 0.7) {
