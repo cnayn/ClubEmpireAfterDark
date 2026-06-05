@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import { View } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -6,6 +6,7 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { reputationTier } from '@/domain/balance';
+import { inboxCount } from '@/lib/phone';
 import { useGameStore } from '@/state/store';
 import { spacing } from '@/theme/tokens';
 
@@ -13,6 +14,7 @@ import { spacing } from '@/theme/tokens';
 export default function MoreScreen() {
   const club = useGameStore((s) => s.club);
   const lastResult = useGameStore((s) => s.lastResult);
+  const messages = club ? inboxCount(club, lastResult) : 0;
 
   return (
     <Screen>
@@ -26,6 +28,11 @@ export default function MoreScreen() {
       ) : null}
 
       <View style={{ gap: spacing.sm }}>
+        <Button
+          label={messages > 0 ? `📱 Phone (${messages})` : '📱 Phone'}
+          disabled={!club}
+          onPress={() => router.push('/phone' as Href)}
+        />
         <Button
           label="Last Night's Results"
           variant="secondary"

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -12,6 +12,7 @@ import { reputationTier } from '@/domain/balance';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { REGULAR_COPY, topRegulars } from '@/domain/regulars';
 import { mentorNote } from '@/lib/mentor';
+import { inboxCount } from '@/lib/phone';
 import { buildFloorView, floorBubbles, goalBoard, venueFloorChips } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
@@ -38,6 +39,7 @@ export default function DashboardScreen() {
 
   // Compact board on the dashboard; the full board lives on the Goals tab.
   const goals = goalBoard(club, lastResult).slice(0, 3);
+  const messages = inboxCount(club, lastResult);
   const regulars = topRegulars(club.regularBase, 3);
   const mentor = mentorNote(club, lastResult, useGameStore.getState().lastBossActions);
   const floor = buildFloorView(club, lastResult);
@@ -146,6 +148,20 @@ export default function DashboardScreen() {
         </Pressable>
       </Card>
 
+      {/* Phone — the city texting you between nights */}
+      {messages > 0 ? (
+        <Pressable onPress={() => router.push('/phone' as Href)} accessibilityRole="button">
+          <Card>
+            <View style={styles.phoneRow}>
+              <Text variant="body">📱 Phone</Text>
+              <Text variant="label" color={colors.neonMagenta}>
+                {messages} message{messages === 1 ? '' : 's'} →
+              </Text>
+            </View>
+          </Card>
+        </Pressable>
+      ) : null}
+
       {/* Regular Base — who's becoming loyal */}
       <Card title="Regular Base">
         {regulars.length === 0 ? (
@@ -204,4 +220,5 @@ const styles = StyleSheet.create({
   regularRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   regularChip: { alignItems: 'center', minWidth: 64 },
   mentorLine: { lineHeight: 21 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });
