@@ -36,6 +36,12 @@ function onDutyBouncers(club: ClubState | undefined): number {
   return club.staff.filter((m) => m.role === 'bouncer' && onDuty.has(m.id)).length;
 }
 
+function onDutyBartenders(club: ClubState | undefined): number {
+  if (!club) return 0;
+  const onDuty = new Set(club.lastConfig.staffOnDuty);
+  return club.staff.filter((m) => m.role === 'bartender' && onDuty.has(m.id)).length;
+}
+
 /** Static crew-relationship flavor (presentation only — no affinity/memory/loyalty). */
 function crewFlavor(result: NightResult, club: ClubState | undefined): DebriefLine | null {
   if (!club) return null;
@@ -266,7 +272,11 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
   if (result.guests === 0) {
     lines.push({ key: 'bar', label: 'Bar', tone: 'neutral', text: 'Quiet bar — nothing to push tonight.' });
   } else if (result.serviceRatio >= 1) {
-    lines.push({ key: 'bar', label: 'Bar', tone: 'good', text: 'Bar held up — guests got served before patience snapped.' });
+    lines.push(
+      onDutyBartenders(club) >= 3
+        ? { key: 'bar', label: 'Bar', tone: 'good', text: 'Plenty of hands on the bar — drinks never stopped and the room felt it.' }
+        : { key: 'bar', label: 'Bar', tone: 'good', text: 'Bar held up — guests got served before patience snapped.' }
+    );
   } else if (result.serviceRatio >= 0.85) {
     lines.push({ key: 'bar', label: 'Bar', tone: 'warn', text: 'Bar stayed just ahead of the crowd — a close one.' });
   } else if (result.serviceRatio >= 0.6) {

@@ -152,6 +152,31 @@ describe('crew impact', () => {
     }
   });
 
+  it('MORE bartenders improve a full base-capacity night (service headroom, #12)', () => {
+    // Base capacity 60 — two bartenders already fully serve it (serviceRatio 1.0),
+    // so the OLD logic gave a 3rd bartender zero benefit. Headroom now rewards the
+    // extra hands with more bar revenue + vibe → a visibly better night.
+    const two = makeClub({ reputation: 70, baseCapacity: 60, staff: [bartender('b1', 50), bartender('b2', 50)] });
+    const three = makeClub({ reputation: 70, baseCapacity: 60, staff: [bartender('b1', 50), bartender('b2', 50), bartender('b3', 50)] });
+    for (const seed of [3, 19, 44]) {
+      const a = resolveNight(two, { ...baseConfig, staffOnDuty: ['b1', 'b2'] }, seed).result;
+      const b = resolveNight(three, { ...baseConfig, staffOnDuty: ['b1', 'b2', 'b3'] }, seed).result;
+      expect(a.serviceRatio).toBe(1); // both already "covered"
+      expect(b.serviceRatio).toBe(1);
+      expect(b.barRevenue).toBeGreaterThan(a.barRevenue); // but the extra hand still helps
+      expect(b.reputationAfter).toBeGreaterThanOrEqual(a.reputationAfter);
+      // ...and it stays bounded (not a runaway).
+      expect(b.barRevenue).toBeLessThan(a.barRevenue * 1.15);
+    }
+  });
+
+  it('service headroom is neutral when understaffed or at exact capacity', () => {
+    // 1 bartender, packed big room → understaffed → no headroom bonus, ratio < 1.
+    const lean = bigClub([bartender('solo', 50)]);
+    const r = resolveNight(lean, { ...packed, staffOnDuty: ['solo'] }, 5).result;
+    expect(r.serviceRatio).toBeLessThan(1);
+  });
+
   it('better bartender quality lifts bar revenue even when not capacity-bound', () => {
     // Two bartenders at a base-capacity house: service (70) always covers the
     // room (≤60 guests), so serviceRatio is 1.0 for both and the only difference

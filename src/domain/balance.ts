@@ -56,6 +56,17 @@ export const AVG_DRINKS_PER_GUEST = 2.0;
 export const SERVICE_PER_BARTENDER = 35;
 
 /**
+ * Service headroom (fix #12 — "more crew should matter"). serviceRatio is capped
+ * at 1.0 (it gates revenue when UNDER-staffed), so beyond that point extra/better
+ * bartenders used to do nothing. Headroom rewards OVER-staffing with a small,
+ * bounded bonus — shorter waits → a little more vibe and bar revenue — so adding
+ * a 3rd bartender or a sharper crew visibly helps even a small full room. Bounded
+ * at 2× coverage; a real trade-off against wages, never free money.
+ */
+export const SERVICE_HEADROOM_VIBE = 4; // max +vibe at ≥2× coverage
+export const SERVICE_HEADROOM_REVENUE = 0.035; // max +3.5% bar revenue at ≥2× coverage
+
+/**
  * Bartender QUALITY → bar revenue, on top of raw service capacity. Centered on
  * BASELINE_SKILL so the starting roster (skill 50) is exactly neutral (×1.0,
  * identity-preserving): a sharper crew pours a little more value per guest, a

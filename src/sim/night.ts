@@ -95,6 +95,11 @@ export function resolveNight(
   // --- Service capacity (bartenders gate bar revenue) ---
   const serviceCapacity = crew.service + fx.serviceBartenders * B.SERVICE_PER_BARTENDER;
   const serviceRatio = guests > 0 ? clamp(serviceCapacity / guests, 0, 1) : 1;
+  // Service headroom (fix #12): surplus coverage beyond the 1.0 cap rewards
+  // more/better crew with a small bounded bonus (shorter waits). 0 when at-or-
+  // under capacity, so understaffed and empty nights are unaffected.
+  const serviceHeadroom = guests > 0 ? clamp(serviceCapacity / guests - 1, 0, 1) : 0;
+  const headroomRevenueMod = 1 + serviceHeadroom * B.SERVICE_HEADROOM_REVENUE;
 
   // Drink Prep v1: stock + quality. Neutral at Standard + House (and absent), so
   // the baseline night is unchanged. `fill` decides lean/heavy stock pressure.
@@ -124,7 +129,7 @@ export function resolveNight(
 
   const coverRevenue = Math.round(guests * coverPrice);
   const barRevenue = Math.round(
-    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * pe.barRevenueMod * dp.barRevenueMod * event.spendMod * intervention.revenueMod
+    guests * B.DRINK_BASE * drinkMult * avgDrinks * serviceRatio * barQualityMod * headroomRevenueMod * pe.barRevenueMod * dp.barRevenueMod * event.spendMod * intervention.revenueMod
   );
 
   // --- Incidents & risk (security mod derives from on-duty bouncers) ---
@@ -169,7 +174,7 @@ export function resolveNight(
   const net = revenue - costs;
 
   // --- Satisfaction → reputation ---
-  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd + ce.vibeAdd + re.vibeAdd, 0, 100);
+  const vibe = clamp(50 + (musicFit - 1) * 100 + fx.vibeBonus + intervention.vibeBonus + pe.vibeAdd + dp.vibeAdd + ve.vibeAdd + ce.vibeAdd + re.vibeAdd + serviceHeadroom * B.SERVICE_HEADROOM_VIBE, 0, 100);
   const regularLoyalty = clamp(70 - priceLevel * 30 - incidents * 8 + (musicFit - 1) * 100, 0, 100);
   const serviceQuality = serviceRatio * 100;
   const vipComponent = config.vipFocus ? vipSatisfaction : B.VIP_NEUTRAL;
