@@ -17,6 +17,7 @@ import {
   stockCost,
 } from '@/domain/drinks';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
+import { DJ_BLURB, DJ_OPTIONS, djCost } from '@/domain/dj';
 import { MENTOR_LABEL, prepMentorLine } from '@/lib/mentor';
 import { eventReadiness, eventRequirement, getEvent, unlockedEvents } from '@/domain/events';
 import { aggregateEffects } from '@/domain/upgrades';
@@ -94,7 +95,8 @@ export default function DayPrepScreen() {
   const wages = wagesForOnDuty(club.staff, onDuty); // post-night estimate, not upfront
   const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
   const stock = stockCost(config.drinkPrep, capacity); // upfront, like the event fee
-  const upfront = event.cost + stock;
+  const djFee = djCost(config.dj); // upfront, like the event fee
+  const upfront = event.cost + stock + djFee;
   const validSchedule = isValidSchedule(club.staff, onDuty);
   // Upfront = event fee + stock order; crew wages settle after the night. A free
   // night (Quiet + Lean/Standard stock) stays openable even from negative cash.
@@ -128,6 +130,9 @@ export default function DayPrepScreen() {
           ) : null}
           {stock > 0 ? (
             <ResultRow label="Stock order (upfront)" value={`-${money(stock)}`} valueColor={colors.warning} />
+          ) : null}
+          {djFee > 0 ? (
+            <ResultRow label="DJ booking (upfront)" value={`-${money(djFee)}`} valueColor={colors.warning} />
           ) : null}
           {event.bookingFee > 0 ? (
             <ResultRow label="Booking fee (up to, if you deliver)" value={`+${money(event.bookingFee)}`} valueColor={colors.success} />
@@ -185,8 +190,16 @@ export default function DayPrepScreen() {
         })}
       </Card>
 
-      <Card title="Music">
-        <SegmentedControl value={config.music} options={MUSIC} onChange={(v) => set('music', v)} />
+      <Card title="Music / DJ">
+        <SegmentedControl label="Genre" value={config.music} options={MUSIC} onChange={(v) => set('music', v)} />
+        <SegmentedControl
+          label="Booking"
+          value={config.dj ?? 'house'}
+          options={DJ_OPTIONS}
+          onChange={(v) => set('dj', v)}
+          accent={colors.neonMagenta}
+        />
+        <Text variant="label" muted>{DJ_BLURB[config.dj ?? 'house']}</Text>
       </Card>
 
       <Card title="Pricing">

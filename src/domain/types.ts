@@ -37,6 +37,12 @@ export interface DrinkPrep {
   quality: DrinkQuality;
 }
 
+// --- DJ Booking v1 (the music act booked for the night) ----------------------
+/** A single pre-night music booking. `house` is neutral (no fee, no effect), so
+ *  a default/absent booking reproduces the pre-DJ night exactly. NOT a DJ career,
+ *  staff role, or loyalty system. */
+export type DjBookingId = 'house' | 'local' | 'hype';
+
 // --- Phase 2A: named staff ---------------------------------------------------
 
 export type StaffRole = 'bartender' | 'bouncer';
@@ -131,6 +137,9 @@ export interface DayConfig {
   /** Drink Prep v1. Optional for save back-compat: absent = neutral (Standard +
    *  House, no upfront cost). */
   drinkPrep?: DrinkPrep;
+  /** DJ Booking v1. Optional for save back-compat: absent = 'house' (neutral, no
+   *  fee, no effect). */
+  dj?: DjBookingId;
 }
 
 // --- Venue / Furniture v1 ----------------------------------------------------

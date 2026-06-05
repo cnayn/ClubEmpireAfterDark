@@ -6,6 +6,7 @@ import { Card, StatCard } from '@/components/Card';
 import { Pill, ResultRow } from '@/components/Controls';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
+import { djCost } from '@/domain/dj';
 import { stockCost } from '@/domain/drinks';
 import { getEvent } from '@/domain/events';
 import { buildDebrief, type DebriefTone } from '@/lib/debrief';
@@ -117,6 +118,12 @@ export default function ResultsScreen() {
           const stock = stockCost(club?.lastConfig.drinkPrep, result.capacity);
           return stock > 0 ? (
             <ResultRow label="Stock order" value={`-${money(stock)}`} valueColor={colors.warning} />
+          ) : null;
+        })()}
+        {(() => {
+          const fee = djCost(club?.lastConfig.dj);
+          return fee > 0 ? (
+            <ResultRow label="DJ booking" value={`-${money(fee)}`} valueColor={colors.warning} />
           ) : null;
         })()}
         {result.fines > 0 ? (

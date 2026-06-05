@@ -15,6 +15,7 @@ import {
   resolveBossAction,
 } from '@/lib/bossActions';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
+import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
 import { nightMentorLine } from '@/lib/mentor';
 import { buildFloorView, type FloorBubble, floorBubbles, venueFloorChips } from '@/lib/dashboard';
@@ -119,6 +120,7 @@ export default function NightTimelineScreen() {
         venueChips={venueFloorChips(planClub)}
         crowdTags={topCrowd(crowdMix(planClub, plan), 3).map((id) => CROWD_SEGMENTS[id].name)}
         regularTags={topRegulars(club.regularBase, 2).filter((r) => r.score >= 15).map((r) => `${r.name} back`)}
+        djLabel={DJ_FLOOR_LABEL[plan.dj ?? 'house']}
       />
 
       {/* Current beat — short, floor-supporting. Tap to move the night along. */}

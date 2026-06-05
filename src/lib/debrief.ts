@@ -171,6 +171,21 @@ function drinkPrepLines(result: NightResult, club: ClubState | undefined): Debri
   return out.slice(0, 2);
 }
 
+/** One DJ line when a real act (not the house playlist) was booked. */
+function djLine(result: NightResult, club: ClubState | undefined): DebriefLine | null {
+  const booking = club?.lastConfig.dj;
+  if (!booking || booking === 'house') return null;
+  const lifted = result.reputationDelta >= 0;
+  if (booking === 'hype') {
+    return lifted
+      ? { key: 'dj', label: 'DJ', tone: 'good', text: 'The hype DJ earned the fee — the room had real energy tonight.' }
+      : { key: 'dj', label: 'DJ', tone: 'warn', text: 'You paid for a name on the decks, but the room never caught fire.' };
+  }
+  return lifted
+    ? { key: 'dj', label: 'DJ', tone: 'good', text: 'The DJ kept the floor moving — a fair booking for the night.' }
+    : { key: 'dj', label: 'DJ', tone: 'info', text: 'The DJ did their job; the rest of the night let them down.' };
+}
+
 /** One venue line when the room's look/hygiene is doing something. */
 function venueLine(club: ClubState | undefined): DebriefLine | null {
   if (!club?.venue) return null;
@@ -323,6 +338,10 @@ export function buildDebrief(result: NightResult, club?: ClubState, bossActions?
   // --- Who's coming back (optional, once a regular base forms) ---
   const regs = regularsLine(result, club);
   if (regs) lines.push(regs);
+
+  // --- DJ booking (optional, when a real act was booked) ---
+  const dj = djLine(result, club);
+  if (dj) lines.push(dj);
 
   // --- Venue look (optional) ---
   const venue = venueLine(club);

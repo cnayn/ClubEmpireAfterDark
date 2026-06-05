@@ -119,6 +119,7 @@ export function FloorView({
   venueChips,
   crowdTags,
   regularTags,
+  djLabel,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -127,6 +128,8 @@ export function FloorView({
   title?: string;
   /** Subtle crowd movement during the live night — presentation only. */
   pulse?: boolean;
+  /** The booked DJ act for the night, shown at the booth (e.g. "Hype DJ"). */
+  djLabel?: string;
   /** Per-zone pressure states (door/bar/floor) to glow the venue. */
   zones?: NightZones;
   /** A zone to briefly highlight after a boss action (door/bar/floor). */
@@ -266,9 +269,14 @@ export function FloorView({
               <EmptyPost />
             )}
           </View>
-          <View style={[styles.futureZone, flashZone === 'floor' && { borderColor: accent, opacity: 0.9 }]}>
-            <Text variant="label" muted>
-              DJ Booth — soon
+          <View
+            style={[
+              djLabel ? styles.djZone : styles.futureZone,
+              flashZone === 'floor' && { borderColor: accent, opacity: 0.95 },
+            ]}
+          >
+            <Text variant="label" color={djLabel ? colors.neonMagenta : colors.textMuted}>
+              {djLabel ? `♪ ${djLabel}` : 'DJ Booth — soon'}
             </Text>
           </View>
         </View>
@@ -319,6 +327,14 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: colors.border,
     opacity: 0.5,
+  },
+  djZone: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.neonMagenta,
+    backgroundColor: colors.surface,
   },
   crowd: {
     flexDirection: 'row',

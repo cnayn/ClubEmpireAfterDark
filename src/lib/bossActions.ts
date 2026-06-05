@@ -12,6 +12,7 @@
  */
 
 import type { FloorBubble } from '@/lib/dashboard';
+import { djPushBonus } from '@/domain/dj';
 import type { ClubState, NightResult } from '@/domain/types';
 import type { Intervention } from '@/sim/night';
 
@@ -62,15 +63,20 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
   const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
 
   switch (id) {
-    case 'push-dj':
-      // Reuses the Push DJ feel: clear vibe lift, tiny bar cost — not a trap.
+    case 'push-dj': {
+      // Reuses the Push DJ feel: clear vibe lift, tiny bar cost — not a trap. A
+      // real booked act (Local/Hype) has more to give when you push it.
+      const djBonus = djPushBonus(club.lastConfig.dj);
       return {
-        intervention: { vibeBonus: 18, revenueMod: 0.99 },
-        bubble: { id: 'boss-dj', label: 'Booth lifting', tone: 'info', zone: 'floor' },
-        mood: { label: 'Energy lifting', tone: 'good' },
+        intervention: { vibeBonus: 18 + djBonus, revenueMod: 0.99 },
+        bubble: { id: 'boss-dj', label: djBonus > 0 ? 'DJ lifted the room' : 'Booth lifting', tone: 'info', zone: 'floor' },
+        mood: { label: djBonus > 0 ? 'Music heads noticed' : 'Energy lifting', tone: 'good' },
         call: BOSS_CALL['push-dj'],
-        note: 'Pushed the booth — the room found another gear.',
+        note: djBonus > 0
+          ? 'Pushed the booth — the DJ lifted the room and the music heads noticed.'
+          : 'Pushed the booth — the room found another gear.',
       };
+    }
     case 'check-bar': {
       const strained = preview.serviceRatio < 0.85;
       return strained

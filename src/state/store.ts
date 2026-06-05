@@ -17,6 +17,7 @@ import {
 import type { BossActionId } from '@/lib/bossActions';
 import type { ClubState, DayConfig, NightResult, VenueZone } from '@/domain/types';
 import { aggregateEffects, getUpgrade } from '@/domain/upgrades';
+import { djCost } from '@/domain/dj';
 import { stockCost } from '@/domain/drinks';
 import { canEquip, getFurniture, getVenue } from '@/domain/furniture';
 import { clearSave, createNewClub, loadClub, saveClub } from '@/save/persistence';
@@ -110,7 +111,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // night (e.g. Quiet Night) stays openable from negative cash, so the player
     // can always run a lean recovery night.
     const capacity = club.baseCapacity + aggregateEffects(club.ownedUpgradeIds).capacity;
-    const upfront = getEvent(config.eventId).cost + stockCost(config.drinkPrep, capacity);
+    const upfront = getEvent(config.eventId).cost + stockCost(config.drinkPrep, capacity) + djCost(config.dj);
     if (upfront > 0 && club.cash < upfront) return null;
     const { result, nextClub } = resolveNight(club, config, nightSeed(club), intervention);
     set({ club: nextClub, lastResult: result, plannedConfig: null, lastBossActions: bossActions ?? [] });
