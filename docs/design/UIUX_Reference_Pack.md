@@ -52,8 +52,11 @@ product.**
    bubbles, posture, and mood — not numbers. (Detail: Sections 6, 7, 8.)
 4. **Build/Prep mode** is organized like a clean phone game, with
    categorized catalogs: **Lighting, Sound, Bar, Seating, Decor, Door,
-   Bath, Staff.** Tap → explain. Preview on the floor. Reversible
-   before confirm. (Detail: Sections 3, 12.)
+   Bathroom, Staff, DJ/Music.** Tap → explain. Preview on the floor.
+   Reversible before confirm. (Detail: Sections 3, 12; full per-category
+   visual/mechanical/identity in
+   [`level-and-floor-progression.md`](level-and-floor-progression.md)
+   Section 3.)
 5. **Live/Night mode** feels like **watching and commanding** the
    club — observation as gameplay, boss actions as commands aimed at a
    place. (Detail: Sections 1, 9.)
@@ -140,7 +143,8 @@ style and not a simulation depth target:
 ### Organization (Sims-style)
 
 - **Catalogs are categorized**, never flat lists. Upgrades group by
-  *function* (Lighting / Sound / Seating / Bar / Decor / Door / Bath).
+  *function*: **Lighting / Sound / Bar / Seating / Decor / Door /
+  Bathroom / Staff / DJ/Music** (nine categories — canonical list).
 - **Build/Live separation.** A distinct *Prep* mode for arranging and
   improving the room, distinct from *Night* mode when it runs. The
   player should never be unsure which mode they're in.
@@ -362,7 +366,8 @@ X first" gating beyond what the economy already forces.
 
 - A distinct mode the player enters between nights.
 - **Categorized catalog** (per Section 3 organization rules):
-  Lighting / Sound / Seating / Bar / Decor / Door / Bath / Staff.
+  **Lighting / Sound / Bar / Seating / Decor / Door / Bathroom / Staff
+  / DJ/Music** (canonical nine).
 - **Preview on the floor.** Selecting an upgrade shows where it lands
   and what it changes — before the player commits cash.
 - **Reversible while previewing.** Once confirmed, the upgrade is real;

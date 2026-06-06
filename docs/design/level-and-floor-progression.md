@@ -228,6 +228,13 @@ Every goal must answer:
 
 ## 7. Example first 20 goals
 
+> **Scope note for Main Claude Code:** these twenty goals are **design
+> canon** — they define what the early-game ladder *looks like*. They
+> are **not** all scoped for the next build. Only the first slice of
+> goals is in scope per Section 9 Slice D (goals 1–5). The remaining
+> goals are banked here so the Goal Board system can be designed once
+> and filled progressively, not built all at once.
+>
 > Authoring rules: each goal carries a short mentor / phone-style line
 > in the voice of a current-active character (Caramel, Rosa, John) or
 > the neutral mentor voice. Future characters appear only as
@@ -473,7 +480,8 @@ one to land.
 ### Slice B — Categorized prep catalog (read-only first pass)
 
 - Prep mode renders nine category tabs: **Lighting, Sound, Bar,
-  Seating, Decor, Door, Bath, Staff, DJ**.
+  Seating, Decor, Door, Bathroom, Staff, DJ/Music** (canonical nine,
+  matches `UIUX_Reference_Pack.md` Canon point 4).
 - Each category lists the available upgrades with name + short line +
   cost. No purchasing yet — read-only.
 - **Acceptance:** the player can browse the catalog and understand each
