@@ -85,7 +85,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       const coolBonus = cooling ? 6 : 0;
       return {
         intervention: { vibeBonus: 18 + djBonus + coolBonus, revenueMod: 1 },
-        bubble: { id: 'boss-dj', label: djBonus > 0 ? 'DJ lifted the room' : 'Booth lifting', tone: 'good', zone: 'floor' },
+        bubble: { id: 'boss-dj', label: djBonus > 0 ? 'DJ lifted it' : 'Booth ↑', tone: 'good', zone: 'floor' },
         mood: { label: cooling ? 'DJ pulled the floor back' : djBonus > 0 ? 'Music heads noticed' : 'Energy lifting', tone: 'good' },
         call: BOSS_CALL['push-dj'],
         note: cooling
@@ -105,7 +105,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       if (ratio < 0.85) {
         return {
           intervention: { vibeBonus: 3, revenueMod: 1.1 },
-          bubble: { id: 'boss-bar', label: 'Backlog cleared', tone: 'good', zone: 'bar' },
+          bubble: { id: 'boss-bar', label: 'Bar caught up', tone: 'good', zone: 'bar' },
           mood: { label: 'Bar was overloaded — you stepped in', tone: 'warn' },
           call: BOSS_CALL['check-bar'],
           note: 'Bar was overloaded — you caught the backlog before it became a complaint.',
@@ -114,7 +114,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       if (ratio < 1) {
         return {
           intervention: { vibeBonus: 2, revenueMod: 1.05 },
-          bubble: { id: 'boss-bar', label: 'Bar steadied', tone: 'good', zone: 'bar' },
+          bubble: { id: 'boss-bar', label: 'Bar held', tone: 'good', zone: 'bar' },
           mood: { label: 'Bar was starting to crack — you steadied it', tone: 'info' },
           call: BOSS_CALL['check-bar'],
           note: 'Bar was starting to crack — you got the pours moving before the line snapped.',
@@ -122,7 +122,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       }
       return {
         intervention: { vibeBonus: 1, revenueMod: 1.02 },
-        bubble: { id: 'boss-bar', label: 'Bar sharp', tone: 'good', zone: 'bar' },
+        bubble: { id: 'boss-bar', label: 'Bar ✓', tone: 'good', zone: 'bar' },
         mood: { label: 'Bar holding — you kept it sharp', tone: 'good' },
         call: BOSS_CALL['check-bar'],
         note: "Bar's holding — a word from the boss kept the pours sharp.",
@@ -139,19 +139,19 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
       // under real risk the effect scales with who's working the door.
       let vibeBonus = 3;
       let note = 'Put eyes on the door — kept it sharp before anything could start.';
-      let label = 'Door kept sharp';
+      let label = 'Door sharp';
       let tone: MoodTone = 'good';
       if (risk) {
         if (caramelOn) {
-          vibeBonus = 12; note = 'Caramel cooled the line before it reached the floor.'; label = 'Caramel cooled the door'; tone = 'info';
+          vibeBonus = 12; note = 'Caramel cooled the line before it reached the floor.'; label = 'Caramel · cool'; tone = 'info';
         } else if (johnOn) {
-          vibeBonus = 8; note = 'John moved fast on the door. It held — maybe too hard.'; label = 'John worked the door'; tone = 'warn';
+          vibeBonus = 8; note = 'John moved fast on the door. It held — maybe too hard.'; label = 'John · fast'; tone = 'warn';
         } else if (avgSkill >= 55) {
-          vibeBonus = 8; note = 'Your bouncer read it early and held the door clean.'; label = 'Door held'; tone = 'info';
+          vibeBonus = 8; note = 'Your bouncer read it early and held the door clean.'; label = 'Held'; tone = 'info';
         } else if (bouncers.length > 0) {
-          vibeBonus = 4; note = 'A green bouncer held the door — barely.'; label = 'Door barely held'; tone = 'warn';
+          vibeBonus = 4; note = 'A green bouncer held the door — barely.'; label = 'Barely held'; tone = 'warn';
         } else {
-          vibeBonus = 3; note = 'Nobody on the door, so you stepped in yourself. Hire someone.'; label = 'You held the door'; tone = 'warn';
+          vibeBonus = 3; note = 'Nobody on the door, so you stepped in yourself. Hire someone.'; label = 'You held it'; tone = 'warn';
         }
       }
       return {
@@ -178,7 +178,7 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
           : 'You worked the room — being seen helped more than the numbers show.';
       return {
         intervention: { vibeBonus, revenueMod: 1 },
-        bubble: { id: 'boss-room', label: 'Boss on the floor', tone: 'info', zone: 'floor' },
+        bubble: { id: 'boss-room', label: 'Boss in room', tone: 'info', zone: 'floor' },
         mood: { label: 'Boss working the room', tone: 'good' },
         call: BOSS_CALL['work-room'],
         note,

@@ -142,6 +142,54 @@ export interface GuestCluster {
   label: string;
 }
 
+// --- Guest visual variation (presentation only) ------------------------------
+//
+// A cluster currently renders identical silhouettes — a row of 5 reads as 1
+// person × 5. To make the room feel populated WITHOUT adding NPC simulation,
+// each silhouette can take a deterministic per-index ACCENT token (a hint at
+// hair/clothing color). FloorView decides what to do with it (e.g. tint a 2px
+// hat dot on top of the head, or shift the body color slightly). The lib only
+// names them; pure / deterministic / no RNG / no save schema / no gameplay.
+//
+// IMPORTANT: this is a PRESENTATION HINT, not a persisted identity. Calling
+// guestVariation(3) twice always returns the same accent, but a guest at
+// position 3 in one cluster is unrelated to a guest at position 3 in another.
+
+/** Tokens the UI maps to original neon-noir palette colors (no copied IP). */
+export type GuestAccent = 'magenta' | 'cyan' | 'violet' | 'warning' | 'success' | 'muted';
+
+const GUEST_ACCENTS: readonly GuestAccent[] = [
+  'cyan',
+  'magenta',
+  'violet',
+  'warning',
+  'success',
+  'muted',
+] as const;
+
+/**
+ * Deterministic accent for the silhouette at `index` inside a cluster. Spreads
+ * across the palette with a prime stride so neighbours don't share an accent,
+ * giving a row of guests a "different people" feel without per-guest data. Pure.
+ *
+ * - guestVariation(0) === guestVariation(0) (deterministic)
+ * - guestVariation(i) is always one of GUEST_ACCENTS (bounded)
+ * - For any negative or non-finite `index`, falls back to the muted accent so
+ *   the renderer never crashes on bad input.
+ */
+export function guestVariation(index: number): GuestAccent {
+  if (!Number.isFinite(index) || index < 0) return 'muted';
+  // Prime stride (7) keeps adjacent indices on different accents and cycles
+  // through every accent before repeating.
+  return GUEST_ACCENTS[(Math.floor(index) * 7) % GUEST_ACCENTS.length];
+}
+
+/** The full accent palette, exposed so callers can build legends/tests without
+ *  hard-coding the order. */
+export function guestVariationPalette(): readonly GuestAccent[] {
+  return GUEST_ACCENTS;
+}
+
 interface FloorPressureRead {
   /** 0..1 — room fill (live or final). */
   crowd: number;
@@ -293,32 +341,32 @@ export function floorEmotes(result: NightResult | null, club: ClubState): FloorB
   const fill = result.capacity > 0 ? result.guests / result.capacity : 0;
   const out: FloorBubble[] = [];
 
-  // Bar — the loudest signal first.
+  // Bar — the loudest signal first. Short, glance-readable strings during play.
   if (result.serviceRatio < 0.85) {
-    out.push({ id: 'emo-bar', label: '“Where’s my drink?”', tone: 'warn', zone: 'bar' });
+    out.push({ id: 'emo-bar', label: '“Drinks?”', tone: 'warn', zone: 'bar' });
   } else if (result.serviceRatio >= 1 && fill >= 0.5) {
-    out.push({ id: 'emo-bar', label: '“Quick pour — nice.”', tone: 'good', zone: 'bar' });
+    out.push({ id: 'emo-bar', label: '“Quick pour.”', tone: 'good', zone: 'bar' });
   }
 
   // Door — trouble reads here.
   if (result.incidents > 0) {
-    out.push({ id: 'emo-door', label: '“Door’s tense.”', tone: 'bad', zone: 'door' });
+    out.push({ id: 'emo-door', label: '“Tense.”', tone: 'bad', zone: 'door' });
   }
 
   // Floor — density, then who's in and how the room feels.
   if (fill >= 0.95) {
-    out.push({ id: 'emo-floor', label: '“Too crowded.”', tone: 'warn', zone: 'floor' });
+    out.push({ id: 'emo-floor', label: '“Crowded.”', tone: 'warn', zone: 'floor' });
   } else if (fill < 0.3) {
-    out.push({ id: 'emo-floor', label: '“This is dead.”', tone: 'info', zone: 'floor' });
+    out.push({ id: 'emo-floor', label: '“Dead.”', tone: 'info', zone: 'floor' });
   } else {
     const top = topCrowd(crowdMix(club, club.lastConfig), 2);
     const v = venueStats(club.venue);
     if (top.includes('musicheads')) {
-      out.push({ id: 'emo-floor', label: '“Sound is good.”', tone: 'good', zone: 'floor' });
+      out.push({ id: 'emo-floor', label: '“Sound ♪”', tone: 'good', zone: 'floor' });
     } else if (top.includes('regulars') || getRegularBase(club.regularBase).regulars >= 20) {
-      out.push({ id: 'emo-floor', label: '“Same faces tonight.”', tone: 'info', zone: 'floor' });
+      out.push({ id: 'emo-floor', label: '“Same faces.”', tone: 'info', zone: 'floor' });
     } else if (v.style + v.doorAppeal >= 4) {
-      out.push({ id: 'emo-door', label: '“This place looks better.”', tone: 'good', zone: 'door' });
+      out.push({ id: 'emo-door', label: '“Looks better.”', tone: 'good', zone: 'door' });
     }
   }
 

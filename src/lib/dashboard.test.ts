@@ -12,6 +12,8 @@ import {
   floorClusters,
   floorEmotes,
   goalBoard,
+  guestVariation,
+  guestVariationPalette,
   nextGoal,
 } from './dashboard';
 
@@ -225,6 +227,46 @@ describe('floorClusters — readable guest clusters per zone', () => {
     // cooling night is visible before the Energy meter has fully drained.
     const cooling = floorClusters(club(), { ...quiet, crowd: 0.5, energy: 0.45 }).find((c) => c.zone === 'floor');
     expect(cooling?.mood).toBe('tired');
+  });
+});
+
+describe('guestVariation — deterministic per-index accent for silhouettes', () => {
+  it('is deterministic: same index always returns the same accent', () => {
+    for (let i = 0; i < 50; i++) {
+      expect(guestVariation(i)).toBe(guestVariation(i));
+    }
+  });
+
+  it('only returns values from the published accent palette', () => {
+    const palette = new Set(guestVariationPalette());
+    for (let i = 0; i < 100; i++) {
+      expect(palette.has(guestVariation(i))).toBe(true);
+    }
+  });
+
+  it('spreads across the palette (a cluster of 6 hits multiple accents)', () => {
+    const cluster = Array.from({ length: 6 }, (_, i) => guestVariation(i));
+    expect(new Set(cluster).size).toBeGreaterThan(1);
+  });
+
+  it('adjacent silhouettes do not share an accent', () => {
+    for (let i = 0; i < 20; i++) {
+      expect(guestVariation(i)).not.toBe(guestVariation(i + 1));
+    }
+  });
+
+  it('falls back safely for invalid inputs (no crash, bounded output)', () => {
+    const palette = new Set(guestVariationPalette());
+    expect(guestVariation(-1)).toBe('muted');
+    expect(guestVariation(Number.NaN)).toBe('muted');
+    expect(guestVariation(Number.POSITIVE_INFINITY)).toBe('muted');
+    // Even a very large finite index stays inside the palette.
+    expect(palette.has(guestVariation(99_999))).toBe(true);
+  });
+
+  it('palette is non-empty and stable', () => {
+    expect(guestVariationPalette().length).toBeGreaterThan(0);
+    expect(guestVariationPalette()).toBe(guestVariationPalette());
   });
 });
 
