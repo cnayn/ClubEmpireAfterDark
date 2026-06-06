@@ -603,6 +603,181 @@ Same emotional target, original realization. Always.
 
 ---
 
+## 15. Night Pacing Philosophy
+
+> The night must feel like a **living club**, not a fast timer where the
+> player panic-clicks every boss action.
+
+### Principles
+
+- **Observation is gameplay.** The room must reward *looking* at it.
+  Boss actions are a layer *on top of* watching, not a replacement for
+  it.
+- **Boss actions are deliberate owner decisions**, not reflexes. Each
+  one should feel like the player *chose* to step in.
+- **Mid-night encounters present, they don't interrupt.** The room
+  keeps running underneath any encounter modal. The clock does not
+  pause to wait for the player.
+- **Pressure builds; it does not spike without warning.** Glow first,
+  bubble next, encounter only after the player has had time to see it
+  coming.
+- **"Ride it out" is a valid choice.** Doing nothing is sometimes
+  correct. The night must not punish the player for thinking.
+
+### Target experience
+
+The player can:
+
+1. Put the phone down. Watch the room breathe for a beat.
+2. Pick it up. Notice a glow building somewhere. Make a deliberate
+   choice.
+3. Watch the room respond.
+4. Put it down again.
+
+If the night demands constant input, pacing is broken. If the night
+goes silent between events, pacing is also broken. The floor is always
+*doing something* — even when nothing is wrong.
+
+### Anti-patterns (do not build)
+
+- A timer that punishes the player for taking a beat.
+- An action tray that demands input every few seconds.
+- A floor that goes quiet between encounters.
+- A floor that screams red constantly.
+- Boss actions with no cooldown or no visible consequence — both turn
+  them into compulsive clicks instead of decisions.
+
+### Why this matters for the NCC borrow
+
+NCC's magnetic loop is **watching your own club**, not playing a
+reflex game. Club Empire's pacing must preserve that — in original IP,
+Neon Noir, with deeper management underneath.
+
+---
+
+## 16. UI Rules for Night Readability
+
+Four rules every night-mode build must respect. Non-negotiable.
+
+### Rule 1 — Pressure must be visible before it becomes text
+
+A bar backing up reads, in order:
+
+1. **Amber glow** on the bar tile (visual signal).
+2. **Queue density** at the rail (state of the room).
+3. **Drink bubble** above waiting guests (cluster comm).
+4. **Bartender token leans forward** (named-staff comm).
+5. *Then* a short voice line — "Bar is cracking" — over the visual.
+
+Text is the *last* layer. If the player only learns the bar is in
+trouble from a string, the screen has failed.
+
+### Rule 2 — Every major problem needs three things
+
+The triangle: **zone + visual signal + possible owner response.**
+
+- **Zone:** the problem lives in a place on the floor.
+- **Visual signal:** the player can see it without reading.
+- **Owner response:** there is at least one thing the player can do
+  (boss action, encounter choice, or deliberate inaction).
+
+No invisible problems. No problems without a response. No floating
+warnings that don't point at a tile.
+
+### Rule 3 — The player should know what's happening before the debrief
+
+Debrief explains the **why** and the **people**. The night itself
+shows the **what**. If a problem only surfaces in the debrief, the
+night failed the player.
+
+The debrief is the room *remembering*. The night is the room *doing*.
+
+### Rule 4 — Text supports the floor; text does not replace the floor
+
+- A line of voice copy belongs **over** a visual cue, never instead of
+  one.
+- Reading order on any night-mode screen: **floor first, characters
+  second, text third.**
+- If a screen could be played with the text hidden and still make
+  sense, the visuals are right. If it can't, the visuals are
+  underbuilt — add more visual signal, do not add more text.
+
+---
+
+## 17. Live Communication Language (staff, guests, story inside the night)
+
+Per Section 16 Rule 1: visuals first, voice second. Characters speak by
+*doing*, not by talking.
+
+### Staff communication (named tokens at stations)
+
+- **Bartender warns about backlog** → token leans forward · drink bubble
+  over the rail · amber glow on bar tile.
+- **Bouncer notices door tension** → tightening stance · red ring on
+  door tile · short bark bubble.
+- **DJ reacts to a dead floor** → booth dims · low-energy bubble
+  hovers · dance-floor pulse slows.
+- **Caramel** (current) → calm protector ring · "bro" bubble icon when
+  stepping in or warning.
+- **John** (current) → tight stance · red flash on incident · short
+  bark bubble.
+- **Rosa** (current) → warm ring at the rail when regulars are happy ·
+  steady-hand bubble icon during a save.
+
+Staff state **never shows numbers.** State shows as posture, ring
+color, and bubble icon (per Section 7).
+
+### Guest communication (clusters)
+
+- **Waiting** → static cluster · clock bubble.
+- **Angry** → red bubble · cluster recoil away from the source.
+- **Happy / impressed** → gold sparkle · warm tint on the cluster.
+- **Bored** → desaturated cluster · slow pulse.
+- **Regulars commenting on culture change** → gold-marker cluster ·
+  thought bubble icon. (Hidden-trait substrate is FUTURE; the visible
+  bubble can land in Phase 2.)
+- **Rough crowd notice** → yellow alert ring around the cluster.
+
+Bubbles are **typed icons**, not free-form speech (per Section 6).
+
+### Story integration inside the night
+
+Story does not only live in debriefs and docs. Characters surface
+**during the night** through:
+
+- **Short bubbles** — a typed line over a token, sub-second hold.
+- **Phone texts** — per [`phone-messages.md`](phone-messages.md),
+  rendered as a phone-bubble overlay that doesn't pause the room.
+- **Staff warnings** — Caramel pulls the owner aside; a future
+  hidden-trait surfaces as a Stage-2 hook (canon, not build).
+- **Quick interaction moments** — encounter modals from
+  [`night-encounters.md`](night-encounters.md) that *present* without
+  freezing the floor underneath (Section 15 Pacing Principle 3).
+- **Visible reactions on the floor** — guests recoil, regulars
+  cluster, bartender leans forward. *The floor itself is the
+  storyteller.*
+
+> **The story is what the floor does. The debrief is what the room
+> remembers.** If a story beat happens only in the morning summary,
+> the night was reading like a report, not a club.
+
+### Pacing of communication
+
+- A single bubble holds ~1–2 seconds, then fades. Never sticky.
+- No more than 2–3 active bubbles on screen at once. The room can
+  speak, but it does not shout over itself.
+- Phone overlays do not stack — one at a time, dismissible.
+- Encounters cooldown so the night isn't a parade (Section 15).
+
+### NCC emotional target — reinforced
+
+What we're chasing: **visible club, visible guests, visible decor,
+visible reactions, edge UI, one-more-night pull.** What we never copy:
+assets, layouts, icons, characters, names, or UI chrome. Per Sections
+2, 13, 14 — the borrow is feeling, not product.
+
+---
+
 ## Cross-references
 
 - Tone, mood, world: [`story-bible.md`](story-bible.md).
@@ -611,4 +786,5 @@ Same emotional target, original realization. Always.
 - Floor encounters (on-floor content): [`night-encounters.md`](night-encounters.md).
 - Phone surface content: [`phone-messages.md`](phone-messages.md).
 - Encounter engine: [`random-events.md`](random-events.md).
+- Floor/level/goal progression: [`level-and-floor-progression.md`](level-and-floor-progression.md).
 - Intake pipeline: [`content-intake-rules.md`](content-intake-rules.md).
