@@ -84,13 +84,13 @@ the following:
 
 | Meter | Icon | Label | Status words |
 | --- | --- | --- | --- |
-| **Time** | clock | "11:40 PM" | (timeline, not status) |
-| **Bar service** | drink | "Bar" | backed up · steady · fast |
-| **Door** | rope / security | "Door" | calm · tense · hot |
+| **Time** | clock | "11:40 PM" + phase | (clock + Opening · Peak · Last Call) |
+| **Bar service** | drink | "Bar" | clear · busy · backed up · slammed |
+| **Door** | rope / security | "Door" | calm · line · tense · hot |
 | **Bathroom** | WC | "Bath" | clear · line · messy |
 | **Floor energy** | music note / light | "Floor" | cold · warming · alive |
-| **Guests** | face / crowd | "Guests" | bored · okay · happy |
-| **Crew** | crew / staff | "Crew" | fresh · pressured · tired |
+| **Guests** | face / crowd | "Guests" | bored · okay · happy · angry |
+| **Crew** | crew / staff | "Crew" | fresh · working · pressured · tired |
 
 (Status words are pool examples — the engine picks one per state,
 per UIUX §10 copy tone and `bubble-bank.md` rules.)
@@ -113,13 +113,23 @@ per UIUX §10 copy tone and `bubble-bank.md` rules.)
 
 ### Time meter, specifically
 
-The time meter is the only one that's a timeline, not a status:
+The time meter is the only one that's a timeline, not a pressure
+status — but it should still carry a **phase word** the player can
+read at a glance.
 
 - Render as a **clock icon + current in-game time string** ("11:40 PM")
   or a **progress edge** (a thin progress sliver along the top of the
   floor frame, not a center HUD bar).
-- The player should know how much of the night has elapsed at a
-  glance, but the time meter must never dominate the screen.
+- Pair the clock with a **phase word** drawn from the canonical
+  pool:
+  - **Opening** — early night, room filling.
+  - **Peak** — mid-night, room is full.
+  - **Last Call** — late night, last orders, energy winds down.
+  - (Pre-open or post-close states sit outside this list.)
+- Example displays: "Time · 11:40 PM · Peak" · "Time · 1:50 AM · Last Call".
+- The player should know how much of the night has elapsed *and*
+  what phase the room is in, at a glance. The time meter must never
+  dominate the screen.
 
 ---
 
@@ -234,6 +244,16 @@ Each inspect card carries:
 - **Spend:** low
 - **Want:** cheaper drinks / better music / faster service
 
+#### Tap DJ booth
+
+- **DJ Booth**
+- **State:** cold / warming / alive
+- **Read:** "Floor needs a push."
+- **Suggested action:** Push DJ / Ride it out
+
+(When the DJ role is hired in future, the booth card carries the
+DJ's name and state per UIUX §7 staff visual language.)
+
 ### What tap-to-inspect is NOT
 
 - Not full NPC AI.
@@ -277,14 +297,16 @@ ship together.
 
 #### Check Bar — can reveal
 
+- bar is already fine — Rosa's holding (calm read, always valid)
 - bartender is working well
 - bartender is overwhelmed
 - bartender is sloppy
-- bartender is wasting stock
-- bartender might be skimming (FUTURE / Sticky Fingers gated)
-- drinks are priced wrong (FUTURE / pricing system gated)
+- stock looks messy / bartender is wasting stock
 - queue is caused by slow service
 - queue is caused by too many guests
+- bartender might be skimming (FUTURE / Sticky Fingers gated)
+- fake / wrong stock arrived (FUTURE / supplier system gated)
+- drinks are priced wrong (FUTURE / pricing system gated)
 
 #### Send Bouncer — can reveal
 
@@ -573,8 +595,13 @@ readability work this doc is scoped around:
   [`relationship-web.md`](relationship-web.md), Phase 4 dependency
   chain.
 - **Hidden-trait reveal mechanics** — per `gameplay-north-star.md`.
-- **Theft / staff-crime economy** — referenced in §5 reveal pools as
-  FUTURE tags; do not build the economy underneath.
+- **Theft / staff-crime economy (stealing alcohol system)** —
+  referenced in §5 reveal pools as FUTURE tags; do not build the
+  economy underneath.
+- **Venue-finding onboarding arc** — the "find the place, scout
+  locations, choose where to open" pre-game flow. Floor 1 starts
+  *already-yours* today; the venue-finding arc is a future
+  onboarding layer, not part of this UI foundation pass.
 
 The **missing foundation today** is:
 
