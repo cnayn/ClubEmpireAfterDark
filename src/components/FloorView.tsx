@@ -318,14 +318,16 @@ function GuestSilhouette({
   let opacity: number | Animated.AnimatedInterpolation<number> = op;
   if (pulse && motion !== 'still') {
     if (motion === 'bounce') {
-      translateY = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -3 - offset * 0.4, 0] });
+      // Dancing — a bigger, livelier hop so a packed floor visibly moves.
+      translateY = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -5 - offset * 0.5, 0] });
       opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [Math.max(0.55, op * 0.7), op] });
     } else if (motion === 'shuffle') {
-      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1.2 + offset * 0.15, 0] });
+      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1.6 + offset * 0.2, 0] });
     } else if (motion === 'shake') {
-      translateX = shimmer.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 1.2, -1.2, 1.2, 0] });
+      // Angry — a sharper, harder jitter that reads as agitation.
+      translateX = shimmer.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 2.2, -2.2, 2.2, 0] });
     } else if (motion === 'sway') {
-      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-0.8, 0.8, -0.8] });
+      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-1.2, 1.2, -1.2] });
     }
   }
 
@@ -876,9 +878,21 @@ export function FloorView({
                     />
                   ))}
                 </View>
-                <View pointerEvents="none" style={[styles.spotlight, { backgroundColor: floorTint, opacity: 0.05 + glow('floor') * 0.18 }]} />
-                <View pointerEvents="none" style={[styles.spotlightLeft, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
-                <View pointerEvents="none" style={[styles.spotlightRight, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
+                {/* Three pulsing spotlights on staggered loops read as a live
+                    nightclub light rig (counter-phased so light "sweeps"). When
+                    pulse is off (dashboard) the shimmers sit at 0.5 = steady glow. */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.spotlight, { backgroundColor: floorTint, opacity: shimmers[0].interpolate({ inputRange: [0, 1], outputRange: [0.06 + glow('floor') * 0.1, 0.24 + glow('floor') * 0.2] }) }]}
+                />
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.spotlightLeft, { backgroundColor: floorTint, opacity: shimmers[1].interpolate({ inputRange: [0, 1], outputRange: [0.04, 0.18 + glow('floor') * 0.12] }) }]}
+                />
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.spotlightRight, { backgroundColor: floorTint, opacity: shimmers[2].interpolate({ inputRange: [0, 1], outputRange: [0.18 + glow('floor') * 0.12, 0.04] }) }]}
+                />
                 <View style={styles.crowd}>
                   {floorCluster ? (
                     <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
