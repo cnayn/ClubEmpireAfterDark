@@ -27,6 +27,7 @@ import {
   resolveBossAction,
 } from '@/lib/bossActions';
 import { bossLifts, guestHappiness, staffMorale } from '@/lib/roomMood';
+import { type BoardZone, getBoardZone, zoneActions } from '@/lib/board';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
@@ -125,6 +126,8 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [bossStream, setBossStream] = useState<StreamEntry[]>([]);
   const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
+  // Which board zone's command sheet is open (tap a zone to command it).
+  const [sheetZone, setSheetZone] = useState<BoardZone | null>(null);
 
   // The night runs itself: advance the clock while playing.
   useEffect(() => {
@@ -221,6 +224,71 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setBossStream((r) => [...r, { id: `ba-${id}`, text: outcome.call, tone: outcome.bubble.tone }]);
   };
 
+  // Tap a board zone → open its command sheet (and flash the zone if it maps to a
+  // live pressure zone). Inspect-only zones (bathroom / staff) show status.
+  const onZonePress = (zone: BoardZone) => {
+    if (committed) return;
+    setSheetZone(zone);
+    if (zone === 'door' || zone === 'bar' || zone === 'floor') setFlashZone(zone);
+  };
+
+  const renderZoneSheet = () => {
+    if (committed || !sheetZone) return null;
+    const def = getBoardZone(sheetZone);
+    const actions = zoneActions(sheetZone);
+    return (
+      <View style={styles.situation}>
+        <View style={styles.situationHead}>
+          <Text variant="label" color={colors.neonCyan} style={styles.situationTag}>
+            {def.label.toUpperCase()}
+          </Text>
+          <Pressable onPress={() => setSheetZone(null)} accessibilityRole="button">
+            <Text variant="label" muted>
+              Close ✕
+            </Text>
+          </Pressable>
+        </View>
+        {actions.length > 0 ? (
+          <>
+            <View style={styles.tray}>
+              {actions.map((id) => {
+                const a = BOSS_ACTIONS.find((x) => x.id === id);
+                const disabled = focusLeft < focusCost(id);
+                return (
+                  <Pressable
+                    key={id}
+                    onPress={() => onAction(id)}
+                    disabled={disabled}
+                    accessibilityRole="button"
+                    style={[styles.choice, disabled && styles.dockBtnDim]}
+                  >
+                    <Text variant="body" color={disabled ? colors.textMuted : colors.neonMagenta}>
+                      {a?.label ?? id}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text variant="label" muted>
+              Owner Attention: {focusLeft}/{NIGHT_FOCUS}
+            </Text>
+          </>
+        ) : sheetZone === 'bathroom' ? (
+          <Text variant="label" muted>
+            Bathroom pressure {Math.round(pressures.bathroom * 100)}% —{' '}
+            {pressures.bathroom >= 0.55 ? 'the line is backing up.' : 'holding for now.'}
+          </Text>
+        ) : sheetZone === 'staff' ? (
+          <Text variant="label" muted>
+            On duty: {[...floor.bartenders, ...floor.bouncers].map((s) => s.name).join(', ') || 'nobody'}.
+          </Text>
+        ) : (
+          <Text variant="label" muted>Nothing to command here yet.</Text>
+        )}
+      </View>
+    );
+  };
+
   const toResults = () => {
     if (!commit()) {
       router.replace('/dashboard');
@@ -257,6 +325,9 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const belowRoom = (
     <>
+      {/* Tap-a-zone command sheet (door / bar / floor / dj / bathroom / staff). */}
+      {renderZoneSheet()}
+
       {/* Live progress bar — same color as the headline so the room reads as one signal. */}
       <View style={styles.progressTrack}>
         <View
@@ -445,6 +516,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         hideFooter
         clusters={liveClusters}
         pressures={pressures}
+        onZonePress={committed ? undefined : onZonePress}
       />
     </Screen>
   );

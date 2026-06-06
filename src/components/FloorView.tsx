@@ -18,11 +18,12 @@
  */
 
 import { ReactNode, useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
 import { Text } from '@/components/Text';
+import type { BoardZone } from '@/lib/board';
 import type {
   BubbleTone,
   ClusterZone,
@@ -391,15 +392,20 @@ function MiniZone({
   hint,
   glow,
   highlighted,
+  onPress,
 }: {
   label: string;
   tint: string;
   hint?: string;
   glow?: number;
   highlighted?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <View
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
       style={[
         styles.miniZone,
         {
@@ -418,7 +424,7 @@ function MiniZone({
           {hint}
         </Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -441,6 +447,7 @@ export function FloorView({
   hideFooter = false,
   clusters,
   pressures,
+  onZonePress,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -460,6 +467,8 @@ export function FloorView({
   hideFooter?: boolean;
   clusters?: GuestCluster[];
   pressures?: { bar: number; door: number; bathroom: number; energy: number; crowd: number };
+  /** Tap a board zone to command it (opens a zone action sheet in the caller). */
+  onZonePress?: (zone: BoardZone) => void;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -564,7 +573,7 @@ export function FloorView({
         {/* DOOR — a doorway frame across the back wall. Two glowing posts
             bracket the opening; the bouncer stands LEFT of the door, a guest
             line queues in the middle, the VIP rope on the right is locked. */}
-        <View style={[styles.doorway, { borderColor: zoneTint('door'), shadowColor: zoneTint('door'), shadowOpacity: 0.2 + glow('door') * 0.5, shadowRadius: 6 + glow('door') * 10 }]}>
+        <Pressable accessibilityRole="button" onPress={() => onZonePress?.('door')} style={[styles.doorway, { borderColor: zoneTint('door'), shadowColor: zoneTint('door'), shadowOpacity: 0.2 + glow('door') * 0.5, shadowRadius: 6 + glow('door') * 10 }]}>
           <View style={[styles.doorPostBeam, { backgroundColor: zoneTint('door') }]} />
           <View style={[styles.doorTopBeam, { backgroundColor: zoneTint('door') }]} />
           <View style={[styles.doorPostBeam, styles.doorPostRight, { backgroundColor: zoneTint('door') }]} />
@@ -593,7 +602,7 @@ export function FloorView({
           <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('door') }]}>
             DOOR
           </Text>
-        </View>
+        </Pressable>
         {venueChips ? <ObjectStrip names={venueChips.door} tint={zoneTint('door')} /> : null}
         {inZone('door').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
@@ -607,6 +616,7 @@ export function FloorView({
             hint={bathCluster ? bathCluster.label : 'clear'}
             glow={glow('bath')}
             highlighted={!!bathCluster}
+            onPress={onZonePress ? () => onZonePress('bathroom') : undefined}
           />
           <MiniZone
             label="DJ"
@@ -614,11 +624,13 @@ export function FloorView({
             hint={djLabel ? `♪ ${djLabel}` : 'soon'}
             glow={glow('dj')}
             highlighted={flashZone === 'floor'}
+            onPress={onZonePress ? () => onZonePress('dj') : undefined}
           />
           <MiniZone
             label="STAFF"
             tint={staffAreaTint}
             hint={onDutyCount > 0 ? `${onDutyCount} on duty` : 'nobody on'}
+            onPress={onZonePress ? () => onZonePress('staff') : undefined}
           />
         </View>
         {bathCluster ? (
@@ -628,7 +640,9 @@ export function FloorView({
         ) : null}
 
         {/* DANCE FLOOR — the hero. */}
-        <View
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onZonePress?.('floor')}
           style={[
             styles.floorPanel,
             {
@@ -706,7 +720,7 @@ export function FloorView({
           {inZone('floor').length > 0 ? (
             <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
           ) : null}
-        </View>
+        </Pressable>
 
         {/* BAR — a real bar counter across the front of the room. The
             bartender(s) stand BEHIND the counter; the guest queue stacks IN
@@ -714,7 +728,7 @@ export function FloorView({
         {inZone('bar').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
-        <View style={[styles.barCounter, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}>
+        <Pressable accessibilityRole="button" onPress={() => onZonePress?.('bar')} style={[styles.barCounter, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}>
           {/* Backbar / bottle row: a thin glowing strip with three notches. */}
           <View style={[styles.backbar, { borderColor: zoneTint('bar') }]}>
             {[0, 1, 2, 3].map((i) => (
@@ -743,7 +757,7 @@ export function FloorView({
           <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('bar') }]}>
             BAR
           </Text>
-        </View>
+        </Pressable>
         {venueChips ? <ObjectStrip names={venueChips.bar} tint={zoneTint('bar')} /> : null}
       </View>
 
