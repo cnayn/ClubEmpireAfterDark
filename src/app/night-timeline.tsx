@@ -64,30 +64,54 @@ const MOOD_COLOR: Record<MoodTone, string> = {
   neutral: colors.textMuted,
 };
 
-type MeterMode = 'crowd' | 'strain' | 'good';
-function meterColor(value: number, mode: MeterMode): string {
-  if (mode === 'crowd') return colors.neonCyan;
-  const hi = mode === 'good' ? colors.success : colors.danger;
-  const lo = mode === 'good' ? colors.danger : colors.success;
-  return value >= 0.66 ? hi : value >= 0.33 ? colors.warning : lo;
+// Every meter has an identity: an icon, a label, and a plain-English STATE word
+// (never an anonymous bar). Strain meters (bar/door/bath) read low = good; mood
+// meters (floor/guests/crew) read high = good. Tone drives color + emphasis.
+type MeterKind = 'bar' | 'door' | 'bath' | 'floor' | 'guests' | 'crew';
+type MeterTone = 'good' | 'ok' | 'warn' | 'bad';
+
+const METER_ICON: Record<MeterKind, string> = {
+  bar: '🍸',
+  door: '🚪',
+  bath: '🚻',
+  floor: '🔊',
+  guests: '🙂',
+  crew: '🧍',
+};
+const METER_TONE_COLOR: Record<MeterTone, string> = {
+  good: colors.success,
+  ok: colors.neonCyan,
+  warn: colors.warning,
+  bad: colors.danger,
+};
+
+/** Plain-English state word + good/neutral/bad tone per meter. */
+function meterRead(kind: MeterKind, v: number): { status: string; tone: MeterTone } {
+  switch (kind) {
+    case 'bar':
+      return v >= 0.85 ? { status: 'Slammed', tone: 'bad' } : v >= 0.66 ? { status: 'Backed up', tone: 'warn' } : v >= 0.33 ? { status: 'Busy', tone: 'ok' } : { status: 'Clear', tone: 'good' };
+    case 'door':
+      return v >= 0.85 ? { status: 'Hot', tone: 'bad' } : v >= 0.66 ? { status: 'Tense', tone: 'warn' } : v >= 0.33 ? { status: 'Line', tone: 'ok' } : { status: 'Calm', tone: 'good' };
+    case 'bath':
+      return v >= 0.85 ? { status: 'Bad', tone: 'bad' } : v >= 0.66 ? { status: 'Messy', tone: 'warn' } : v >= 0.33 ? { status: 'Line', tone: 'ok' } : { status: 'Clear', tone: 'good' };
+    case 'floor':
+      return v >= 0.66 ? { status: 'Hot', tone: 'good' } : v >= 0.45 ? { status: 'Alive', tone: 'good' } : v >= 0.3 ? { status: 'Warming', tone: 'ok' } : { status: 'Cold', tone: 'bad' };
+    case 'guests':
+      return v >= 0.66 ? { status: 'Happy', tone: 'good' } : v >= 0.4 ? { status: 'Okay', tone: 'ok' } : v >= 0.2 ? { status: 'Bored', tone: 'warn' } : { status: 'Angry', tone: 'bad' };
+    case 'crew':
+      return v >= 0.66 ? { status: 'Fresh', tone: 'good' } : v >= 0.45 ? { status: 'Working', tone: 'ok' } : v >= 0.25 ? { status: 'Pressured', tone: 'warn' } : { status: 'Tired', tone: 'bad' };
+  }
 }
 
-/** Compact, single-row meter — small enough to stack four across the floor. */
-/** A short at-a-glance status word per meter, so the bar reads without math. */
-function meterStatus(value: number, mode: MeterMode): string {
-  if (mode === 'strain') return value >= 0.66 ? 'HIGH' : value >= 0.33 ? 'busy' : 'ok';
-  if (mode === 'good') return value >= 0.66 ? 'good' : value >= 0.33 ? 'ok' : 'LOW';
-  return `${Math.round(value * 100)}%`;
-}
-
-function MiniMeter({ label, value, mode }: { label: string; value: number; mode: MeterMode }) {
-  const col = meterColor(value, mode);
-  // A meter "shouts" when it's in a state the owner should act on.
-  const alert = (mode === 'strain' && value >= 0.66) || (mode === 'good' && value < 0.33);
-  // An alerting meter pulses so the eye is pulled to the problem before reading.
+/** Compact meter: "🍸 Bar … Backed up" + a tinted fill. The worst state pulses
+ *  so a problem is unmistakable before the player reads anything. */
+function MiniMeter({ kind, label, value }: { kind: MeterKind; label: string; value: number }) {
+  const { status, tone } = meterRead(kind, value);
+  const col = METER_TONE_COLOR[tone];
+  const alert = tone === 'bad' || tone === 'warn';
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!alert) {
+    if (tone !== 'bad') {
       pulse.setValue(0);
       return;
     }
@@ -99,16 +123,16 @@ function MiniMeter({ label, value, mode }: { label: string; value: number; mode:
     );
     loop.start();
     return () => loop.stop();
-  }, [alert, pulse]);
-  const fillOpacity = alert ? pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1;
+  }, [tone, pulse]);
+  const fillOpacity = tone === 'bad' ? pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) : 1;
   return (
     <View style={styles.mini}>
       <View style={styles.miniHead}>
         <Text variant="label" muted style={styles.miniLabel} numberOfLines={1}>
-          {label}
+          {METER_ICON[kind]} {label}
         </Text>
         <Text variant="label" color={col} style={[styles.miniStatus, alert && styles.miniStatusAlert]} numberOfLines={1}>
-          {meterStatus(value, mode)}
+          {status}
         </Text>
       </View>
       <View style={[styles.miniTrack, alert && { borderColor: col, borderWidth: 1 }]}>
@@ -346,16 +370,22 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     // preview (serviceRatio / theft / incidents) + live energy.
     const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
     const reveal = ((): { text: string; tone: BeatTone } | null => {
+      // Name the actual crew on the station so it reads as inspecting THEM, not
+      // a generic zone. (Reads only — no theft/hidden-trait system yet.)
+      const bartender = floor.bartenders[0]?.name;
+      const bouncer = floor.bouncers[0]?.name;
       if (sheetZone === 'bar') {
-        if (preview.theft > 0) return { text: 'Stock’s walking — someone behind the bar is skimming.', tone: 'bad' };
-        if (preview.serviceRatio < 0.85) return { text: 'Pours are sloppy — drinks are backing up.', tone: 'warn' };
-        if (preview.serviceRatio < 1) return { text: 'Bar’s keeping pace, just barely.', tone: 'info' };
-        return { text: 'Bar’s clean and fast — the pours are sharp.', tone: 'good' };
+        const who = bartender ?? 'The bar';
+        if (preview.theft > 0) return { text: `Stock looks light — something’s off at ${bartender ?? 'the bar'}.`, tone: 'bad' };
+        if (preview.serviceRatio < 0.85) return { text: `${who} is slammed — pours are slow.`, tone: 'bad' };
+        if (preview.serviceRatio < 1) return { text: `${who} is holding the line — just keeping pace.`, tone: 'warn' };
+        return { text: `${who} is steady — drinks are moving.`, tone: 'good' };
       }
       if (sheetZone === 'door') {
-        if (preview.incidents > 0) return { text: 'There’s been trouble at the door tonight.', tone: 'bad' };
-        if (fill >= 0.7) return { text: 'The line’s heavy — the door’s getting tense.', tone: 'warn' };
-        return { text: 'Door’s calm — nothing kicking off.', tone: 'good' };
+        const who = bouncer ?? 'The door';
+        if (preview.incidents > 0) return { text: `Trouble at the door — ${bouncer ? `${bouncer} has their hands full` : 'nobody’s holding it'}.`, tone: 'bad' };
+        if (fill >= 0.7) return { text: `${who} — line’s heavy, getting tense.`, tone: 'warn' };
+        return { text: `${who} has it calm — nothing kicking off.`, tone: 'good' };
       }
       if (sheetZone === 'floor' || sheetZone === 'dj') {
         if (pressures.energy <= 0.3) return { text: 'The floor’s cooling — the room needs a lift.', tone: 'warn' };
@@ -535,16 +565,16 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           reads how the room FEELS (guest happiness / staff morale) so the
           owner sees who they're hurting and who they're helping. */}
       <View style={styles.meters}>
-        <MiniMeter label="Bar" value={pressures.bar} mode="strain" />
-        <MiniMeter label="Door" value={pressures.door} mode="strain" />
-        <MiniMeter label="Bath" value={pressures.bathroom} mode="strain" />
-        <MiniMeter label="Energy" value={pressures.energy} mode="good" />
+        <MiniMeter kind="bar" label="Bar" value={pressures.bar} />
+        <MiniMeter kind="door" label="Door" value={pressures.door} />
+        <MiniMeter kind="bath" label="Bath" value={pressures.bathroom} />
+        <MiniMeter kind="floor" label="Floor" value={pressures.energy} />
       </View>
 
       {/* Room mood — is the room happy, is the crew holding? */}
       <View style={styles.meters}>
-        <MiniMeter label="Guests" value={happy} mode="good" />
-        <MiniMeter label="Crew" value={morale} mode="good" />
+        <MiniMeter kind="guests" label="Guests" value={happy} />
+        <MiniMeter kind="crew" label="Crew" value={morale} />
       </View>
 
       {/* A situation in the room — pinned to the floor, not a stacked card. */}
