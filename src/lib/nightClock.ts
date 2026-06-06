@@ -9,13 +9,13 @@
  */
 
 /**
- * A full night plays out over ~240s of real time at 1× — and that's only the
- * MOVING time: situations auto-pause the clock, so a real night runs longer.
- * Deliberately unhurried (Nightclub-City-style watching), a stopgap until the
- * 2.5D floor lands. Impatient players tap the speed chip to 2× (~120s) or 3×
- * (~80s); the command drawer / situations also pause the clock.
+ * A full night moves over ~150s of real time at 1× — and that's only the MOVING
+ * time: situations auto-pause the clock, so a real night runs longer. Interim
+ * value: 240s felt empty with only the four-button tray to watch; once the
+ * richer edge-UI / tap-the-room interaction lands, the night can breathe longer
+ * again. Speed chip cycles 2× (~75s) / 3× (~50s); the drawer / situations pause.
  */
-export const NIGHT_DURATION_MS = 240_000;
+export const NIGHT_DURATION_MS = 150_000;
 export const NIGHT_TICK_MS = 100;
 
 /** Map 0..1 night progress to a phase index for `phaseCount` phases. */

@@ -35,7 +35,7 @@ import { nightMentorLine } from '@/lib/mentor';
 import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
 import { buildFloorView, type FloorBubble, floorBubbles, floorClusters, venueFloorChips } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
-import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS } from '@/lib/nightClock';
+import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS, phaseForProgress } from '@/lib/nightClock';
 import {
   encounterTrigger,
   liveEmotes,
@@ -340,6 +340,30 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     if (committed || !sheetZone) return null;
     const def = getBoardZone(sheetZone);
     const actions = zoneActions(sheetZone);
+    // What inspecting the zone REVEALS — the bar runs all night; checking it
+    // tells you whether the crew are clean/fast, sloppy, or skimming stock; the
+    // door tells you if it's calm or tense, etc. Read off the deterministic
+    // preview (serviceRatio / theft / incidents) + live energy.
+    const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
+    const reveal = ((): { text: string; tone: BeatTone } | null => {
+      if (sheetZone === 'bar') {
+        if (preview.theft > 0) return { text: 'Stock’s walking — someone behind the bar is skimming.', tone: 'bad' };
+        if (preview.serviceRatio < 0.85) return { text: 'Pours are sloppy — drinks are backing up.', tone: 'warn' };
+        if (preview.serviceRatio < 1) return { text: 'Bar’s keeping pace, just barely.', tone: 'info' };
+        return { text: 'Bar’s clean and fast — the pours are sharp.', tone: 'good' };
+      }
+      if (sheetZone === 'door') {
+        if (preview.incidents > 0) return { text: 'There’s been trouble at the door tonight.', tone: 'bad' };
+        if (fill >= 0.7) return { text: 'The line’s heavy — the door’s getting tense.', tone: 'warn' };
+        return { text: 'Door’s calm — nothing kicking off.', tone: 'good' };
+      }
+      if (sheetZone === 'floor' || sheetZone === 'dj') {
+        if (pressures.energy <= 0.3) return { text: 'The floor’s cooling — the room needs a lift.', tone: 'warn' };
+        if (pressures.energy >= 0.66) return { text: 'Floor’s hot — they’re dancing.', tone: 'good' };
+        return { text: 'Floor’s steady.', tone: 'info' };
+      }
+      return null;
+    })();
     return (
       <View style={styles.situation}>
         <View style={styles.situationHead}>
@@ -352,6 +376,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
             </Text>
           </Pressable>
         </View>
+        {reveal ? (
+          <Text variant="body" color={TONE_COLOR[reveal.tone]} style={styles.bannerBody}>
+            {reveal.text}
+          </Text>
+        ) : null}
         {actions.length > 0 ? (
           <>
             <View style={styles.tray}>
@@ -482,6 +511,16 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       {renderZoneSheet()}
 
       {/* Live progress bar — same color as the headline so the room reads as one signal. */}
+      {/* Label the progress bar so it reads as the NIGHT CLOCK + phase, not just
+          a moving color: "Tonight · 00:45 · Building". */}
+      <View style={styles.progressHead}>
+        <Text variant="label" muted style={styles.bannerHint}>
+          Tonight · {clockLabel(liveProgress)}
+        </Text>
+        <Text variant="label" color={moodAccent ?? TONE_COLOR[headline.tone]} style={styles.bannerHint}>
+          {committed ? 'Closed' : ['Doors open', 'Building', 'Peak', 'Last call'][phaseForProgress(liveProgress, 4)]}
+        </Text>
+      </View>
       <View style={styles.progressTrack}>
         <View
           style={[
@@ -720,7 +759,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   speedDisabled: { opacity: 0.5 },
-  progressTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  progressHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+  progressTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: radius.pill },
   meters: { flexDirection: 'row', gap: spacing.sm },
   mini: { flex: 1, gap: 3 },
