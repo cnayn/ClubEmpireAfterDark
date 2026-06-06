@@ -5,7 +5,7 @@
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, NightResult } from '@/domain/types';
 import type { NightPressures } from '@/lib/nightPressure';
-import { guestHappiness, staffMorale } from './roomMood';
+import { bossLifts, guestHappiness, staffMorale } from './roomMood';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -60,5 +60,34 @@ describe('staffMorale', () => {
   it('a boss-support lift visibly raises morale', () => {
     const base = staffMorale(result(), club(), P());
     expect(staffMorale(result(), club(), P(), 0.15)).toBeGreaterThan(base);
+  });
+});
+
+describe('bossLifts — diminishing per repeat, clamped 0..1', () => {
+  it('empty actions = no lift on either meter', () => {
+    expect(bossLifts([])).toEqual({ happy: 0, morale: 0 });
+  });
+
+  it('work-room lifts happy most, send-bouncer lifts morale most', () => {
+    expect(bossLifts(['work-room']).happy).toBeGreaterThan(bossLifts(['push-dj']).happy);
+    expect(bossLifts(['send-bouncer']).morale).toBeGreaterThan(bossLifts(['push-dj']).morale);
+  });
+
+  it('repeats give diminishing lift (never linear)', () => {
+    const one = bossLifts(['work-room']).happy;
+    const two = bossLifts(['work-room', 'work-room']).happy;
+    const three = bossLifts(['work-room', 'work-room', 'work-room']).happy;
+    expect(two).toBeGreaterThan(one); // a second call still lifts
+    expect(two).toBeLessThan(one * 2); // but not by another full call
+    expect(three - two).toBeLessThan(two - one); // and the third lifts less than the second
+  });
+
+  it('stays clamped to 0..1 even under heavy spam', () => {
+    const spam: import('./bossActions').BossActionId[] = Array.from({ length: 20 }, () => 'push-dj');
+    const r = bossLifts(spam);
+    expect(r.happy).toBeGreaterThanOrEqual(0);
+    expect(r.happy).toBeLessThanOrEqual(1);
+    expect(r.morale).toBeGreaterThanOrEqual(0);
+    expect(r.morale).toBeLessThanOrEqual(1);
   });
 });

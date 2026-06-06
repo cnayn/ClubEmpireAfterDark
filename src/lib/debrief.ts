@@ -118,11 +118,15 @@ function policyLines(result: NightResult, club: ClubState | undefined): DebriefL
 }
 
 /** Up to 2 lines connecting the boss actions the player took to how the night
- *  actually went (uses existing result data only). */
+ *  actually went (uses existing result data only). Same-id repeats fold into one
+ *  line — the debrief reads WHAT the boss called, not HOW MANY times. */
 function bossActionLines(result: NightResult, bossActions: BossActionId[] | undefined): DebriefLine[] {
   if (!bossActions || bossActions.length === 0) return [];
   const out: DebriefLine[] = [];
+  const seen = new Set<BossActionId>();
   for (const id of bossActions) {
+    if (seen.has(id)) continue;
+    seen.add(id);
     if (id === 'push-dj') {
       out.push(
         result.reputationDelta >= 0

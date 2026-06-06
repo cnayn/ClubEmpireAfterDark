@@ -26,7 +26,7 @@ import {
   NIGHT_FOCUS,
   resolveBossAction,
 } from '@/lib/bossActions';
-import { guestHappiness, staffMorale } from '@/lib/roomMood';
+import { bossLifts, guestHappiness, staffMorale } from '@/lib/roomMood';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
@@ -177,11 +177,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const focusLeft = Math.max(0, NIGHT_FOCUS - focusSpent);
 
   // Room mood meters — Guest Happiness + Staff Morale. Boss commands visibly lift
-  // them while the night is live (capped); the committed read drops the lift.
-  const guestLift = committed ? 0 : Math.min(0.18, chosen.filter((a) => a === 'push-dj' || a === 'work-room').length * 0.05);
-  const staffLift = committed ? 0 : Math.min(0.18, chosen.filter((a) => a === 'check-bar' || a === 'send-bouncer' || a === 'work-room').length * 0.05);
-  const happy = guestHappiness(shownResult, planClub, pressures, guestLift);
-  const morale = staffMorale(shownResult, planClub, pressures, staffLift);
+  // them while the night is live (diminishing per repeat); the committed read drops
+  // the lift since the result already reflects the calls in the resolver.
+  const lifts = committed ? { happy: 0, morale: 0 } : bossLifts(chosen);
+  const happy = guestHappiness(shownResult, planClub, pressures, lifts.happy);
+  const morale = staffMorale(shownResult, planClub, pressures, lifts.morale);
 
   // The event stream: ambient ticks (progress-derived) merged with boss/encounter
   // reactions. Newest first; capped to keep the floor reading like a room.
@@ -267,7 +267,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         />
       </View>
 
-      {/* The pressure strip — four mini meters in one row. */}
+      {/* Pressure strip (strain) + Mood strip (happy / morale). Two rows: the
+          top row reads what's HEAVY (bar/door/bath/energy), the bottom row
+          reads how the room FEELS (guest happiness / staff morale) so the
+          owner sees who they're hurting and who they're helping. */}
       <View style={styles.meters}>
         <MiniMeter label="Bar" value={pressures.bar} mode="strain" />
         <MiniMeter label="Door" value={pressures.door} mode="strain" />

@@ -6,7 +6,14 @@
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, StaffMember } from '@/domain/types';
 import { resolveNight } from '@/sim/night';
-import { bossIntervention, combineInterventions, focusCost, NIGHT_FOCUS, resolveBossAction } from './bossActions';
+import {
+  bossIntervention,
+  combineInterventions,
+  diminishFactor,
+  focusCost,
+  NIGHT_FOCUS,
+  resolveBossAction,
+} from './bossActions';
 
 const BARTENDERS = STARTING_ROSTER.filter((m) => m.role === 'bartender').map((m) => m.id);
 
@@ -36,6 +43,51 @@ describe('Owner Attention (Boss Focus)', () => {
     const fivePushes = Array.from({ length: 5 }, () => ({ vibeBonus: 24, revenueMod: 1 }));
     const r = combineInterventions(fivePushes);
     expect(r.vibeBonus).toBeLessThanOrEqual(30); // stacking can't run away
+  });
+});
+
+describe('diminishing returns on repeated SAME-id calls', () => {
+  it('diminishFactor falls off across repeats', () => {
+    expect(diminishFactor(0)).toBe(1);
+    expect(diminishFactor(1)).toBeLessThan(diminishFactor(0));
+    expect(diminishFactor(2)).toBeLessThan(diminishFactor(1));
+    expect(diminishFactor(99)).toBeLessThan(diminishFactor(2));
+    for (let i = 0; i < 10; i++) {
+      expect(diminishFactor(i)).toBeGreaterThanOrEqual(0);
+      expect(diminishFactor(i)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('bossIntervention applies smaller pull on each repeat of the same action', () => {
+    const c = club({ reputation: 35 });
+    const config = cfg({ coverLevel: 'high', drinkLevel: 'high' });
+    const pv = preview(c, config, 9);
+    const one = bossIntervention(['push-dj'], pv, c);
+    const four = bossIntervention(['push-dj', 'push-dj', 'push-dj', 'push-dj'], pv, c);
+    // Four repeats cannot be four times stronger — the diminish + clamp bound it.
+    expect(four.vibeBonus).toBeLessThan(one.vibeBonus * 2.5);
+  });
+
+  it('different-id calls do NOT diminish each other (a second push-dj diminishes; check-bar does not)', () => {
+    const c = club();
+    const config = cfg();
+    const pv = preview(c, config, 9);
+    const justOnePush = bossIntervention(['push-dj'], pv, c);
+    const pushThenCheck = bossIntervention(['push-dj', 'check-bar'], pv, c);
+    const pushThenPush = bossIntervention(['push-dj', 'push-dj'], pv, c);
+    // Adding a DIFFERENT-id action adds its full first-call effect on top.
+    expect(pushThenCheck.vibeBonus).toBeGreaterThan(justOnePush.vibeBonus);
+    // A SECOND push-dj is diminished, so the 2nd-call lift is smaller than the 1st.
+    const firstLift = justOnePush.vibeBonus;
+    const secondLift = pushThenPush.vibeBonus - firstLift;
+    expect(secondLift).toBeLessThan(firstLift);
+  });
+
+  it('empty sequence is still the identity', () => {
+    const c = club();
+    const config = cfg();
+    const pv = preview(c, config, 9);
+    expect(bossIntervention([], pv, c)).toEqual({ vibeBonus: 0, revenueMod: 1 });
   });
 });
 

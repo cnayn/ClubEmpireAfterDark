@@ -53,3 +53,43 @@ export function staffMorale(result: NightResult, club: ClubState, p: NightPressu
       lift
   );
 }
+
+/**
+ * Boss-command lifts to the two mood meters, derived from the actions taken so
+ * far tonight. Same-action repeats diminish per call ([1, 0.5, 0.25, 0.1]) so a
+ * second Push DJ feels half as strong as the first, a fifth is barely a touch.
+ *
+ * - Push DJ lifts happiness (music), barely touches morale.
+ * - Check Bar lifts both (the bar feels the support).
+ * - Send Bouncer lifts morale most (the crew feels covered).
+ * - Work the Room is the biggest happiness lift (owner presence).
+ *
+ * Pure / deterministic. Independent of the resolver — these are display nudges
+ * so the player sees their calls land, not new economy.
+ */
+export function bossLifts(actions: BossActionId[] = []): { happy: number; morale: number } {
+  const REPEAT = [1, 0.5, 0.25, 0.1];
+  const factor = (n: number) => REPEAT[Math.min(Math.max(0, n - 1), REPEAT.length - 1)];
+  const counts: Partial<Record<BossActionId, number>> = {};
+  for (const a of actions) counts[a] = (counts[a] ?? 0) + 1;
+
+  const sum = (id: BossActionId, perCall: number): number => {
+    const n = counts[id] ?? 0;
+    let total = 0;
+    for (let i = 1; i <= n; i++) total += perCall * factor(i);
+    return total;
+  };
+
+  const happy =
+    sum('work-room', 0.05) +
+    sum('push-dj', 0.04) +
+    sum('check-bar', 0.02) +
+    sum('send-bouncer', 0.01);
+  const morale =
+    sum('send-bouncer', 0.05) +
+    sum('check-bar', 0.04) +
+    sum('work-room', 0.03) +
+    sum('push-dj', 0.01);
+
+  return { happy: clamp01(happy), morale: clamp01(morale) };
+}
