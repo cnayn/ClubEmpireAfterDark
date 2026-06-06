@@ -474,6 +474,59 @@ The line stays: **the reckoning ships before the reward** (per
 `gameplay-north-star.md`). Don't surface a system the player can't
 yet see consequences from.
 
+### Onboarding guardrails (FUTURE / DO NOT BUILD YET)
+
+> Banked rules that protect the first-night experience. None are
+> built today; tag accordingly when scoped.
+
+#### First-prep crew selection must be reversible before confirm
+
+During the **first-night setup**, hiring or removing crew must be
+**reversible until the player taps the final confirmation** ("Open
+Doors" or equivalent CTA). Specifically:
+
+- Hiring a bartender in first prep does **not** debit cash
+  immediately. Cash debits on confirm.
+- Removing a hired crew member from the lineup **fully refunds** the
+  hire before confirm.
+- The player can swap crew freely in first prep without burning
+  money.
+- After confirm + first night opens, normal hire/fire economics
+  apply.
+
+**Soft-lock prevention is the goal.** A new player must never be in
+a state where they:
+
+- Spent money on crew during onboarding,
+- Then can't open the first night because they can't afford the
+  remaining costs,
+- And have no way to undo the spend.
+
+Same rule applies to **first-night Drink Prep** and **first-night
+upgrades** if either of those surfaces ever takes pre-confirm money.
+
+> Beyond first night, normal economics resume. This rule covers the
+> onboarding window only.
+
+#### Phone & story unlock gate
+
+The phone surface (per [`phone-messages.md`](phone-messages.md)) and
+mid-night story bubbles should **not fire during first prep**. The
+player needs room to:
+
+1. Find the place.
+2. Set it up.
+3. Open the first night.
+
+…before crew, suppliers, regulars, or contacts start texting them.
+Canonical gate definition lives in
+[`phone-messages.md`](phone-messages.md) "Phone unlock gate" — TL;DR:
+phone activates after first prep + first open, or after first
+successful night.
+
+> Implementation: phone surface is FUTURE; gate is the first rule it
+> ships with when scoped.
+
 ---
 
 ## 9. Recommended next build slices for Main Claude Code
