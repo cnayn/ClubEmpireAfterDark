@@ -23,7 +23,7 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
 import { Text } from '@/components/Text';
-import type { BoardZone } from '@/lib/board';
+import { type BoardZone, zonePlacement } from '@/lib/board';
 import type {
   BubbleTone,
   ClusterZone,
@@ -701,217 +701,203 @@ export function FloorView({
           ))}
         </View>
 
-        {/* DOOR — a doorway frame across the back wall. Two glowing posts
-            bracket the opening; the bouncer stands LEFT of the door, a guest
-            line queues in the middle, the VIP rope on the right is locked. */}
-        <Pressable accessibilityRole="button" onPress={() => onZonePress?.('door')} style={[styles.doorway, { borderColor: zoneTint('door'), shadowColor: zoneTint('door'), shadowOpacity: 0.2 + glow('door') * 0.5, shadowRadius: 6 + glow('door') * 10 }]}>
-          <View style={[styles.doorPostBeam, { backgroundColor: zoneTint('door') }]} />
-          <View style={[styles.doorTopBeam, { backgroundColor: zoneTint('door') }]} />
-          <View style={[styles.doorPostBeam, styles.doorPostRight, { backgroundColor: zoneTint('door') }]} />
-          <View style={styles.doorRow}>
-            <View style={styles.doorPost}>
-              {floor.bouncers.length > 0 ? (
-                floor.bouncers.map((b) => (
-                  <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} />
-                ))
-              ) : (
-                <EmptyPost />
-              )}
-            </View>
-            {doorCluster ? (
-              <View style={styles.doorLine}>
-                <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
-                {/* Stanchion rope under the queue — two small posts + a sagging
-                    velvet line so the entrance reads as a doorway with a rope,
-                    not a row of dots. */}
-                <View style={styles.stanchionRow} pointerEvents="none">
-                  <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
-                  <View style={[styles.stanchionRope, { backgroundColor: colors.warning }]} />
-                  <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
+        {/* The room is laid out as a FLOOR PLAN driven by FIRST_FLOOR_LAYOUT
+            (src/lib/board.ts): a top band (door + locked VIP), a middle band
+            (dance-floor hero on the left, DJ booth over the bar down the right),
+            and a bottom band (bathroom + staff). Column spans come from the
+            layout model so the plan is data-driven, not a hand-stacked column. */}
+
+        {/* TOP BAND (row 0) — DOOR across the back wall + locked VIP corner. */}
+        <View style={styles.band}>
+          <View style={{ flex: zonePlacement('door')?.colSpan ?? 3 }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onZonePress?.('door')}
+              style={[styles.doorway, styles.cellFill, { borderColor: zoneTint('door'), shadowColor: zoneTint('door'), shadowOpacity: 0.2 + glow('door') * 0.5, shadowRadius: 6 + glow('door') * 10 }]}
+            >
+              <View style={[styles.doorPostBeam, { backgroundColor: zoneTint('door') }]} />
+              <View style={[styles.doorTopBeam, { backgroundColor: zoneTint('door') }]} />
+              <View style={[styles.doorPostBeam, styles.doorPostRight, { backgroundColor: zoneTint('door') }]} />
+              <View style={styles.doorRow}>
+                <View style={styles.doorPost}>
+                  {floor.bouncers.length > 0 ? (
+                    floor.bouncers.map((b) => (
+                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} />
+                    ))
+                  ) : (
+                    <EmptyPost />
+                  )}
                 </View>
+                {doorCluster ? (
+                  <View style={styles.doorLine}>
+                    <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                    <View style={styles.stanchionRow} pointerEvents="none">
+                      <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
+                      <View style={[styles.stanchionRope, { backgroundColor: colors.warning }]} />
+                      <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
+                    </View>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-            <View style={styles.vipChip}>
+              <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('door') }]}>
+                DOOR
+              </Text>
+            </Pressable>
+          </View>
+          {/* VIP — locked future expansion in the top-right corner. */}
+          <View style={{ flex: zonePlacement('vip')?.colSpan ?? 1 }}>
+            <View style={styles.vipCard}>
               <Text variant="label" muted style={styles.vipText}>
                 VIP
               </Text>
               <View style={styles.vipRope} />
+              <Text variant="label" muted style={styles.vipLocked}>
+                locked
+              </Text>
             </View>
           </View>
-          <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('door') }]}>
-            DOOR
-          </Text>
-        </Pressable>
+        </View>
         {venueChips ? <ObjectStrip names={venueChips.door} tint={zoneTint('door')} /> : null}
         {inZone('door').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
 
-        {/* MID STRIP — a tiled bathroom · the DJ turntable booth · the staff
-            area. The first two are rendered as real objects, not labelled
-            boxes, so the room reads as a club instead of a dashboard. */}
-        <View style={styles.midRow}>
-          <TiledRoom
-            tint={bathTint}
-            glow={glow('bath')}
-            highlighted={!!bathCluster}
-            hint={bathCluster ? bathCluster.label : 'clear'}
-            onPress={onZonePress ? () => onZonePress('bathroom') : undefined}
-          />
-          <TurntableBooth
-            tint={djTint}
-            djLabel={djLabel}
-            glow={glow('dj')}
-            highlighted={flashZone === 'floor'}
-            onPress={onZonePress ? () => onZonePress('dj') : undefined}
-          />
-          <MiniZone
-            label="STAFF"
-            tint={staffAreaTint}
-            hint={onDutyCount > 0 ? `${onDutyCount} on duty` : 'nobody on'}
-            onPress={onZonePress ? () => onZonePress('staff') : undefined}
-          />
-        </View>
-        {bathCluster ? (
-          <View style={styles.midClusters}>
-            <TokenCluster cluster={bathCluster} pulse={pulse} shimmer={shimmers[1]} showLabel={false} />
-          </View>
-        ) : null}
-
-        {/* DANCE FLOOR — the hero. */}
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onZonePress?.('floor')}
-          style={[
-            styles.floorPanel,
-            {
-              borderColor: floorTint,
-              shadowColor: floorTint,
-              shadowOpacity: 0.25 + glow('floor') * 0.5,
-              shadowRadius: 10 + glow('floor') * 14,
-            },
-          ]}
-        >
-          <View style={styles.floorHead}>
-            <Text variant="label" style={[styles.zoneLabel, { color: floorTint }]}>
-              FLOOR
-            </Text>
-            {regularsCluster ? (
-              <View style={[styles.regularChip, { borderColor: MOOD_COLOR[regularsCluster.mood] }]}>
-                <Text variant="label" color={MOOD_COLOR[regularsCluster.mood]}>
-                  {regularsCluster.label}
+        {/* MIDDLE BAND (rows 1–2) — DANCE FLOOR hero on the LEFT; the RIGHT
+            column stacks the DJ booth over the bar (col 3 of the plan). */}
+        <View style={styles.band}>
+          <View style={{ flex: zonePlacement('floor')?.colSpan ?? 3 }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onZonePress?.('floor')}
+              style={[styles.floorPanel, styles.cellFill, { borderColor: floorTint, shadowColor: floorTint, shadowOpacity: 0.25 + glow('floor') * 0.5, shadowRadius: 10 + glow('floor') * 14 }]}
+            >
+              <View style={styles.floorHead}>
+                <Text variant="label" style={[styles.zoneLabel, { color: floorTint }]}>
+                  FLOOR
                 </Text>
+                {regularsCluster ? (
+                  <View style={[styles.regularChip, { borderColor: MOOD_COLOR[regularsCluster.mood] }]}>
+                    <Text variant="label" color={MOOD_COLOR[regularsCluster.mood]}>
+                      {regularsCluster.label}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
 
-          {crowdTags && crowdTags.length > 0 ? (
-            <View style={styles.crowdTagRow}>
-              {crowdTags.map((t) => (
-                <View key={t} style={styles.crowdTag}>
-                  <Text variant="label" color={colors.neonCyan}>
-                    {t}
-                  </Text>
+              {crowdTags && crowdTags.length > 0 ? (
+                <View style={styles.crowdTagRow}>
+                  {crowdTags.map((t) => (
+                    <View key={t} style={styles.crowdTag}>
+                      <Text variant="label" color={colors.neonCyan}>
+                        {t}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          ) : null}
-          {regularTags && regularTags.length > 0 ? (
-            <View style={styles.crowdTagRow}>
-              {regularTags.map((t) => (
-                <View key={t} style={[styles.crowdTag, { borderColor: colors.success }]}>
-                  <Text variant="label" color={colors.success}>
-                    {t}
-                  </Text>
+              ) : null}
+              {regularTags && regularTags.length > 0 ? (
+                <View style={styles.crowdTagRow}>
+                  {regularTags.map((t) => (
+                    <View key={t} style={[styles.crowdTag, { borderColor: colors.success }]}>
+                      <Text variant="label" color={colors.success}>
+                        {t}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          ) : null}
+              ) : null}
 
-          <View style={styles.grid}>
-            {/* Floor tile grid — a 4x3 checker reads as a real dance-floor
-                surface, not just stripes. Opacities staggered. */}
-            <View style={styles.tiles} pointerEvents="none">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.tile,
-                    {
-                      backgroundColor: floorTint,
-                      opacity: 0.04 + ((i + Math.floor(i / 4)) % 2) * 0.05 + glow('floor') * 0.04,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-            {/* Center spotlight from the DJ direction + two side beams angled
-                in. Three layered beams pull the eye to the floor as the hero. */}
-            <View pointerEvents="none" style={[styles.spotlight, { backgroundColor: floorTint, opacity: 0.05 + glow('floor') * 0.18 }]} />
-            <View pointerEvents="none" style={[styles.spotlightLeft, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
-            <View pointerEvents="none" style={[styles.spotlightRight, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
-            <View style={styles.crowd}>
-              {floorCluster ? (
-                <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
-              ) : (
-                renderFallbackCrowd()
-              )}
-            </View>
-          </View>
-
-          {inZone('floor').length > 0 ? (
-            <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
-          ) : null}
-        </Pressable>
-
-        {/* BAR — a real bar counter across the front of the room. The
-            bartender(s) stand BEHIND the counter; the guest queue stacks IN
-            FRONT of it. A bottle row sits behind the bartender. */}
-        {inZone('bar').length > 0 ? (
-          <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
-        ) : null}
-        <Pressable accessibilityRole="button" onPress={() => onZonePress?.('bar')} style={[styles.barCounter, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}>
-          {/* Backbar shelf — a row of varied bottles so the bar reads as a
-              stocked shelf, not four equal stripes. Heights/opacities differ. */}
-          <View style={[styles.backbar, { borderColor: zoneTint('bar') }]}>
-            {[10, 13, 8, 14, 11, 9, 12].map((h, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.bottle,
-                  {
-                    height: h,
-                    backgroundColor: zoneTint('bar'),
-                    opacity: 0.4 + ((i * 17) % 7) / 18,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-          {/* Posts + queue. */}
-          <View style={styles.barRow}>
-            <View style={styles.barPost}>
-              {floor.bartenders.length > 0 ? (
-                floor.bartenders.map((b) => (
-                  <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} />
-                ))
-              ) : (
-                <EmptyPost />
-              )}
-            </View>
-            {barCluster ? (
-              <View style={styles.barQueue}>
-                <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} />
+              <View style={styles.grid}>
+                <View style={styles.tiles} pointerEvents="none">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.tile,
+                        { backgroundColor: floorTint, opacity: 0.04 + ((i + Math.floor(i / 4)) % 2) * 0.05 + glow('floor') * 0.04 },
+                      ]}
+                    />
+                  ))}
+                </View>
+                <View pointerEvents="none" style={[styles.spotlight, { backgroundColor: floorTint, opacity: 0.05 + glow('floor') * 0.18 }]} />
+                <View pointerEvents="none" style={[styles.spotlightLeft, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
+                <View pointerEvents="none" style={[styles.spotlightRight, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
+                <View style={styles.crowd}>
+                  {floorCluster ? (
+                    <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                  ) : (
+                    renderFallbackCrowd()
+                  )}
+                </View>
               </View>
-            ) : null}
+
+              {inZone('floor').length > 0 ? (
+                <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
+              ) : null}
+            </Pressable>
           </View>
-          {/* Bar top — a thick magenta strip is what the eye reads as "the bar". */}
-          <View style={[styles.barTop, { backgroundColor: zoneTint('bar') }]} />
-          <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('bar') }]}>
-            BAR
-          </Text>
-        </Pressable>
+
+          {/* RIGHT COLUMN — DJ booth over the bar. */}
+          <View style={styles.sideCol}>
+            <TurntableBooth
+              tint={djTint}
+              djLabel={djLabel}
+              glow={glow('dj')}
+              highlighted={flashZone === 'floor'}
+              onPress={onZonePress ? () => onZonePress('dj') : undefined}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onZonePress?.('bar')}
+              style={[styles.sideBar, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}
+            >
+              <Text variant="label" style={[styles.zoneLabel, { color: zoneTint('bar') }]}>
+                BAR
+              </Text>
+              <View style={styles.sideBackbar}>
+                {[10, 13, 8, 12, 9].map((h, i) => (
+                  <View key={i} style={[styles.bottle, { height: h, backgroundColor: zoneTint('bar'), opacity: 0.4 + ((i * 17) % 7) / 18 }]} />
+                ))}
+              </View>
+              <View style={[styles.barTop, { backgroundColor: zoneTint('bar') }]} />
+              <View style={styles.sideBarPosts}>
+                {floor.bartenders.length > 0 ? (
+                  floor.bartenders.map((b) => (
+                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} />
+                  ))
+                ) : (
+                  <EmptyPost />
+                )}
+              </View>
+              {barCluster ? <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} /> : null}
+              {inZone('bar').length > 0 ? (
+                <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
+              ) : null}
+            </Pressable>
+          </View>
+        </View>
         {venueChips ? <ObjectStrip names={venueChips.bar} tint={zoneTint('bar')} /> : null}
+
+        {/* BOTTOM BAND (row 3) — BATHROOM + STAFF AREA, secondary. */}
+        <View style={styles.band}>
+          <View style={{ flex: zonePlacement('bathroom')?.colSpan ?? 2 }}>
+            <TiledRoom
+              tint={bathTint}
+              glow={glow('bath')}
+              highlighted={!!bathCluster}
+              hint={bathCluster ? bathCluster.label : 'clear'}
+              onPress={onZonePress ? () => onZonePress('bathroom') : undefined}
+            />
+          </View>
+          <View style={{ flex: zonePlacement('staff')?.colSpan ?? 2 }}>
+            <MiniZone
+              label="STAFF"
+              tint={staffAreaTint}
+              hint={onDutyCount > 0 ? `${onDutyCount} on duty` : 'nobody on'}
+              onPress={onZonePress ? () => onZonePress('staff') : undefined}
+            />
+          </View>
+        </View>
       </View>
 
       {belowRoom ? <View style={styles.belowRoom}>{belowRoom}</View> : null}
@@ -957,6 +943,38 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scanline: { height: 1, marginVertical: 1 },
+  // --- Floor-plan bands (data-driven from FIRST_FLOOR_LAYOUT) ---
+  band: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
+  cellFill: { flex: 1, marginHorizontal: 0 },
+  sideCol: { flex: 1, gap: spacing.sm },
+  // Locked VIP corner (top-right of the plan).
+  vipCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    gap: 2,
+    opacity: 0.8,
+  },
+  vipLocked: { fontSize: 8, letterSpacing: 1 },
+  // Compact side bar (right column, under the DJ booth).
+  sideBar: {
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    gap: 2,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  sideBackbar: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, paddingVertical: 1 },
+  sideBarPosts: { alignItems: 'center', marginTop: 2 },
   // Zone panels (door / bar) — tinted, glowing.
   zonePanel: {
     backgroundColor: colors.surfaceAlt,
