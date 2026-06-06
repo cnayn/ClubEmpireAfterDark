@@ -124,6 +124,16 @@ export default function DayPrepScreen() {
   const crowdTags = topCrowd(crowdMix(club, { ...config, eventId, staffOnDuty: onDuty }), 3);
   const mentorTip = prepMentorLine(club, { ...config, eventId, staffOnDuty: onDuty });
 
+  // Final-check summary copy for the first night: the wizard already configured
+  // bar + house rules, so the pre-open screen confirms them instead of asking
+  // again. (Live mid-night policy/bar changes are a separate future build.)
+  const labelOf = <T extends string>(opts: { value: T; label: string }[], v: T) =>
+    opts.find((o) => o.value === v)?.label ?? String(v);
+  const rulesSummary = `${labelOf(POLICY_OPTIONS.smoking, policies.smoking)} · ${labelOf(
+    POLICY_OPTIONS.idCheck,
+    policies.idCheck
+  )} ID · ${labelOf(POLICY_OPTIONS.security, policies.security)} · ${labelOf(POLICY_OPTIONS.barService, policies.barService)}`;
+
   const onOpen = () => {
     planNight({ ...config, eventId, staffOnDuty: onDuty });
     router.replace('/night-timeline');
@@ -399,9 +409,26 @@ export default function DayPrepScreen() {
         </Text>
       </Card>
 
-      {barCard}
-      {crewCard}
-      {rulesCard}
+      {/* First night: the wizard already configured crew / bar / house rules, so
+          the pre-open screen shows a compact FINAL CHECK instead of asking the
+          same questions again. Veteran nights keep the full editable cards. */}
+      {firstNight ? (
+        <Card title="Final Check" accent={colors.neonCyan}>
+          <Text variant="label" muted>
+            Set during setup — change crew any time from the Crew tab.
+          </Text>
+          <ResultRow label="Crew on duty" value={`${onDuty.length} working`} />
+          <ResultRow label="Bar stock" value={`${labelOf(STOCK_OPTIONS, drink.stock)} · ${labelOf(QUALITY_OPTIONS, drink.quality)}`} />
+          <ResultRow label="House rules" value={rulesSummary} />
+          <Button label="Hire / Fire Staff" variant="secondary" onPress={() => router.push('/staff')} />
+        </Card>
+      ) : (
+        <>
+          {barCard}
+          {crewCard}
+          {rulesCard}
+        </>
+      )}
 
       {/* Derived readouts — kept LAST so a selector change never pushes a control
           above it up the page (the scroll-jump fix). */}
