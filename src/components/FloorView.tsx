@@ -108,14 +108,27 @@ function staffTint(id: string, role: 'bartender' | 'bouncer', baseTint: string):
   return baseTint;
 }
 
+/** Tiny role glyph for the staff avatar — a cocktail glass for the bartender,
+ *  a shield-ish diamond for the bouncer. Pure cosmetic; helps a staff token
+ *  read as "the bouncer" / "the bartender" at a glance. */
+const ROLE_GLYPH: Record<'bartender' | 'bouncer', string> = {
+  bartender: '◍',
+  bouncer: '◆',
+};
+
 function StaffToken({ s, role, color, state }: { s: FloorStaff; role: 'bartender' | 'bouncer'; color: string; state?: string }) {
   const tint = staffTint(s.id, role, color);
   return (
-    <View style={styles.token} accessibilityLabel={s.name}>
+    <View style={styles.token} accessibilityLabel={`${role} ${s.name}`}>
       <View style={[styles.avatar, { borderColor: tint, shadowColor: tint }]}>
         <Text variant="label" color={tint}>
           {s.initials}
         </Text>
+        <View style={[styles.roleBadge, { borderColor: tint, backgroundColor: colors.surface }]}>
+          <Text variant="label" color={tint} style={styles.roleGlyph}>
+            {ROLE_GLYPH[role]}
+          </Text>
+        </View>
       </View>
       <Text variant="label" muted numberOfLines={1} style={styles.tokenName}>
         {s.name}
@@ -428,6 +441,124 @@ function MiniZone({
   );
 }
 
+/** TurntableBooth — two glowing deck circles + a center mixer panel. Reads as a
+ *  real DJ object on the mid-strip, not a labelled box. A small silhouette
+ *  inside represents the booked act when one is on the decks. Pressable. */
+function TurntableBooth({
+  tint,
+  djLabel,
+  glow,
+  highlighted,
+  onPress,
+}: {
+  tint: string;
+  djLabel?: string;
+  glow?: number;
+  highlighted?: boolean;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={djLabel ? `DJ ${djLabel}` : 'DJ booth'}
+      style={[
+        styles.booth,
+        {
+          borderColor: highlighted ? tint : colors.border,
+          shadowColor: tint,
+          shadowOpacity: highlighted ? 0.55 : 0.18 + (glow ?? 0) * 0.45,
+          shadowRadius: highlighted ? 14 : 5 + (glow ?? 0) * 10,
+        },
+      ]}
+    >
+      <View style={styles.boothDecks}>
+        <View style={[styles.deck, { borderColor: tint, shadowColor: tint }]}>
+          <View style={[styles.deckSpindle, { backgroundColor: tint }]} />
+        </View>
+        <View style={[styles.mixer, { borderColor: tint, shadowColor: tint }]}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={[styles.fader, { backgroundColor: tint, opacity: 0.6 + i * 0.1 }]} />
+          ))}
+        </View>
+        <View style={[styles.deck, { borderColor: tint, shadowColor: tint }]}>
+          <View style={[styles.deckSpindle, { backgroundColor: tint }]} />
+        </View>
+      </View>
+      {djLabel ? (
+        <Text variant="label" color={tint} numberOfLines={1} style={styles.boothLabel}>
+          ♪ {djLabel}
+        </Text>
+      ) : (
+        <Text variant="label" muted style={styles.boothLabel}>
+          DJ booth
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
+/** TiledRoom — a small tiled-room representation for the bathroom: a 3×2 mini
+ *  tile grid with a WC corner sign. The whole room glows under strain.
+ *  Pressable so the player can poke the zone. */
+function TiledRoom({
+  tint,
+  glow,
+  highlighted,
+  hint,
+  onPress,
+}: {
+  tint: string;
+  glow?: number;
+  highlighted?: boolean;
+  hint?: string;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel="bathroom"
+      style={[
+        styles.bathRoom,
+        {
+          borderColor: highlighted ? tint : colors.border,
+          shadowColor: tint,
+          shadowOpacity: highlighted ? 0.55 : 0.15 + (glow ?? 0) * 0.45,
+          shadowRadius: highlighted ? 14 : 4 + (glow ?? 0) * 9,
+        },
+      ]}
+    >
+      <View style={styles.bathTiles} pointerEvents="none">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.bathTile,
+              {
+                backgroundColor: tint,
+                opacity: 0.05 + ((i + Math.floor(i / 3)) % 2) * 0.06 + (glow ?? 0) * 0.05,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <View style={[styles.wcSign, { borderColor: tint }]}>
+        <Text variant="label" color={tint} style={styles.wcText}>
+          WC
+        </Text>
+      </View>
+      {hint ? (
+        <Text variant="label" muted numberOfLines={1} style={styles.boothLabel}>
+          {hint}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
 export function FloorView({
   floor,
   bubbles = [],
@@ -590,6 +721,14 @@ export function FloorView({
             {doorCluster ? (
               <View style={styles.doorLine}>
                 <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                {/* Stanchion rope under the queue — two small posts + a sagging
+                    velvet line so the entrance reads as a doorway with a rope,
+                    not a row of dots. */}
+                <View style={styles.stanchionRow} pointerEvents="none">
+                  <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
+                  <View style={[styles.stanchionRope, { backgroundColor: colors.warning }]} />
+                  <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
+                </View>
               </View>
             ) : null}
             <View style={styles.vipChip}>
@@ -608,20 +747,20 @@ export function FloorView({
           <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
 
-        {/* MID STRIP — Bathroom · DJ Booth · Staff Area. */}
+        {/* MID STRIP — a tiled bathroom · the DJ turntable booth · the staff
+            area. The first two are rendered as real objects, not labelled
+            boxes, so the room reads as a club instead of a dashboard. */}
         <View style={styles.midRow}>
-          <MiniZone
-            label="BATH"
+          <TiledRoom
             tint={bathTint}
-            hint={bathCluster ? bathCluster.label : 'clear'}
             glow={glow('bath')}
             highlighted={!!bathCluster}
+            hint={bathCluster ? bathCluster.label : 'clear'}
             onPress={onZonePress ? () => onZonePress('bathroom') : undefined}
           />
-          <MiniZone
-            label="DJ"
+          <TurntableBooth
             tint={djTint}
-            hint={djLabel ? `♪ ${djLabel}` : 'soon'}
+            djLabel={djLabel}
             glow={glow('dj')}
             highlighted={flashZone === 'floor'}
             onPress={onZonePress ? () => onZonePress('dj') : undefined}
@@ -706,8 +845,11 @@ export function FloorView({
                 />
               ))}
             </View>
-            {/* Center spotlight beam from the DJ booth direction. */}
+            {/* Center spotlight from the DJ direction + two side beams angled
+                in. Three layered beams pull the eye to the floor as the hero. */}
             <View pointerEvents="none" style={[styles.spotlight, { backgroundColor: floorTint, opacity: 0.05 + glow('floor') * 0.18 }]} />
+            <View pointerEvents="none" style={[styles.spotlightLeft, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
+            <View pointerEvents="none" style={[styles.spotlightRight, { backgroundColor: floorTint, opacity: 0.04 + glow('floor') * 0.12 }]} />
             <View style={styles.crowd}>
               {floorCluster ? (
                 <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
@@ -729,10 +871,21 @@ export function FloorView({
           <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
         <Pressable accessibilityRole="button" onPress={() => onZonePress?.('bar')} style={[styles.barCounter, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}>
-          {/* Backbar / bottle row: a thin glowing strip with three notches. */}
+          {/* Backbar shelf — a row of varied bottles so the bar reads as a
+              stocked shelf, not four equal stripes. Heights/opacities differ. */}
           <View style={[styles.backbar, { borderColor: zoneTint('bar') }]}>
-            {[0, 1, 2, 3].map((i) => (
-              <View key={i} style={[styles.bottle, { backgroundColor: zoneTint('bar'), opacity: 0.7 - i * 0.1 }]} />
+            {[10, 13, 8, 14, 11, 9, 12].map((h, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.bottle,
+                  {
+                    height: h,
+                    backgroundColor: zoneTint('bar'),
+                    opacity: 0.4 + ((i * 17) % 7) / 18,
+                  },
+                ]}
+              />
             ))}
           </View>
           {/* Posts + queue. */}
@@ -934,6 +1087,122 @@ const styles = StyleSheet.create({
     transform: [{ translateX: -12 }, { rotate: '0deg' }],
     borderRadius: 6,
   },
+  // Two side beams angled inward — the floor gets three layered lights.
+  spotlightLeft: {
+    position: 'absolute',
+    top: -30,
+    left: '20%',
+    width: 14,
+    height: 220,
+    transform: [{ translateX: -7 }, { rotate: '12deg' }],
+    borderRadius: 6,
+  },
+  spotlightRight: {
+    position: 'absolute',
+    top: -30,
+    right: '20%',
+    width: 14,
+    height: 220,
+    transform: [{ translateX: 7 }, { rotate: '-12deg' }],
+    borderRadius: 6,
+  },
+  // --- Stanchion rope under the door line.
+  stanchionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+    marginTop: 2,
+  },
+  stanchionPost: { width: 2, height: 6, borderRadius: 1, opacity: 0.85 },
+  stanchionRope: { flex: 1, maxWidth: 36, height: 1.5, opacity: 0.7 },
+  // --- DJ TurntableBooth (replaces the labelled mini-zone in v1).
+  booth: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    gap: 2,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  boothDecks: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
+  deck: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  deckSpindle: { width: 3, height: 3, borderRadius: 2, opacity: 0.9 },
+  mixer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 1,
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+    borderRadius: 2,
+    borderWidth: 1,
+    backgroundColor: colors.bg,
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  fader: { width: 1.5, height: 8, borderRadius: 1 },
+  boothLabel: { fontSize: 9, letterSpacing: 0.5 },
+  // --- TiledRoom (bathroom).
+  bathRoom: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    gap: 2,
+    shadowOffset: { width: 0, height: 0 },
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bathTiles: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  bathTile: { width: '33.33%', height: '50%' },
+  wcSign: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    borderWidth: 1,
+    backgroundColor: colors.bg,
+    marginTop: 4,
+  },
+  wcText: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
+  // --- Role badge on the staff avatar.
+  roleBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleGlyph: { fontSize: 8, lineHeight: 10 },
   // Staff avatar token.
   token: { alignItems: 'center', width: 56, gap: 2 },
   avatar: {
