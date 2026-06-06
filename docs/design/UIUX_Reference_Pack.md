@@ -258,11 +258,13 @@ The build session owns realization; this section is the guardrail.
 - **No copied IP** — original assets only. If a placeholder is needed,
   use a flat shape, not a fetched image.
 - **No full 3D** — no Three.js, no react-three-fiber, no GLB pipelines.
-  The board is 2.5D: stylized top-down zones with depth via tint, shadow,
-  and z-order.
-- **Push the current floor toward a readable 2.5D board.** Zones as
-  tiles. Guests as cluster sprites. Staff as named tokens. Pressure as
-  glow + bubble + density.
+  The board is **2D today, headed to 2.5D later** — stylized top-down
+  zones with depth via tint, shadow, and z-order. See **Section 13 —
+  UI Roadmap** for the phase order.
+- **Push the current floor toward a readable 2D club room first.**
+  Zones as tiles. Guests as cluster sprites today, readable sprites
+  next. Staff as named tokens. Pressure as glow + bubble + density.
+  2.5D depth comes after the 2D room reads cleanly.
 - **Determinism preserved** (per `gameplay-north-star.md` design law
   #4). UI surfaces sim state — UI never generates new RNG.
 - **Performance budget.** The floor renders every tick; keep it
@@ -327,6 +329,96 @@ NCC's magnetic loop wasn't just "look at your club" — it was "look at
 *my* club, the one I built, the one nobody else built the same way."
 That's the loop we want. The Sims taught us how to make it readable.
 Club Empire ships it Neon Noir.
+
+---
+
+## 13. UI Roadmap (the main direction, not someday fantasy)
+
+> **Status change:** 2D / 2.5D is **no longer a "someday" target.** It is
+> the **main UI direction** for Club Empire. The phases below are the
+> through-line for every UI build pass from here forward. The earlier
+> stylized-zones-with-clusters version was the **starting point** of
+> Phase 1 — not the destination.
+
+### Phase 1 — Current floor (today)
+
+**What it is:** stylized 2D board. Zones as tiles. Guests as cluster
+sprites / density blobs. Staff as named tokens at their stations.
+Pressure as glow + bubble + queue density. Boss actions point at
+zones.
+
+**Goal:** the floor reads at a glance — door, bar, dance floor, DJ —
+in under two seconds. Pressure is visible without numbers.
+
+**Acceptance:** the player stays on the floor screen and watches the
+night happen. They do not feel they're clicking through cards.
+
+### Phase 2 — Next floor (stronger 2D club room)
+
+**What it is:** the same 2D board, **leveled up**. Guests become
+**readable sprites** (still simple, still cluster-friendly, but with
+silhouette and posture). Staff tokens gain idle animation and clearer
+identity. Zones get layered backgrounds (bar tile reads as *a bar*,
+dance-floor tile reads as *a floor*).
+
+**What it isn't:** still no individual NPC pathfinding. Still no free
+placement. Still no 3D.
+
+**Goal:** the room is the club, not a board. Closer to NCC's
+*"that's my place"* feeling, in original IP.
+
+**Acceptance:** a screenshot of the floor reads as a nightclub on its
+own — not a UI mockup.
+
+### Phase 3 — Later (2.5D depth + richer room customization)
+
+**What it is:** angled perspective on the 2D base. Depth via tint,
+shadow, z-order, light bleed. **Decorate mode** matures (per Section
+12): the player previews upgrades on the floor and the floor shows
+each install — banquettes change, lighting rigs change, decor pieces
+change.
+
+**What it isn't:** still no Three.js, no GLB, no free placement of
+individual furniture pieces. The room knows its slots; the player
+fills them.
+
+**Goal:** the floor has weight. The player sees their *own* club, not
+a template.
+
+**Acceptance:** two players with two different upgrade paths produce
+two visibly distinct rooms.
+
+### Phase 4 — Long-term (the NCC emotional finish line, on Club Empire IP)
+
+**What it is:** the full magnetic loop. The player opens the app, the
+floor is alive, decisions ripple visibly, decoration is identity,
+characters carry weight. Pulled forward by everything we banked in
+`random-events.md`, `night-encounters.md`, `phone-messages.md`,
+`relationship-web.md`, `event-bible.md`.
+
+**What it isn't:** an NCC clone. **No copied assets, no copied UI, no
+copied characters, no copied names, no exact layout.** The borrow
+remains *emotional*, per Section 2.
+
+**Goal:** the "one more night" feeling, lived inside an original
+Neon Noir nightclub.
+
+**Acceptance:** a player who has never played NCC plays Club Empire
+and feels the magnetic loop on its own terms.
+
+### IP guardrail (applies to every phase)
+
+The roadmap is about how readable and alive the floor gets. It is
+**not** a license to copy. Per Section 2:
+
+- Borrow: feeling, magnetism, decorate-and-see-it, guests-in-the-room,
+  music-as-room-state.
+- Do not borrow: assets, sprites, icons, screen layouts, characters,
+  names, exact compositions.
+
+If a build prompt asks for "make it look like NCC," translate it to:
+"make it as *magnetic* as NCC, in our IP." Same target, original
+realization.
 
 ---
 
