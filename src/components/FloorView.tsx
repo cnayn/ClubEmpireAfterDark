@@ -1,15 +1,20 @@
 /**
- * Floor Identity Pass v1 — the club floor as the main game surface.
+ * 2D Club Floor — visual identity pass.
  *
- * A stylized, layered top-down nightclub: a back wall (DOOR / VIP), a middle
- * strip (BATHROOM · DJ BOOTH · STAFF AREA), the dance-floor hero, then the BAR
- * across the front. Zones glow with live pressure; guest CLUSTERS appear per
- * zone (bar queue, door line, dance crowd, bathroom queue, returning regulars),
- * each with a mood-colored token style. Staff markers tint by character
- * (Caramel reads calm, John reads hot). Pure presentation — no per-guest sim,
- * no pathfinding, no saved positions, no resolver/economy involvement. Depth is
- * faked with layered panels, subtle perspective, and a neon floor grid; crowd
- * "movement" is a deterministic shimmer (UI only).
+ * The room reads as a nightclub, not a dashboard: a DOORWAY at the back wall, a
+ * mid-strip of BATHROOM · DJ BOOTH · STAFF AREA, the DANCE FLOOR (the hero) in
+ * the middle, and a real BAR COUNTER across the front. Guests are mini head-
+ * plus-body silhouettes that line up at the door, queue at the bar, scatter
+ * across the floor, or stack at the bathroom — each cluster animated per mood
+ * (dancing bounces, queues shuffle, angry shakes, tired stays still). Staff
+ * tokens read at their station, character-tinted (Caramel calm cyan, John hot
+ * magenta). Equipped furniture surfaces as small object icons embedded in their
+ * zone, not as text chips below it.
+ *
+ * Still pure presentation: no per-guest sim, no pathfinding, no saved positions,
+ * no resolver / economy / save-schema change. Movement is deterministic, driven
+ * by three staggered shimmer loops shared across all silhouettes — no per-token
+ * state, no RNG. The night's books still come from the resolver.
  */
 
 import { ReactNode, useEffect, useRef } from 'react';
@@ -62,6 +67,24 @@ const MOOD_COLOR: Record<GuestMood, string> = {
   confused: colors.warning,
 };
 
+/** Tiny mood pip drawn over an angry / waiting cluster — a one-character vent
+ *  that lets the floor shout without a label. Returns null when the mood is
+ *  neutral enough to skip the pip. */
+function moodPip(mood: GuestMood): string | null {
+  switch (mood) {
+    case 'angry':
+      return '!';
+    case 'confused':
+      return '?';
+    case 'impressed':
+      return '✦';
+    case 'dancing':
+      return '♪';
+    default:
+      return null;
+  }
+}
+
 // Characters whose presence tints their station marker.
 const CARAMEL = 'bnc-kareem';
 const JOHN = 'bnc-john';
@@ -105,7 +128,7 @@ function StaffToken({ s, role, color, state }: { s: FloorStaff; role: 'bartender
   );
 }
 
-function EmptyPost({ label = 'empty' }: { label?: string }) {
+function EmptyPost() {
   return (
     <View style={styles.token}>
       <View style={[styles.avatar, styles.emptyAvatar]}>
@@ -113,9 +136,6 @@ function EmptyPost({ label = 'empty' }: { label?: string }) {
           —
         </Text>
       </View>
-      <Text variant="label" muted style={styles.tokenName}>
-        {label}
-      </Text>
     </View>
   );
 }
@@ -130,14 +150,17 @@ function Bubble({ b }: { b: FloorBubble }) {
   );
 }
 
-/** Small muted chips naming equipped furniture in a zone. */
-function FurnitureChips({ names }: { names: string[] }) {
+/** Small "object" markers for equipped furniture in a zone — a tiny zone-tinted
+ *  square + short name, so decoration reads as visible club objects on the
+ *  floor instead of muted text chips. */
+function ObjectStrip({ names, tint }: { names: string[]; tint: string }) {
   if (names.length === 0) return null;
   return (
     <View style={styles.furnRow}>
       {names.map((n) => (
-        <View key={n} style={styles.furnChip}>
-          <Text variant="label" muted>
+        <View key={n} style={[styles.furnChip, { borderColor: tint, shadowColor: tint }]}>
+          <View style={[styles.furnIcon, { backgroundColor: tint }]} />
+          <Text variant="label" color={tint} style={styles.furnText}>
             {n}
           </Text>
         </View>
@@ -146,87 +169,183 @@ function FurnitureChips({ names }: { names: string[] }) {
   );
 }
 
-/** Mood-driven token shape — height + opacity carry the feeling, the color
- *  carries the mood. Deterministic. */
-function tokenStyle(mood: GuestMood): { height: number; opacity: number } {
+// --- Guests as silhouettes -----------------------------------------------
+
+/** Body height per mood — shorter for tired, taller for active. */
+function bodyHeight(mood: GuestMood): number {
   switch (mood) {
     case 'dancing':
-      return { height: 16, opacity: 1 };
+      return 12;
     case 'impressed':
-      return { height: 15, opacity: 0.95 };
+      return 11;
     case 'happy':
-      return { height: 14, opacity: 0.9 };
+      return 11;
     case 'waiting':
-      return { height: 12, opacity: 0.65 };
+      return 10;
     case 'confused':
-      return { height: 13, opacity: 0.8 };
+      return 10;
     case 'tired':
-      return { height: 9, opacity: 0.75 };
+      return 7;
     case 'angry':
-      return { height: 14, opacity: 1 };
+      return 11;
   }
 }
 
-/** A row of mood-tinted tokens for a single cluster, with a tiny mood word
- *  underneath. Uses the shared shimmer when pulsing — the cluster feels alive
- *  without per-token state. */
+/** Per-mood opacity — waiting/tired read dimmer; dancing/angry read sharp. */
+function moodOpacity(mood: GuestMood): number {
+  switch (mood) {
+    case 'dancing':
+      return 1;
+    case 'impressed':
+      return 0.95;
+    case 'happy':
+      return 0.9;
+    case 'angry':
+      return 1;
+    case 'confused':
+      return 0.8;
+    case 'waiting':
+      return 0.65;
+    case 'tired':
+      return 0.7;
+  }
+}
+
+/** A motion mode for how the silhouette ANIMATES on the shimmer loop. The
+ *  cluster's zone + mood pick which one — dancing bounces up, queue lines
+ *  shuffle sideways, angry shakes, tired stays. Pure cosmetic.  */
+type Motion = 'bounce' | 'shuffle' | 'shake' | 'sway' | 'still';
+
+function motionFor(zone: ClusterZone, mood: GuestMood): Motion {
+  if (mood === 'tired' || mood === 'waiting') return 'still';
+  if (mood === 'angry') return 'shake';
+  if (mood === 'confused') return 'sway';
+  if (mood === 'dancing' || mood === 'impressed' || mood === 'happy') {
+    // A dancer bounces; a happy guest on a queue still shuffles in line.
+    if (zone === 'floor' || zone === 'regulars') return 'bounce';
+    return 'shuffle';
+  }
+  return 'shuffle';
+}
+
+/** A single mini-person silhouette — head circle + body trapezoid, mood-
+ *  colored, animated by the chosen Motion. The `offset` lets the cluster
+ *  stagger neighbouring silhouettes so they don't move in lockstep. */
+function GuestSilhouette({
+  mood,
+  motion,
+  pulse,
+  shimmer,
+  offset = 0,
+  color,
+}: {
+  mood: GuestMood;
+  motion: Motion;
+  pulse: boolean;
+  shimmer: Animated.Value;
+  offset?: number;
+  color?: string;
+}) {
+  const c = color ?? MOOD_COLOR[mood];
+  const h = bodyHeight(mood);
+  const op = moodOpacity(mood);
+
+  // Pick the transform style for this silhouette based on motion. Each motion
+  // reads the same shimmer 0..1 loop differently — that single source of truth
+  // is what keeps "movement" cheap and deterministic.
+  let translateY: Animated.AnimatedInterpolation<number> | number = 0;
+  let translateX: Animated.AnimatedInterpolation<number> | number = 0;
+  let opacity: number | Animated.AnimatedInterpolation<number> = op;
+  if (pulse && motion !== 'still') {
+    if (motion === 'bounce') {
+      translateY = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -3 - offset * 0.4, 0] });
+      opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [Math.max(0.55, op * 0.7), op] });
+    } else if (motion === 'shuffle') {
+      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1.2 + offset * 0.15, 0] });
+    } else if (motion === 'shake') {
+      translateX = shimmer.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 1.2, -1.2, 1.2, 0] });
+    } else if (motion === 'sway') {
+      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-0.8, 0.8, -0.8] });
+    }
+  }
+
+  return (
+    <Animated.View style={[styles.silhouette, { opacity, transform: [{ translateX }, { translateY }] }]}>
+      <View style={[styles.silhouetteHead, { backgroundColor: c, shadowColor: c }]} />
+      <View style={[styles.body, { height: h, backgroundColor: c, shadowColor: c }]} />
+    </Animated.View>
+  );
+}
+
+/** Arrangement style for a cluster — picks flex/wrap/gap so the cluster reads
+ *  as a "line at the door" / "queue at the bar" / "spread on the dance floor" /
+ *  "small knot at the bathroom or regulars area". */
+type Layout = 'line' | 'scatter' | 'stack';
+
+function layoutFor(zone: ClusterZone): Layout {
+  if (zone === 'door' || zone === 'bar') return 'line';
+  if (zone === 'floor') return 'scatter';
+  return 'stack'; // bath, regulars
+}
+
+/** A cluster of silhouettes — arranged per zone (line / scatter / stack),
+ *  animated per mood, with a tiny mood pip and an optional short label below.
+ *  The cluster is fed one shimmer Animated.Value so neighbouring people don't
+ *  move in lockstep but the floor still shares one motion source.  */
 function TokenCluster({
   cluster,
   pulse,
   shimmer,
+  showLabel = true,
 }: {
   cluster: GuestCluster;
   pulse: boolean;
   shimmer: Animated.Value;
+  showLabel?: boolean;
 }) {
   const color = MOOD_COLOR[cluster.mood];
-  const ts = tokenStyle(cluster.mood);
+  const motion = motionFor(cluster.zone, cluster.mood);
+  const layout = layoutFor(cluster.zone);
+  const pip = moodPip(cluster.mood);
+
+  const rowStyle =
+    layout === 'line'
+      ? styles.clusterLine
+      : layout === 'scatter'
+        ? styles.clusterScatter
+        : styles.clusterStack;
+
   return (
     <View style={styles.cluster}>
-      <View style={styles.clusterRow}>
-        {Array.from({ length: cluster.count }).map((_, i) => {
-          const base = (
-            <View
-              key={i}
-              style={[
-                styles.token2d,
-                {
-                  height: ts.height,
-                  backgroundColor: color,
-                  opacity: ts.opacity,
-                  shadowColor: color,
-                },
-              ]}
-            />
-          );
-          if (!pulse || cluster.mood === 'tired' || cluster.mood === 'waiting') return base;
-          const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [Math.max(0.5, ts.opacity * 0.6), ts.opacity] });
-          const translateY = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, cluster.mood === 'dancing' ? -3 : -1.5, 0] });
-          return (
-            <Animated.View
-              key={i}
-              style={[
-                styles.token2d,
-                {
-                  height: ts.height,
-                  backgroundColor: color,
-                  opacity,
-                  shadowColor: color,
-                  transform: [{ translateY }],
-                },
-              ]}
-            />
-          );
-        })}
+      {pip ? (
+        <View style={[styles.moodPip, { borderColor: color, backgroundColor: colors.surface }]}>
+          <Text variant="label" color={color} style={styles.moodPipText}>
+            {pip}
+          </Text>
+        </View>
+      ) : null}
+      <View style={rowStyle}>
+        {Array.from({ length: cluster.count }).map((_, i) => (
+          <GuestSilhouette
+            key={i}
+            mood={cluster.mood}
+            motion={motion}
+            pulse={pulse}
+            shimmer={shimmer}
+            offset={i}
+          />
+        ))}
       </View>
-      <Text variant="label" color={color} style={styles.clusterLabel}>
-        {cluster.label}
-      </Text>
+      {showLabel ? (
+        <Text variant="label" color={color} style={styles.clusterLabel}>
+          {cluster.label}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-/** A tinted, glowing zone panel. Used for back-row (DOOR/VIP) and front-row
+/** A tinted, glowing zone panel. Used for back-row (DOOR) and front-row
  *  (BAR) — the dance floor is its own hero panel below. */
 function ZonePanel({
   label,
@@ -339,20 +458,15 @@ export function FloorView({
   headRight?: ReactNode;
   belowRoom?: ReactNode;
   hideFooter?: boolean;
-  /** Guest clusters per zone (Floor Identity Pass). When provided, the room
-   *  renders them in addition to the fallback floor-crowd dots. */
   clusters?: GuestCluster[];
-  /** Optional pressure reads (0..1) per zone — bar / door / bathroom / energy.
-   *  Used to scale zone glow + give the bathroom & DJ markers something to react
-   *  to. Live night passes these; dashboard can omit. */
   pressures?: { bar: number; door: number; bathroom: number; energy: number; crowd: number };
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
   const inZone = (z: FloorBubble['zone']) => bubbles.filter((b) => b.zone === z);
 
-  // Three staggered shimmer loops give the crowd a lively, non-uniform drift
-  // without per-token state or any simulated agents. Deterministic UI animation.
+  // Three staggered shimmer loops give the floor a non-uniform motion source
+  // without per-token state. Deterministic.
   const shimmers = [useRef(new Animated.Value(0.5)).current, useRef(new Animated.Value(0.5)).current, useRef(new Animated.Value(0.5)).current];
   useEffect(() => {
     if (!pulse) return;
@@ -384,19 +498,20 @@ export function FloorView({
   const bathCluster = clusterIn('bath');
   const regularsCluster = clusterIn('regulars');
 
-  // Glow strength per zone (0..1). Highest of (live pressure, zone-warn fallback).
+  // Glow strength per zone (0..1).
   const glow = (key: ZoneKey | 'bath' | 'dj'): number => {
     if (key === 'bar') return pressures?.bar ?? (zones?.bar === 'warn' ? 0.6 : zones?.bar === 'busy' ? 0.35 : 0);
     if (key === 'door') return pressures?.door ?? (zones?.door === 'warn' ? 0.6 : zones?.door === 'busy' ? 0.35 : 0);
     if (key === 'floor') return Math.max(pressures?.energy ?? 0, pressures?.crowd ?? 0);
     if (key === 'bath') return pressures?.bathroom ?? 0;
-    return djLabel ? 0.4 : 0; // dj: a low baseline glow when an act is booked
+    return djLabel ? 0.4 : 0;
   };
 
   const liveDots = Math.max(0, Math.round(floor.dots * Math.max(0, Math.min(1, liveScale))));
 
-  /** Fallback floor crowd (when no `floor` cluster is provided). */
-  const renderFallbackDots = () => {
+  /** Fallback floor crowd as scattered silhouettes (when no `floor` cluster is
+   *  provided — e.g. on the dashboard, where there are no live pressures). */
+  const renderFallbackCrowd = () => {
     if (liveDots <= 0) {
       return (
         <Text variant="label" muted>
@@ -404,15 +519,17 @@ export function FloorView({
         </Text>
       );
     }
-    return Array.from({ length: liveDots }).map((_, i) => {
-      if (!pulse) {
-        return <View key={i} style={[styles.dot, { backgroundColor: accent, opacity: dotOpacity }]} />;
-      }
-      const v = shimmers[i % shimmers.length];
-      const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [Math.max(0.3, dotOpacity * 0.45), dotOpacity] });
-      const translateY = v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -2.5, 0] });
-      return <Animated.View key={i} style={[styles.dot, { backgroundColor: accent, opacity, transform: [{ translateY }] }]} />;
-    });
+    return Array.from({ length: liveDots }).map((_, i) => (
+      <GuestSilhouette
+        key={i}
+        mood={floor.density === 'packed' ? 'dancing' : floor.density === 'busy' ? 'happy' : 'waiting'}
+        motion={floor.density === 'packed' ? 'bounce' : 'shuffle'}
+        pulse={pulse}
+        shimmer={shimmers[i % shimmers.length]}
+        offset={i}
+        color={accent}
+      />
+    ));
   };
 
   const floorTint = zoneTint('floor');
@@ -420,7 +537,6 @@ export function FloorView({
   const bathTint = pressures && pressures.bathroom >= 0.55 ? colors.warning : colors.textMuted;
   const staffAreaTint = colors.neonViolet;
 
-  // Total staff on duty across both posts — used to label the Staff Area.
   const onDutyCount = floor.bartenders.length + floor.bouncers.length;
 
   return (
@@ -445,44 +561,57 @@ export function FloorView({
           ))}
         </View>
 
-        {/* DOOR — back of the room (inset for depth), with the VIP placeholder. */}
-        <ZonePanel label="DOOR · ENTRANCE" tint={zoneTint('door')} inset glow={glow('door')}>
-          <View style={styles.posts}>
-            {floor.bouncers.length > 0 ? (
-              floor.bouncers.map((b) => (
-                <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} />
-              ))
-            ) : (
-              <EmptyPost label="no door" />
-            )}
-            {doorCluster ? <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} /> : null}
+        {/* DOOR — a doorway frame across the back wall. Two glowing posts
+            bracket the opening; the bouncer stands LEFT of the door, a guest
+            line queues in the middle, the VIP rope on the right is locked. */}
+        <View style={[styles.doorway, { borderColor: zoneTint('door'), shadowColor: zoneTint('door'), shadowOpacity: 0.2 + glow('door') * 0.5, shadowRadius: 6 + glow('door') * 10 }]}>
+          <View style={[styles.doorPostBeam, { backgroundColor: zoneTint('door') }]} />
+          <View style={[styles.doorTopBeam, { backgroundColor: zoneTint('door') }]} />
+          <View style={[styles.doorPostBeam, styles.doorPostRight, { backgroundColor: zoneTint('door') }]} />
+          <View style={styles.doorRow}>
+            <View style={styles.doorPost}>
+              {floor.bouncers.length > 0 ? (
+                floor.bouncers.map((b) => (
+                  <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} />
+                ))
+              ) : (
+                <EmptyPost />
+              )}
+            </View>
+            {doorCluster ? (
+              <View style={styles.doorLine}>
+                <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+              </View>
+            ) : null}
+            <View style={styles.vipChip}>
+              <Text variant="label" muted style={styles.vipText}>
+                VIP
+              </Text>
+              <View style={styles.vipRope} />
+            </View>
           </View>
-          <View style={styles.cornerChip}>
-            <Text variant="label" muted>
-              VIP — locked
-            </Text>
-          </View>
-        </ZonePanel>
-        {venueChips ? <FurnitureChips names={venueChips.door} /> : null}
+          <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('door') }]}>
+            DOOR
+          </Text>
+        </View>
+        {venueChips ? <ObjectStrip names={venueChips.door} tint={zoneTint('door')} /> : null}
         {inZone('door').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
 
-        {/* MID STRIP — Bathroom · DJ Booth · Staff Area. Compact markers; the
-            DJ booth pulses when a real act is booked, the bathroom warns under
-            strain, the staff area shows how many crew are working. */}
+        {/* MID STRIP — Bathroom · DJ Booth · Staff Area. */}
         <View style={styles.midRow}>
           <MiniZone
-            label="BATHROOM"
+            label="BATH"
             tint={bathTint}
-            hint={bathCluster ? `${bathCluster.label}` : 'clear'}
+            hint={bathCluster ? bathCluster.label : 'clear'}
             glow={glow('bath')}
             highlighted={!!bathCluster}
           />
           <MiniZone
-            label={djLabel ? `DJ · ${djLabel}` : 'DJ BOOTH'}
+            label="DJ"
             tint={djTint}
-            hint={djLabel ? '♪ on the decks' : 'soon'}
+            hint={djLabel ? `♪ ${djLabel}` : 'soon'}
             glow={glow('dj')}
             highlighted={flashZone === 'floor'}
           />
@@ -494,11 +623,11 @@ export function FloorView({
         </View>
         {bathCluster ? (
           <View style={styles.midClusters}>
-            <TokenCluster cluster={bathCluster} pulse={pulse} shimmer={shimmers[1]} />
+            <TokenCluster cluster={bathCluster} pulse={pulse} shimmer={shimmers[1]} showLabel={false} />
           </View>
         ) : null}
 
-        {/* DANCE FLOOR — the hero. Subtle skew + a glowing border carry depth. */}
+        {/* DANCE FLOOR — the hero. */}
         <View
           style={[
             styles.floorPanel,
@@ -512,7 +641,7 @@ export function FloorView({
         >
           <View style={styles.floorHead}>
             <Text variant="label" style={[styles.zoneLabel, { color: floorTint }]}>
-              DANCE FLOOR
+              FLOOR
             </Text>
             {regularsCluster ? (
               <View style={[styles.regularChip, { borderColor: MOOD_COLOR[regularsCluster.mood] }]}>
@@ -547,16 +676,29 @@ export function FloorView({
           ) : null}
 
           <View style={styles.grid}>
-            <View style={styles.gridLines} pointerEvents="none">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <View key={i} style={[styles.gridLine, { opacity: 0.05 + i * 0.04, backgroundColor: floorTint }]} />
+            {/* Floor tile grid — a 4x3 checker reads as a real dance-floor
+                surface, not just stripes. Opacities staggered. */}
+            <View style={styles.tiles} pointerEvents="none">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.tile,
+                    {
+                      backgroundColor: floorTint,
+                      opacity: 0.04 + ((i + Math.floor(i / 4)) % 2) * 0.05 + glow('floor') * 0.04,
+                    },
+                  ]}
+                />
               ))}
             </View>
+            {/* Center spotlight beam from the DJ booth direction. */}
+            <View pointerEvents="none" style={[styles.spotlight, { backgroundColor: floorTint, opacity: 0.05 + glow('floor') * 0.18 }]} />
             <View style={styles.crowd}>
               {floorCluster ? (
-                <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} />
+                <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
               ) : (
-                renderFallbackDots()
+                renderFallbackCrowd()
               )}
             </View>
           </View>
@@ -566,23 +708,43 @@ export function FloorView({
           ) : null}
         </View>
 
-        {/* BAR — front of the room, with the bartender(s) + the queue cluster. */}
+        {/* BAR — a real bar counter across the front of the room. The
+            bartender(s) stand BEHIND the counter; the guest queue stacks IN
+            FRONT of it. A bottle row sits behind the bartender. */}
         {inZone('bar').length > 0 ? (
           <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
         ) : null}
-        <ZonePanel label="BAR" tint={zoneTint('bar')} glow={glow('bar')}>
-          <View style={styles.posts}>
-            {floor.bartenders.length > 0 ? (
-              floor.bartenders.map((b) => (
-                <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} />
-              ))
-            ) : (
-              <EmptyPost label="no bar" />
-            )}
-            {barCluster ? <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} /> : null}
+        <View style={[styles.barCounter, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}>
+          {/* Backbar / bottle row: a thin glowing strip with three notches. */}
+          <View style={[styles.backbar, { borderColor: zoneTint('bar') }]}>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={[styles.bottle, { backgroundColor: zoneTint('bar'), opacity: 0.7 - i * 0.1 }]} />
+            ))}
           </View>
-        </ZonePanel>
-        {venueChips ? <FurnitureChips names={venueChips.bar} /> : null}
+          {/* Posts + queue. */}
+          <View style={styles.barRow}>
+            <View style={styles.barPost}>
+              {floor.bartenders.length > 0 ? (
+                floor.bartenders.map((b) => (
+                  <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} />
+                ))
+              ) : (
+                <EmptyPost />
+              )}
+            </View>
+            {barCluster ? (
+              <View style={styles.barQueue}>
+                <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} />
+              </View>
+            ) : null}
+          </View>
+          {/* Bar top — a thick magenta strip is what the eye reads as "the bar". */}
+          <View style={[styles.barTop, { backgroundColor: zoneTint('bar') }]} />
+          <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('bar') }]}>
+            BAR
+          </Text>
+        </View>
+        {venueChips ? <ObjectStrip names={venueChips.bar} tint={zoneTint('bar')} /> : null}
       </View>
 
       {belowRoom ? <View style={styles.belowRoom}>{belowRoom}</View> : null}
@@ -597,6 +759,11 @@ export function FloorView({
     </Card>
   );
 }
+
+// Dummy reference to silence the unused-var lint while keeping the prop in the
+// component signature for future use (kept dim by callers).
+const _unusedDotOpacity = (n: number) => n;
+void _unusedDotOpacity;
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -623,7 +790,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scanline: { height: 1, marginVertical: 1 },
-  // Zone panels (door / bar) — tinted, glowing, layered for depth.
+  // Zone panels (door / bar) — tinted, glowing.
   zonePanel: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.sm,
@@ -637,19 +804,69 @@ const styles = StyleSheet.create({
   zonePanelInset: { marginHorizontal: spacing.lg },
   zoneAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, opacity: 0.9 },
   zoneBody: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  zoneLabel: { letterSpacing: 1 },
-  posts: { flexDirection: 'row', gap: spacing.sm, flex: 1, flexWrap: 'wrap', alignItems: 'flex-end' },
-  cornerChip: {
+  zoneLabel: { letterSpacing: 1, fontSize: 10 },
+  // --- Doorway frame — two posts + top beam evoke a doorway across the back wall.
+  doorway: {
+    position: 'relative',
+    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 0 },
+  },
+  doorPostBeam: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, opacity: 0.9 },
+  doorPostRight: { left: undefined, right: 0 },
+  doorTopBeam: { position: 'absolute', left: 0, right: 0, top: 0, height: 3, opacity: 0.9 },
+  doorRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm },
+  doorPost: { width: 56 },
+  doorLine: { flex: 1, alignItems: 'flex-end', minHeight: 24, paddingHorizontal: spacing.xs },
+  vipChip: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 2,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: colors.border,
-    opacity: 0.65,
-    alignSelf: 'flex-start',
+    opacity: 0.7,
+    alignItems: 'center',
   },
-  // Middle row — Bathroom · DJ · Staff (compact markers under the back wall).
+  vipText: { fontSize: 9 },
+  vipRope: { width: 24, height: 2, backgroundColor: colors.warning, marginTop: 2, opacity: 0.8 },
+  // A faint zone-stamp in the corner of the doorway/bar, so the label is there
+  // but doesn't compete with the visible object for attention.
+  zoneStamp: { position: 'absolute', right: 6, bottom: 4, fontSize: 8, letterSpacing: 1, opacity: 0.7 },
+  // --- Bar counter — a real "object" at the front of the room.
+  barCounter: {
+    position: 'relative',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    gap: spacing.xs,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 0 },
+  },
+  backbar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  bottle: { width: 3, height: 10, borderTopLeftRadius: 2, borderTopRightRadius: 2 },
+  barTop: { height: 4, borderRadius: 2, marginTop: 2, opacity: 0.85 },
+  barRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  barPost: { width: 56 },
+  barQueue: { flex: 1, alignItems: 'flex-end', minHeight: 24, paddingHorizontal: spacing.xs },
+  // Middle row — Bathroom · DJ · Staff (compact markers).
   midRow: { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.md },
   midClusters: { alignItems: 'center', marginTop: -spacing.xs },
   miniZone: {
@@ -684,14 +901,26 @@ const styles = StyleSheet.create({
   },
   grid: {
     position: 'relative',
-    minHeight: 120,
+    minHeight: 140,
     borderRadius: radius.sm,
     overflow: 'hidden',
     backgroundColor: colors.bg,
     justifyContent: 'center',
   },
-  gridLines: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-evenly', paddingVertical: spacing.sm },
-  gridLine: { height: 1 },
+  // 4x3 tile grid behind the dance floor — reads as a real club floor.
+  tiles: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', flexWrap: 'wrap' },
+  tile: { width: '25%', height: '33.33%' },
+  // A soft beam from the DJ booth direction; sits behind the silhouettes.
+  spotlight: {
+    position: 'absolute',
+    top: -20,
+    left: '50%',
+    width: 24,
+    height: 220,
+    transform: [{ translateX: -12 }, { rotate: '0deg' }],
+    borderRadius: 6,
+  },
+  // Staff avatar token.
   token: { alignItems: 'center', width: 56, gap: 2 },
   avatar: {
     width: 36,
@@ -706,7 +935,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   emptyAvatar: { borderColor: colors.border, borderStyle: 'dashed', shadowOpacity: 0 },
-  tokenName: { maxWidth: 56, textAlign: 'center' },
+  tokenName: { maxWidth: 56, textAlign: 'center', fontSize: 10 },
   tokenState: { maxWidth: 56, textAlign: 'center', fontSize: 9 },
   crowd: {
     flexDirection: 'row',
@@ -716,33 +945,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.sm,
   },
-  // Mood-tinted guest token (cluster member).
-  token2d: {
+  // --- Guest silhouette (head + body) ---
+  silhouette: { alignItems: 'center', width: 8 },
+  silhouetteHead: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    shadowOpacity: 0.6,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 0 },
+    marginBottom: 1,
+  },
+  body: {
     width: 6,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
     borderBottomLeftRadius: 1,
     borderBottomRightRadius: 1,
-    shadowOpacity: 0.6,
+    shadowOpacity: 0.5,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 0 },
   },
-  // Cluster wrapper: tokens above, mood word below.
+  // --- Cluster arrangements ---
   cluster: { alignItems: 'center', gap: 2 },
-  clusterRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  clusterLine: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  clusterScatter: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-end', gap: 4, maxWidth: 220 },
+  clusterStack: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   clusterLabel: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
-  // Fallback dance dot (when no cluster passed).
-  dot: { width: 7, height: 14, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderBottomLeftRadius: 1, borderBottomRightRadius: 1 },
+  // Mood pip sits over a cluster (angry / confused / impressed / dancing).
+  moodPip: {
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  moodPipText: { fontSize: 9, fontWeight: '700', lineHeight: 12 },
   bubbleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
+  // Furniture as small "object" badges — tinted square + name, so decoration
+  // reads like things ON the floor rather than text below it.
   furnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
   furnChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
+    paddingVertical: 2,
     borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderWidth: 1,
     backgroundColor: colors.surface,
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 0 },
   },
+  furnIcon: { width: 6, height: 6, borderRadius: 2 },
+  furnText: { fontSize: 9, letterSpacing: 0.3 },
   crowdTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
   crowdTag: {
     paddingHorizontal: spacing.sm,
