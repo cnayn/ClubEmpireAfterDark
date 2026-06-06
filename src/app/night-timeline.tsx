@@ -73,17 +73,30 @@ function meterColor(value: number, mode: MeterMode): string {
 }
 
 /** Compact, single-row meter — small enough to stack four across the floor. */
+/** A short at-a-glance status word per meter, so the bar reads without math. */
+function meterStatus(value: number, mode: MeterMode): string {
+  if (mode === 'strain') return value >= 0.66 ? 'HIGH' : value >= 0.33 ? 'busy' : 'ok';
+  if (mode === 'good') return value >= 0.66 ? 'good' : value >= 0.33 ? 'ok' : 'LOW';
+  return `${Math.round(value * 100)}%`;
+}
+
 function MiniMeter({ label, value, mode }: { label: string; value: number; mode: MeterMode }) {
+  const col = meterColor(value, mode);
+  // A meter "shouts" when it's in a state the owner should act on.
+  const alert = (mode === 'strain' && value >= 0.66) || (mode === 'good' && value < 0.33);
   return (
     <View style={styles.mini}>
-      <View style={styles.miniTrack}>
-        <View
-          style={[styles.miniFill, { width: `${Math.round(value * 100)}%`, backgroundColor: meterColor(value, mode) }]}
-        />
+      <View style={styles.miniHead}>
+        <Text variant="label" muted style={styles.miniLabel} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text variant="label" color={col} style={[styles.miniStatus, alert && styles.miniStatusAlert]} numberOfLines={1}>
+          {meterStatus(value, mode)}
+        </Text>
       </View>
-      <Text variant="label" muted style={styles.miniLabel}>
-        {label}
-      </Text>
+      <View style={[styles.miniTrack, alert && { borderColor: col, borderWidth: 1 }]}>
+        <View style={[styles.miniFill, { width: `${Math.round(value * 100)}%`, backgroundColor: col }]} />
+      </View>
     </View>
   );
 }
@@ -131,12 +144,14 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   // The night runs itself: advance the clock while playing.
   useEffect(() => {
-    if (committed || !running) return;
+    // The clock holds while a command drawer is open, so opening a zone to make
+    // a call pauses the room — deliberate calls, not a race against the timer.
+    if (committed || !running || sheetZone) return;
     const id = setInterval(() => {
       setProgress((p) => Math.min(1, p + (NIGHT_TICK_MS * speed) / NIGHT_DURATION_MS));
     }, NIGHT_TICK_MS);
     return () => clearInterval(id);
-  }, [committed, running, speed]);
+  }, [committed, running, speed, sheetZone]);
 
   // Stop the clock at last call.
   useEffect(() => {
@@ -310,7 +325,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       style={[styles.speed, encounterBlocking && styles.speedDisabled]}
     >
       <Text variant="label" color={encounterBlocking ? colors.textMuted : colors.neonCyan}>
-        {clockLabel(progress)} · {speed}× {running ? '▶' : '❚❚'}
+        {clockLabel(progress)} · {speed}× {running && !sheetZone ? '▶' : '❚❚'}
       </Text>
     </Pressable>
   ) : (
@@ -569,10 +584,13 @@ const styles = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: radius.pill },
   meters: { flexDirection: 'row', gap: spacing.sm },
-  mini: { flex: 1, gap: 2 },
-  miniTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
-  miniFill: { height: 6, borderRadius: radius.pill },
-  miniLabel: { textAlign: 'center', fontSize: 11 },
+  mini: { flex: 1, gap: 3 },
+  miniHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  miniTrack: { height: 10, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  miniFill: { height: 10, borderRadius: radius.pill },
+  miniLabel: { fontSize: 11 },
+  miniStatus: { fontSize: 10, letterSpacing: 0.5 },
+  miniStatusAlert: { fontWeight: '700' },
   situation: {
     borderRadius: radius.md,
     borderWidth: 1,
