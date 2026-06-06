@@ -4,7 +4,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState } from '@/domain/types';
-import { BOARD_ZONES, boardFurniture, boardTokens, tokensInZone, zoneActions } from './board';
+import { BOARD_COLS, BOARD_ZONES, boardFurniture, boardTokens, FIRST_FLOOR_LAYOUT, tokensInZone, zoneActions, zonePlacement } from './board';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -84,5 +84,43 @@ describe('boardTokens / tokensInZone', () => {
 
   it('is deterministic for the same club', () => {
     expect(boardTokens(club())).toEqual(boardTokens(club()));
+  });
+});
+
+describe('FIRST_FLOOR_LAYOUT — starter floor plan', () => {
+  it('places every board zone exactly once, within the grid', () => {
+    const zonesInLayout = FIRST_FLOOR_LAYOUT.map((p) => p.zone).sort();
+    expect(zonesInLayout).toEqual(BOARD_ZONES.map((z) => z.id).sort());
+    for (const p of FIRST_FLOOR_LAYOUT) {
+      expect(p.col).toBeGreaterThanOrEqual(0);
+      expect(p.col + p.colSpan).toBeLessThanOrEqual(BOARD_COLS);
+      expect(p.colSpan).toBeGreaterThanOrEqual(1);
+      expect(p.row).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('the dance floor is the hero; the door spans the top; VIP is top-right', () => {
+    const floor = zonePlacement('floor')!;
+    expect(floor.hero).toBe(true);
+    expect(zonePlacement('door')!.row).toBe(0);
+    const vip = zonePlacement('vip')!;
+    expect(vip.row).toBe(0);
+    expect(vip.col + vip.colSpan).toBe(BOARD_COLS); // flush to the right edge
+    // bar sits on the right side, bathroom/staff along the bottom
+    expect(zonePlacement('bar')!.col).toBeGreaterThan(0);
+    expect(zonePlacement('bathroom')!.row).toBe(zonePlacement('staff')!.row);
+  });
+
+  it('no two zones overlap the same grid cell', () => {
+    const seen = new Set<string>();
+    for (const p of FIRST_FLOOR_LAYOUT) {
+      for (let r = p.row; r < p.row + (p.rowSpan ?? 1); r++) {
+        for (let c = p.col; c < p.col + p.colSpan; c++) {
+          const cell = `${r},${c}`;
+          expect(seen.has(cell)).toBe(false);
+          seen.add(cell);
+        }
+      }
+    }
   });
 });

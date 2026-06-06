@@ -113,3 +113,45 @@ export function boardTokens(club: ClubState): BoardToken[] {
 export function tokensInZone(club: ClubState, zone: BoardZone): BoardToken[] {
   return boardTokens(club).filter((t) => t.zone === zone);
 }
+
+// --- First-floor plan (spatial layout the board renders from) ----------------
+
+/** Where a zone sits on the floor-plan grid. Pure layout data — the renderer maps
+ *  these cells to views; nothing here touches the sim or save. */
+export interface ZonePlacement {
+  zone: BoardZone;
+  /** 0 = back/top row. */
+  row: number;
+  /** 0 = left column. */
+  col: number;
+  /** How many of BOARD_COLS columns this zone spans. */
+  colSpan: number;
+  /** How many rows this zone spans (default 1). */
+  rowSpan?: number;
+  /** The dominant zone (the dance floor) — rendered largest. */
+  hero?: boolean;
+}
+
+/** The starter floor is laid out on a 4-column grid. */
+export const BOARD_COLS = 4;
+
+/**
+ * The STARTER FIRST FLOOR plan: door across the top with a locked VIP in the
+ * top-right corner, the dance floor as the central hero, the bar down the right
+ * side with the DJ booth above it, and bathroom + staff along the bottom. Future
+ * floors (unlocked as the club grows) can define their own plans; this is floor 1.
+ */
+export const FIRST_FLOOR_LAYOUT: ZonePlacement[] = [
+  { zone: 'door', row: 0, col: 0, colSpan: 3 },
+  { zone: 'vip', row: 0, col: 3, colSpan: 1 },
+  { zone: 'floor', row: 1, col: 0, colSpan: 3, rowSpan: 2, hero: true },
+  { zone: 'dj', row: 1, col: 3, colSpan: 1 },
+  { zone: 'bar', row: 2, col: 3, colSpan: 1 },
+  { zone: 'bathroom', row: 3, col: 0, colSpan: 2 },
+  { zone: 'staff', row: 3, col: 2, colSpan: 2 },
+];
+
+/** The placement for a zone on the current (first) floor, if any. */
+export function zonePlacement(zone: BoardZone): ZonePlacement | undefined {
+  return FIRST_FLOOR_LAYOUT.find((p) => p.zone === zone);
+}
