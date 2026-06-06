@@ -36,6 +36,20 @@ Three rules follow:
 3. **Multiple lanes, one room.** Different upgrade paths produce
    visibly different rooms (per UIUX Section 12).
 
+### Pacing principle (the night must breathe)
+
+Progression also has to *feel right inside a night.* Per UIUX
+**Section 15** (Night Pacing Philosophy):
+
+- The night is **a living club**, not a fast click-loop.
+- Observation is gameplay; boss actions are deliberate decisions.
+- Encounters present without freezing the floor.
+- "Ride it out" is a valid option — doing nothing is sometimes right.
+
+Every upgrade and every slice below must respect that the player needs
+*time to look at the room.* If a slice makes the night more
+demanding-of-clicks than rewarding-of-watching, it is mis-scoped.
+
 ---
 
 ## 2. Floor 1 Starter Club
@@ -508,6 +522,9 @@ one to land.
   packed** based on existing sim signals (fill / vibe).
 - **Acceptance:** the player can tell the difference between a quiet
   night and a packed night by looking at the floor for one second.
+- **Pacing acceptance:** the player can watch the density *change*
+  over the night without being asked to click. The floor "breathes"
+  on its own.
 
 ### Slice F — Identity tint on the floor (Choose Your Lane payoff)
 
