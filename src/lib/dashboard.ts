@@ -159,39 +159,57 @@ const clampInt = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi
 
 /**
  * Derive READABLE guest clusters per zone from existing pressures + state. Pure
- * presentation — no per-guest sim. A cluster only appears once its zone's
- * pressure crosses a small threshold, so a calm room reads calm.
+ * presentation — no per-guest sim. A cluster appears as soon as its zone is
+ * meaningfully under pressure, so the room SHOUTS visually before the player
+ * has to read meters or text. Counts scale aggressively so high pressure is
+ * unmistakable; mood thresholds escalate earlier so angry/tired faces show up
+ * before the night is already lost.
+ *
+ * v2 thresholds (Living Night Readability) — tighter than the original Floor
+ * Identity Pass, so pressure becomes visually obvious sooner:
+ *  - Bar queue from 0.3 (was 0.4); angry at 0.55 (was 0.7); count 2..9 (was 2..7)
+ *  - Door line from 0.25 (was 0.3); confused at 0.35, angry at 0.55 (was 0.45 / 0.7); count 2..9
+ *  - Bath queue from 0.45 (was 0.55); angry at 0.7 (was 0.8)
+ *  - Floor mood drops to tired earlier (energy < 0.5 vs 0.4) so a cooling room reads cold sooner
  */
 export function floorClusters(club: ClubState, pressures: FloorPressureRead): GuestCluster[] {
   const clusters: GuestCluster[] = [];
 
   // --- Door line — grows with door strain, peaks at a packed room. -----------
-  if (pressures.door >= 0.3 || pressures.crowd >= 0.7) {
-    const count = clampInt(2 + pressures.door * 4 + pressures.crowd * 2, 2, 7);
-    const mood: GuestMood = pressures.door >= 0.7 ? 'angry' : pressures.door >= 0.45 ? 'confused' : 'waiting';
+  // Shows as soon as the door is even mildly tense (0.25) or a packed room is
+  // forming. Angry crosses earlier so the tension reads BEFORE the incident.
+  if (pressures.door >= 0.25 || pressures.crowd >= 0.65) {
+    const count = clampInt(2 + pressures.door * 6 + pressures.crowd * 3, 2, 9);
+    const mood: GuestMood =
+      pressures.door >= 0.55 ? 'angry' : pressures.door >= 0.35 ? 'confused' : 'waiting';
     clusters.push({ zone: 'door', count, mood, label: 'line' });
   }
 
   // --- Bar queue — grows with bar strain. ------------------------------------
-  if (pressures.bar >= 0.4) {
-    const count = clampInt(2 + pressures.bar * 5, 2, 7);
-    const mood: GuestMood = pressures.bar >= 0.7 ? 'angry' : 'waiting';
+  // Surfaces at 0.3 (the bar is already wobbling at this point) and counts
+  // climb steeply so a strained bar VISIBLY chokes; angry mood at 0.55 reads
+  // before service has fully cracked.
+  if (pressures.bar >= 0.3) {
+    const count = clampInt(2 + pressures.bar * 8, 2, 9);
+    const mood: GuestMood = pressures.bar >= 0.55 ? 'angry' : 'waiting';
     clusters.push({ zone: 'bar', count, mood, label: 'queue' });
   }
 
   // --- Floor / dance — the hero (always shows when there is a room). ---------
+  // Mood drops to tired earlier so a cooling room reads cold before the player
+  // has to read the Energy meter. Dancing stays at the same threshold so the
+  // good-night feel isn't suppressed.
   if (pressures.crowd >= 0.05) {
-    // The dance count scales with crowd; mood reads off ENERGY (good = dancing).
     const count = clampInt(4 + pressures.crowd * 10, 3, 14);
     const mood: GuestMood =
-      pressures.energy >= 0.65 ? 'dancing' : pressures.energy < 0.4 ? 'tired' : 'happy';
+      pressures.energy >= 0.65 ? 'dancing' : pressures.energy < 0.5 ? 'tired' : 'happy';
     clusters.push({ zone: 'floor', count, mood, label: mood === 'dancing' ? 'dancing' : 'on the floor' });
   }
 
-  // --- Bathroom queue — only when overrun (the warning, not the constant). ---
-  if (pressures.bathroom >= 0.55) {
-    const count = clampInt(1 + pressures.bathroom * 4, 2, 5);
-    const mood: GuestMood = pressures.bathroom >= 0.8 ? 'angry' : 'tired';
+  // --- Bathroom queue — surfaces sooner (the queue is invisible when buried). -
+  if (pressures.bathroom >= 0.45) {
+    const count = clampInt(1 + pressures.bathroom * 5, 2, 6);
+    const mood: GuestMood = pressures.bathroom >= 0.7 ? 'angry' : 'tired';
     clusters.push({ zone: 'bath', count, mood, label: 'queue' });
   }
 

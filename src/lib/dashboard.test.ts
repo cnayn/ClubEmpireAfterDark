@@ -171,6 +171,61 @@ describe('floorClusters — readable guest clusters per zone', () => {
     const cs = floorClusters(c, { ...quiet, crowd: 0.5 });
     expect(cs.some((x) => x.zone === 'regulars')).toBe(true);
   });
+
+  // --- v2 thresholds (Living Night Readability) ----------------------------
+  // The room must SHOUT visually as soon as a zone starts to wobble, not after
+  // the night has already cracked. These assertions lock the earlier triggers
+  // and steeper count scaling so future tuning can't quietly walk them back.
+
+  it('bar queue appears at 0.3 (was 0.4), so a wobbling bar reads immediately', () => {
+    const justWobbling = floorClusters(club(), { ...quiet, bar: 0.3 }).find((c) => c.zone === 'bar');
+    expect(justWobbling).toBeDefined();
+    expect(justWobbling!.mood).toBe('waiting');
+  });
+
+  it('bar angry crosses at 0.55, before service has fully cracked', () => {
+    const wobblingHard = floorClusters(club(), { ...quiet, bar: 0.55 }).find((c) => c.zone === 'bar');
+    expect(wobblingHard?.mood).toBe('angry');
+  });
+
+  it('bar count climbs more aggressively under pressure (visible chokes faster)', () => {
+    const mid = floorClusters(club(), { ...quiet, bar: 0.5 }).find((c) => c.zone === 'bar')!;
+    const high = floorClusters(club(), { ...quiet, bar: 0.9 }).find((c) => c.zone === 'bar')!;
+    expect(high.count).toBeGreaterThan(mid.count);
+    expect(high.count).toBeGreaterThanOrEqual(8); // steep enough to read PACKED at a glance
+  });
+
+  it('door line appears at 0.25, well before incidents', () => {
+    const justTense = floorClusters(club(), { ...quiet, door: 0.25 }).find((c) => c.zone === 'door');
+    expect(justTense).toBeDefined();
+  });
+
+  it('door mood escalates waiting → confused → angry in sharper steps', () => {
+    const mild = floorClusters(club(), { ...quiet, door: 0.3 }).find((c) => c.zone === 'door');
+    const tense = floorClusters(club(), { ...quiet, door: 0.4 }).find((c) => c.zone === 'door');
+    const ugly = floorClusters(club(), { ...quiet, door: 0.6 }).find((c) => c.zone === 'door');
+    expect(mild?.mood).toBe('waiting');
+    expect(tense?.mood).toBe('confused');
+    expect(ugly?.mood).toBe('angry');
+  });
+
+  it('bathroom queue surfaces at 0.45 (was 0.55), so the line stops being invisible', () => {
+    const justBacking = floorClusters(club(), { ...quiet, bathroom: 0.45 }).find((c) => c.zone === 'bath');
+    expect(justBacking).toBeDefined();
+    expect(justBacking!.mood).toBe('tired');
+  });
+
+  it('bathroom angry crosses at 0.7 (was 0.8)', () => {
+    const overrun = floorClusters(club(), { ...quiet, bathroom: 0.7 }).find((c) => c.zone === 'bath');
+    expect(overrun?.mood).toBe('angry');
+  });
+
+  it('low floor energy reads as tired sooner (mid-energy room cools earlier)', () => {
+    // At energy 0.45 the room USED to read happy; now it reads tired so a
+    // cooling night is visible before the Energy meter has fully drained.
+    const cooling = floorClusters(club(), { ...quiet, crowd: 0.5, energy: 0.45 }).find((c) => c.zone === 'floor');
+    expect(cooling?.mood).toBe('tired');
+  });
 });
 
 describe('nextGoal — one primary goal by precedence', () => {
