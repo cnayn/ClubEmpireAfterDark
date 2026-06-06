@@ -5,7 +5,7 @@
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, NightResult } from '@/domain/types';
 import type { NightPressures } from '@/lib/nightPressure';
-import { bossLifts, guestHappiness, staffMorale } from './roomMood';
+import { bossLifts, bossRelief, guestHappiness, staffMorale } from './roomMood';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -60,6 +60,34 @@ describe('staffMorale', () => {
   it('a boss-support lift visibly raises morale', () => {
     const base = staffMorale(result(), club(), P());
     expect(staffMorale(result(), club(), P(), 0.15)).toBeGreaterThan(base);
+  });
+});
+
+describe('bossRelief — the floor reacts to commands (presentation only)', () => {
+  it('no actions = no relief', () => {
+    expect(bossRelief([])).toEqual({ bar: 0, door: 0, bathroom: 0, energy: 0 });
+  });
+
+  it('each command relieves its own zone', () => {
+    expect(bossRelief(['check-bar']).bar).toBeGreaterThan(0);
+    expect(bossRelief(['check-bar']).door).toBe(0);
+    expect(bossRelief(['send-bouncer']).door).toBeGreaterThan(0);
+    expect(bossRelief(['push-dj']).energy).toBeGreaterThan(0);
+    expect(bossRelief(['work-room']).energy).toBeGreaterThan(0);
+  });
+
+  it('nothing relieves the bathroom (no action targets it yet)', () => {
+    expect(bossRelief(['check-bar', 'send-bouncer', 'push-dj', 'work-room']).bathroom).toBe(0);
+  });
+
+  it('repeats diminish and stay clamped 0..1', () => {
+    const one = bossRelief(['check-bar']).bar;
+    const two = bossRelief(['check-bar', 'check-bar']).bar;
+    expect(two).toBeGreaterThan(one);
+    expect(two).toBeLessThan(one * 2);
+    const spam = bossRelief(Array.from({ length: 20 }, () => 'check-bar' as const));
+    expect(spam.bar).toBeGreaterThanOrEqual(0);
+    expect(spam.bar).toBeLessThanOrEqual(1);
   });
 });
 

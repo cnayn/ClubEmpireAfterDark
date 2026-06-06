@@ -93,3 +93,30 @@ export function bossLifts(actions: BossActionId[] = []): { happy: number; morale
 
   return { happy: clamp01(happy), morale: clamp01(morale) };
 }
+
+/**
+ * Boss-command RELIEF to the live zone pressures, so the floor visibly reacts
+ * after a call: Check Bar cools the bar queue, Send Bouncer cools the door,
+ * Push DJ warms the floor (energy up), Work the Room lifts energy a touch. Same
+ * diminishing-per-repeat as bossLifts. Returns positive magnitudes the caller
+ * SUBTRACTS from strain (bar/door) and ADDS to energy — presentation only, no
+ * resolver/economy change; the night's books still come from the resolver.
+ */
+export function bossRelief(actions: BossActionId[] = []): { bar: number; door: number; bathroom: number; energy: number } {
+  const REPEAT = [1, 0.5, 0.25, 0.1];
+  const factor = (n: number) => REPEAT[Math.min(Math.max(0, n - 1), REPEAT.length - 1)];
+  const counts: Partial<Record<BossActionId, number>> = {};
+  for (const a of actions) counts[a] = (counts[a] ?? 0) + 1;
+  const sum = (id: BossActionId, perCall: number): number => {
+    const n = counts[id] ?? 0;
+    let total = 0;
+    for (let i = 1; i <= n; i++) total += perCall * factor(i);
+    return total;
+  };
+  return {
+    bar: clamp01(sum('check-bar', 0.28)),
+    door: clamp01(sum('send-bouncer', 0.28)),
+    bathroom: 0,
+    energy: clamp01(sum('push-dj', 0.22) + sum('work-room', 0.12)),
+  };
+}

@@ -26,7 +26,7 @@ import {
   NIGHT_FOCUS,
   resolveBossAction,
 } from '@/lib/bossActions';
-import { bossLifts, guestHappiness, staffMorale } from '@/lib/roomMood';
+import { bossLifts, bossRelief, guestHappiness, staffMorale } from '@/lib/roomMood';
 import { type BoardZone, getBoardZone, zoneActions } from '@/lib/board';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
@@ -173,7 +173,17 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   // instead of the owner racing a timer. Each zone pauses once per night.
   useEffect(() => {
     if (!preview || committed || !running || sheetZone) return;
-    const p = livePressures(preview, planClub, progress);
+    // Use relieved pressures so acting on a situation actually resolves it (the
+    // meter drops below threshold once the owner makes the call).
+    const raw = livePressures(preview, planClub, progress);
+    const r = bossRelief(chosen);
+    const p: NightPressures = {
+      crowd: raw.crowd,
+      bar: Math.max(0, raw.bar - r.bar),
+      door: Math.max(0, raw.door - r.door),
+      bathroom: Math.max(0, raw.bathroom - r.bathroom),
+      energy: Math.min(1, raw.energy + r.energy),
+    };
     const lift = bossLifts(chosen);
     const checks: Array<[string, boolean, string]> = [
       ['bar', p.bar >= 0.7, 'The bar is overloaded — drinks are backing up.'],
@@ -201,7 +211,19 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const shownResult = committed ?? preview;
   const liveProgress = committed ? 1 : progress;
-  const pressures: NightPressures = livePressures(preview, planClub, liveProgress);
+  // The floor REACTS to the owner's calls: each command relieves its zone's live
+  // pressure (Check Bar cools the bar, Send Bouncer cools the door, Push DJ /
+  // Work Room warm the floor). Presentation only — the books still come from the
+  // resolver; this just makes the room visibly respond after an action.
+  const rawPressures = livePressures(preview, planClub, liveProgress);
+  const relief = committed ? { bar: 0, door: 0, bathroom: 0, energy: 0 } : bossRelief(chosen);
+  const pressures: NightPressures = {
+    crowd: rawPressures.crowd,
+    bar: Math.max(0, rawPressures.bar - relief.bar),
+    door: Math.max(0, rawPressures.door - relief.door),
+    bathroom: Math.max(0, rawPressures.bathroom - relief.bathroom),
+    energy: Math.min(1, rawPressures.energy + relief.energy),
+  };
   const headline = pressureHeadline(pressures);
   const atEnd = committed != null || progress >= 1;
   const encounterDue = !!encounter && !committed && encTrigger != null && progress >= encTrigger;
