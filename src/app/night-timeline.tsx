@@ -141,6 +141,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
   // Which board zone's command sheet is open (tap a zone to command it).
   const [sheetZone, setSheetZone] = useState<BoardZone | null>(null);
+  // Zones that have already auto-paused the night this run (so each serious
+  // situation stops the clock ONCE — a prompt to read the room, not a nag loop).
+  const [alerted, setAlerted] = useState<Set<string>>(() => new Set());
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   // The night runs itself: advance the clock while playing.
   useEffect(() => {
@@ -163,6 +167,32 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     if (committed || encTrigger == null || encChoice) return;
     if (progress >= encTrigger && running) setRunning(false);
   }, [progress, committed, encTrigger, encChoice, running]);
+
+  // Auto-pause the night the FIRST time a meter goes serious, and name the
+  // problem — the room calls the owner to read it and make a deliberate call,
+  // instead of the owner racing a timer. Each zone pauses once per night.
+  useEffect(() => {
+    if (!preview || committed || !running || sheetZone) return;
+    const p = livePressures(preview, planClub, progress);
+    const lift = bossLifts(chosen);
+    const checks: Array<[string, boolean, string]> = [
+      ['bar', p.bar >= 0.7, 'The bar is overloaded — drinks are backing up.'],
+      ['door', p.door >= 0.7, 'The door is getting tense.'],
+      ['bath', p.bathroom >= 0.7, 'The bathroom line is backing up.'],
+      ['energy', p.energy <= 0.3, 'The dance floor is cooling off.'],
+      ['guests', guestHappiness(preview, planClub, p, lift.happy) <= 0.3, 'Guests are getting unhappy.'],
+      ['crew', staffMorale(preview, planClub, p, lift.morale) <= 0.3, 'The crew is getting strained.'],
+    ];
+    for (const [key, bad, msg] of checks) {
+      if (bad && !alerted.has(key)) {
+        setAlerted((s) => new Set(s).add(key));
+        setAlertMsg(msg);
+        setRunning(false);
+        break;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress, running, committed, sheetZone]);
 
   if (!preview) {
     router.replace('/dashboard');
@@ -312,14 +342,23 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     router.replace('/results');
   };
 
+  // Pause/resume; resuming clears any standing situation banner.
+  const togglePause = () => {
+    if (encounterBlocking) return;
+    setRunning((r) => {
+      if (!r) setAlertMsg(null);
+      return !r;
+    });
+  };
+
   const headerRight = !committed ? (
     <Pressable
       onPress={() => {
         if (encounterBlocking) return;
         if (running) setSpeed((s) => (s === 1 ? 2 : 1));
-        else setRunning(true);
+        else togglePause();
       }}
-      onLongPress={() => !encounterBlocking && setRunning((r) => !r)}
+      onLongPress={togglePause}
       accessibilityRole="button"
       accessibilityLabel={running ? `${speed}× — long press to pause` : 'Resume'}
       style={[styles.speed, encounterBlocking && styles.speedDisabled]}
@@ -340,6 +379,20 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const belowRoom = (
     <>
+      {/* The room stopped you: a serious situation auto-paused the night. Read it,
+          make a call (tap a zone / use the dock), then resume. */}
+      {!committed && !running && !sheetZone && alertMsg && !encounterDue ? (
+        <View style={styles.alertBanner}>
+          <Text variant="label" color={colors.warning} style={styles.situationTag}>
+            ⚠ SITUATION · NIGHT PAUSED
+          </Text>
+          <Text variant="body">{alertMsg}</Text>
+          <Text variant="label" muted>
+            Read the room and make a call, or resume the night.
+          </Text>
+        </View>
+      ) : null}
+
       {/* Tap-a-zone command sheet (door / bar / floor / dj / bathroom / staff). */}
       {renderZoneSheet()}
 
@@ -601,6 +654,14 @@ const styles = StyleSheet.create({
   },
   situationHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   situationTag: { letterSpacing: 1 },
+  alertBanner: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: {
     flexGrow: 1,
