@@ -162,6 +162,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   // situation stops the clock ONCE — a prompt to read the room, not a nag loop).
   const [alerted, setAlerted] = useState<Set<string>>(() => new Set());
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  // The zone of the active situation, and the situations the owner chose to ride
+  // out (ignoring a serious problem worsens that zone + costs a little at close).
+  const [alertKey, setAlertKey] = useState<string | null>(null);
+  const [ignored, setIgnored] = useState<string[]>([]);
 
   // The night runs itself: advance the clock while playing.
   useEffect(() => {
@@ -214,6 +218,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       if (bad && !alerted.has(key)) {
         setAlerted((s) => new Set(s).add(key));
         setAlertMsg(msg);
+        setAlertKey(key);
         setRunning(false);
         break;
       }
@@ -234,12 +239,23 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   // resolver; this just makes the room visibly respond after an action.
   const rawPressures = livePressures(preview, planClub, liveProgress);
   const relief = committed ? { bar: 0, door: 0, bathroom: 0, energy: 0 } : bossRelief(chosen);
+  // Riding out a serious situation has a visible cost: that zone keeps slipping
+  // (strain creeps up / energy keeps dropping) for the rest of the night.
+  const worsen = { bar: 0, door: 0, bathroom: 0, energy: 0 };
+  if (!committed) {
+    for (const k of ignored) {
+      if (k === 'bar') worsen.bar += 0.12;
+      else if (k === 'door') worsen.door += 0.12;
+      else if (k === 'bath') worsen.bathroom += 0.12;
+      else worsen.energy -= 0.1; // energy / guests / crew
+    }
+  }
   const pressures: NightPressures = {
     crowd: rawPressures.crowd,
-    bar: Math.max(0, rawPressures.bar - relief.bar),
-    door: Math.max(0, rawPressures.door - relief.door),
-    bathroom: Math.max(0, rawPressures.bathroom - relief.bathroom),
-    energy: Math.min(1, rawPressures.energy + relief.energy),
+    bar: Math.max(0, Math.min(1, rawPressures.bar - relief.bar + worsen.bar)),
+    door: Math.max(0, Math.min(1, rawPressures.door - relief.door + worsen.door)),
+    bathroom: Math.max(0, Math.min(1, rawPressures.bathroom - relief.bathroom + worsen.bathroom)),
+    energy: Math.max(0, Math.min(1, rawPressures.energy + relief.energy + worsen.energy)),
   };
   const headline = pressureHeadline(pressures);
   const atEnd = committed != null || progress >= 1;
@@ -279,9 +295,13 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const commit = () => {
     if (committed) return committed;
+    // Each serious situation ridden out costs a little reputation at the books —
+    // a real consequence for ignoring the room, bounded by combineInterventions.
+    const ignoreVibe = -3 * ignored.length;
     const combined = combineInterventions([
       bossIntervention(chosen, preview, planClub),
       ...(encChoice ? [encChoice.intervention] : []),
+      ...(ignoreVibe < 0 ? [{ vibeBonus: ignoreVibe, revenueMod: 1 }] : []),
     ]);
     const r = runNight(plan, combined, chosen);
     if (r) setCommitted(r);
@@ -390,6 +410,27 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     });
   };
 
+  // Ride out the current situation: a real owner call with a visible cost — that
+  // zone keeps slipping and it dings reputation at close. (Minor states never
+  // pause, so you only ever ride out something that's genuinely serious.)
+  const RIDE_TEXT: Record<string, string> = {
+    bar: 'You let the bar ride — the queue kept backing up.',
+    door: 'You let the door ride — the line stayed tense.',
+    bath: 'You let the bathroom ride — the line kept growing.',
+    energy: 'You let it ride — the floor kept cooling.',
+    guests: 'You let it ride — the room stayed unhappy.',
+    crew: 'You let it ride — the crew stayed strained.',
+  };
+  const rideOut = () => {
+    if (alertKey) {
+      const k = alertKey;
+      setIgnored((i) => [...i, k]);
+      setBossStream((r) => [...r, { id: `ride-${k}-${ignored.length}`, text: RIDE_TEXT[k] ?? 'You let it ride.', tone: 'warn' }]);
+    }
+    setAlertKey(null);
+    togglePause();
+  };
+
   const headerRight = !committed ? (
     <Pressable
       onPress={() => {
@@ -425,12 +466,12 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           <Text variant="label" color={colors.warning} style={styles.situationTag}>
             ⚠ SITUATION · NIGHT PAUSED
           </Text>
-          <Text variant="body">{alertMsg}</Text>
-          <Text variant="label" muted>
-            Your call: tap the zone to act, or ride it out — not every problem needs the boss.
+          <Text variant="body" style={styles.bannerBody}>{alertMsg}</Text>
+          <Text variant="label" muted style={styles.bannerHint}>
+            Your call: tap the zone to fix it — or ride it out and let it slip (it'll cost you).
           </Text>
-          <Pressable onPress={togglePause} accessibilityRole="button" style={styles.rideItOut}>
-            <Text variant="label" color={colors.neonCyan}>
+          <Pressable onPress={rideOut} accessibilityRole="button" style={styles.rideItOut}>
+            <Text variant="label" color={colors.warning} style={styles.bannerHint}>
               Ride it out ▸
             </Text>
           </Pressable>
@@ -707,6 +748,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   rideItOut: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginTop: spacing.xs },
+  // Slightly larger live-night text for readability until phone testing works.
+  bannerBody: { fontSize: 16, lineHeight: 22 },
+  bannerHint: { fontSize: 14, lineHeight: 19 },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: {
     flexGrow: 1,
@@ -723,5 +767,5 @@ const styles = StyleSheet.create({
   stream: { gap: 4, paddingHorizontal: spacing.xs },
   streamRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   streamDot: { width: 6, height: 6, borderRadius: radius.pill, marginTop: 6 },
-  streamText: { flex: 1, lineHeight: 18 },
+  streamText: { flex: 1, fontSize: 13, lineHeight: 19 },
 });

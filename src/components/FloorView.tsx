@@ -261,7 +261,12 @@ function GuestSilhouette({
   color?: string;
 }) {
   const c = color ?? MOOD_COLOR[mood];
-  const h = bodyHeight(mood);
+  // Slight deterministic per-person variation (height + a tiny lean) so a cluster
+  // reads as a crowd of different people, not identical bars. Pure: keyed off the
+  // cluster offset, no RNG.
+  const vary = (offset * 37) % 5; // 0..4
+  const h = bodyHeight(mood) + (vary - 2); // ±2px torso height
+  const lean = ((offset * 53) % 3) - 1; // -1 / 0 / +1 deg
   const op = moodOpacity(mood);
 
   // Pick the transform style for this silhouette based on motion. Each motion
@@ -284,11 +289,15 @@ function GuestSilhouette({
   }
 
   return (
-    <Animated.View style={[styles.silhouette, { opacity, transform: [{ translateX }, { translateY }] }]}>
+    <Animated.View style={[styles.silhouette, { opacity, transform: [{ translateX }, { translateY }, { rotate: `${lean}deg` }] }]}>
       <View style={[styles.silhouetteHead, { backgroundColor: c, shadowColor: c }]} />
-      {/* Shoulders bar + torso + two splayed legs read as a little figure, not a
-          pencil. Cheap shapes only — no sprites/art. */}
-      <View style={[styles.shoulders, { backgroundColor: c }]} />
+      {/* Head + shoulders + two arms + torso + two splayed legs read as a little
+          person, not a pencil. Cheap shapes only — no sprites/art, no AI. */}
+      <View style={styles.shouldersRow} pointerEvents="none">
+        <View style={[styles.arm, styles.armLeft, { backgroundColor: c }]} />
+        <View style={[styles.shoulders, { backgroundColor: c }]} />
+        <View style={[styles.arm, styles.armRight, { backgroundColor: c }]} />
+      </View>
       <View style={[styles.body, { height: h, backgroundColor: c, shadowColor: c }]} />
       <View style={styles.legs} pointerEvents="none">
         <View style={[styles.leg, styles.legLeft, { backgroundColor: c }]} />
@@ -1264,8 +1273,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     marginBottom: 1,
   },
-  // Shoulders bar — a touch wider than the torso so the figure reads human.
-  shoulders: { width: 7, height: 1.5, borderRadius: 1, marginBottom: -0.5 },
+  // Shoulders bar + two short arms so the figure reads human, not a bar.
+  shouldersRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
+  shoulders: { width: 6, height: 1.5, borderRadius: 1, marginBottom: -0.5 },
+  arm: { width: 1.5, height: 4, borderRadius: 1 },
+  armLeft: { transform: [{ rotate: '28deg' }], marginRight: -0.5 },
+  armRight: { transform: [{ rotate: '-28deg' }], marginLeft: -0.5 },
   body: {
     width: 5,
     borderTopLeftRadius: 2.5,
