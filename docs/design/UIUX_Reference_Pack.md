@@ -702,6 +702,38 @@ The debrief is the room *remembering*. The night is the room *doing*.
   sense, the visuals are right. If it can't, the visuals are
   underbuilt — add more visual signal, do not add more text.
 
+### Rule 5 — Every major pressure state must have a paired guest or staff reaction
+
+A glowing tile alone is not enough. The room must *react*:
+
+- **Bar pressure** without Rosa leaning forward / a drink bubble / a
+  guest cluster looking elsewhere = the player feels nothing.
+- **Door pressure** without John's posture tightening / the line
+  cluster moving / a warning ring = the door is invisible.
+- **Dance floor cooling** without thinned cluster / dimmed booth /
+  bored cluster = the room is just darker, not *sadder*.
+
+Pressure is a state of the **room**, not a state of a meter. If a
+pressure state can fire without a paired character reaction, the rule
+is broken — add the reaction, do not add a number.
+
+### Rule 6 — Boss actions are owner decisions, not score buttons
+
+The action tray is **deliberate choice**, not a meter the player has
+to fill. Per Section 15:
+
+- Each boss action has a visible **consequence on the floor** within
+  one beat.
+- Each boss action has a **cooldown** so the player can't spam it.
+- "**Ride it out**" — the choice to not press anything — is always
+  valid and sometimes correct.
+- The night must not punish thinking. The screen should never make
+  the player feel they are "behind" on a click.
+
+If a boss action ever feels like a *score button* (press it because
+it's available, not because the room needs it), the design has
+failed.
+
 ---
 
 ## 17. Live Communication Language (staff, guests, story inside the night)
