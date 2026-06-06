@@ -21,6 +21,57 @@
 
 ---
 
+## Phone unlock gate (FUTURE / DO NOT BUILD YET — pacing rule)
+
+> The phone surface — and the story content it carries — should
+> **not** start firing the moment the player opens the app for the
+> first time.
+>
+> A new player needs room to **find the place, set it up, and open
+> the first night** before crew, suppliers, regulars, or story
+> contacts begin texting them. Phone overload during onboarding kills
+> the magnetic floor pull the rest of this canon is built around.
+
+### Unlock condition (when phone activates)
+
+The phone surface activates **after at least one** of these is true:
+
+- The player has completed first prep AND opened the doors at least
+  once.
+- The player has cleared their first successful night (net-positive,
+  per Goal 6 "First Real Earnings" in
+  [`level-and-floor-progression.md`](level-and-floor-progression.md)).
+
+Until that gate is crossed, phone content from this bank does not
+fire. The first night belongs to the floor.
+
+### Ordering after unlock (gentle ramp)
+
+When the phone unlocks, beats land in a soft order — not all at once:
+
+1. **First crew text** (Caramel: "Door's Already A Line" or similar)
+   — opens the channel.
+2. **First supplier offer** — only after one or two real nights of
+   activity.
+3. **First rumor / inspection** — only after a relevant signal
+   (smoking relaxed, last 3 nights had issues, etc.) — never on
+   night two for no reason.
+4. **Booking inquiries** — only after reputation tier ≥ Local Spot.
+
+### Authoring implication
+
+Beats in this bank that already carry tier/reputation triggers
+(e.g., influencer booking ≥ Rising Name, promoter partnership ≥
+Rising Name) are *already* compatible with this gate. Beats with
+"Off-night inbox poll. NEEDS SIGNAL." must respect the unlock gate
+as a precondition when the framework lands.
+
+> **Implementation status:** FUTURE / DO NOT BUILD YET. Today the
+> phone surface isn't built; when it is scoped, this gate is the
+> first rule it ships with.
+
+---
+
 ## 6. Crew Text Message
 
 ### Caramel – "Door's Already A Line"
