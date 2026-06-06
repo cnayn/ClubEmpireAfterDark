@@ -46,10 +46,26 @@ not only at prep time.
 Today, policies are set in prep. The night runs them deterministically.
 A future *policy switch* layer would let the player react to:
 
-- A compliance rumor surfaces → tighten smoking on the spot.
+- A compliance rumor surfaces → **flip smoking from "allowed" to
+  "banned"** on the spot.
 - Door is bottlenecking → loosen ID checks briefly.
 - Vibe is screaming → cap volume to dodge a noise complaint.
 - VIP pressure → flip to strict door for two intervals.
+- Bar is reading slow → **flip drink strategy from "premium" to
+  "cheap"** mid-night to pull crowd back to the rail (or vice versa
+  if a VIP party walks in). See System 3 (Slow-night deals) and
+  System 4 (Premium switching) — mid-night policy switching is the
+  *surface* both of those live on.
+
+### Concrete switchable policies (banked)
+
+- **Smoking** — allowed ↔ banned (relaxed ↔ strict).
+- **Door** — relaxed ↔ balanced ↔ strict.
+- **ID checks** — fast sweep ↔ rigorous.
+- **Music volume** — uncapped ↔ capped (compliance dodge).
+- **Drink strategy** — cheap promo ↔ standard ↔ premium (cross-ref
+  System 3 & 4).
+- **Dress code / vibe gate** (FUTURE, deeper) — open ↔ themed-only.
 
 ### Player surface (future)
 
@@ -250,16 +266,54 @@ layer:
   delivery, accept counter-offers, reject bad ones.
 - Friction surfaces in Prep mode (per System 2 above).
 
+### Pre-night bottle ordering (the core decision)
+
+Between nights, the owner places an order: **what stock arrives
+before the next open?** This is where the supplier-risk axis lives
+— *who* you order from defines *what* shows up.
+
+- The order screen shows: bottles needed (based on event +
+  prep choices), unit prices per supplier, reliability ratings.
+- The player picks **who fills each line**.
+- Order placed → delivery arrives in next pre-open window with the
+  consequences from System 2 ("bar stock delivery problems").
+
+### Sketchy vs reliable supplier axis (the central tradeoff)
+
+The supplier roster lives on a deliberate **risk/reward axis**:
+
+| Pole | Tradeoff |
+| --- | --- |
+| **Sketchy supplier** | **Cheaper** unit prices, but **risk of late, missing, fake, or wrong** drinks arriving on the night. |
+| **Reliable supplier** | **More expensive**, but consistent — what you ordered shows up, on time, correct. |
+
+Most suppliers sit somewhere on this axis. The player's choice is
+deliberate: chase margin (risk surprises during the night) or chase
+stability (pay more for a quiet pre-open).
+
 ### Roster archetypes (banked, do NOT name in-product)
 
-- **The Reliable** — slightly expensive, never late, dependable. (The
-  Kerem-coded pick.)
-- **The Hustler** — cheap, occasional issues (late, wrong, short).
+- **The Reliable** — expensive, never late, dependable. The
+  "premium-but-boring" pick. (Kerem-coded.)
+- **The Sketchy Hustler** — cheap unit price, but recurring risk:
+  late delivery, short pallet, swapped brand, fake/wrong bottles on
+  arrival. Player has to babysit. (Pole opposite of The Reliable.)
 - **The Specialist** — premium-only, slow turnaround, prestige.
-- **The Closeout King** — close-dated stock at deep discount, waste
-  risk if not moved.
+  Sits on the reliable side but only for narrow ranges.
+- **The Closeout King** — close-dated stock at deep discount; waste
+  risk if not moved before expiry. Sketchy-adjacent.
 - **The Promoter** — "guest list partnership" framing; not really a
   supplier, but enters via the same surface.
+
+### How the axis shows up in play
+
+- **Margin player** chooses Sketchy more often → more cash, but
+  occasional "we're out of gin at 11 PM" surprises (System 2 triggers).
+- **Stability player** chooses Reliable more often → less cash, but
+  the bar always runs (System 2 rarely triggers).
+- **Identity drift** consequences (System 4 cross-ref): a club leaning
+  into Sketchy supply long-term reads "underground" / "rough"; a club
+  leaning into Reliable reads "premium" / "locals."
 
 ### Relationship drift (banked, FUTURE)
 
