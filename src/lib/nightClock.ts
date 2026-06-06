@@ -9,12 +9,14 @@
  */
 
 /**
- * A full night plays out in ~60s of real time at 1× (×0.5 at 2×). Deliberately
+ * A full night plays out in ~80s of real time at 1× (×0.5 at 2×) — and that's
+ * only the moving time: situations auto-pause the clock, so a real night is
+ * longer. Deliberately
  * unhurried: the owner should WATCH the room and read pressure before making a
  * call — the night is a playthrough, not a click-race. (Players who want it
  * faster can tap 2×; the command drawer / situations also pause the clock.)
  */
-export const NIGHT_DURATION_MS = 60_000;
+export const NIGHT_DURATION_MS = 80_000;
 export const NIGHT_TICK_MS = 100;
 
 /** Map 0..1 night progress to a phase index for `phaseCount` phases. */

@@ -9,8 +9,8 @@
  */
 
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { FloorView } from '@/components/FloorView';
@@ -84,6 +84,23 @@ function MiniMeter({ label, value, mode }: { label: string; value: number; mode:
   const col = meterColor(value, mode);
   // A meter "shouts" when it's in a state the owner should act on.
   const alert = (mode === 'strain' && value >= 0.66) || (mode === 'good' && value < 0.33);
+  // An alerting meter pulses so the eye is pulled to the problem before reading.
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!alert) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [alert, pulse]);
+  const fillOpacity = alert ? pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1;
   return (
     <View style={styles.mini}>
       <View style={styles.miniHead}>
@@ -95,7 +112,7 @@ function MiniMeter({ label, value, mode }: { label: string; value: number; mode:
         </Text>
       </View>
       <View style={[styles.miniTrack, alert && { borderColor: col, borderWidth: 1 }]}>
-        <View style={[styles.miniFill, { width: `${Math.round(value * 100)}%`, backgroundColor: col }]} />
+        <Animated.View style={[styles.miniFill, { width: `${Math.round(value * 100)}%`, backgroundColor: col, opacity: fillOpacity }]} />
       </View>
     </View>
   );
@@ -410,8 +427,13 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           </Text>
           <Text variant="body">{alertMsg}</Text>
           <Text variant="label" muted>
-            Read the room and make a call, or resume the night.
+            Your call: tap the zone to act, or ride it out — not every problem needs the boss.
           </Text>
+          <Pressable onPress={togglePause} accessibilityRole="button" style={styles.rideItOut}>
+            <Text variant="label" color={colors.neonCyan}>
+              Ride it out ▸
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -684,6 +706,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
+  rideItOut: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginTop: spacing.xs },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: {
     flexGrow: 1,
