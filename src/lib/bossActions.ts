@@ -28,6 +28,17 @@ export interface BossActionDef {
   hint: string;
 }
 
+/**
+ * Owner Attention — a limited per-night command budget. Boss actions cost Focus,
+ * so the owner can act repeatedly through the night but never infinitely (no
+ * spam). Combined with combineInterventions' clamp, repeated calls give bounded,
+ * diminishing returns. Presentation/loop only — no resolver/save change.
+ */
+export const NIGHT_FOCUS = 5;
+export function focusCost(_id: BossActionId): number {
+  return 1; // v1: every command costs one Focus
+}
+
 /** The tray (order = display order). */
 export const BOSS_ACTIONS: BossActionDef[] = [
   { id: 'push-dj', label: 'Push the DJ', hint: 'Lift the room’s energy.' },
@@ -189,7 +200,36 @@ export function combineInterventions(list: Intervention[]): Intervention {
   return { vibeBonus: clamp(vibeBonus, -20, 30), revenueMod: clamp(revenueMod, 0.9, 1.2) };
 }
 
-/** Build the combined intervention for a set of chosen action ids. */
+/**
+ * Per-call diminishing factor for the Nth use of the SAME action this night.
+ * The first call lands full; the second, third, fourth+ have visibly smaller
+ * pull. Combined with combineInterventions' clamp, this makes spamming the same
+ * command bad strategy without forbidding repeat use. Pure / deterministic.
+ */
+const REPEAT_DIMINISH = [1, 0.5, 0.25, 0.1];
+export function diminishFactor(callIndex: number): number {
+  if (callIndex < 0) return 1;
+  return REPEAT_DIMINISH[Math.min(callIndex, REPEAT_DIMINISH.length - 1)];
+}
+function applyDiminish(i: Intervention, f: number): Intervention {
+  return { vibeBonus: i.vibeBonus * f, revenueMod: 1 + (i.revenueMod - 1) * f };
+}
+
+/**
+ * Build the combined intervention for a SEQUENCE of chosen action ids. Repeats
+ * of the same id are allowed (Focus-limited at the call site) — the Nth repeat
+ * of an action is diminished, so the player can press a struggling zone without
+ * it ever stacking into a free win. Different-id calls don't diminish each
+ * other; only same-id repeats do.
+ */
 export function bossIntervention(ids: BossActionId[], preview: NightResult, club: ClubState): Intervention {
-  return combineInterventions(ids.map((id) => resolveBossAction(id, preview, club).intervention));
+  const counts: Partial<Record<BossActionId, number>> = {};
+  const list: Intervention[] = [];
+  for (const id of ids) {
+    const idx = counts[id] ?? 0;
+    counts[id] = idx + 1;
+    const base = resolveBossAction(id, preview, club).intervention;
+    list.push(applyDiminish(base, diminishFactor(idx)));
+  }
+  return combineInterventions(list);
 }

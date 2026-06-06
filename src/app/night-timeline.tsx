@@ -21,9 +21,12 @@ import {
   type BossActionId,
   bossIntervention,
   combineInterventions,
+  focusCost,
   type MoodTone,
+  NIGHT_FOCUS,
   resolveBossAction,
 } from '@/lib/bossActions';
+import { guestHappiness, staffMorale } from '@/lib/roomMood';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
@@ -168,6 +171,18 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   // Readable guest clusters per zone — the room reads as a club, not just dots.
   const liveClusters = committed ? undefined : floorClusters(planClub, pressures);
 
+  // Owner Attention (Boss Focus): a bounded per-night command budget. Each call
+  // costs Focus, so the owner acts repeatedly but never spams.
+  const focusSpent = chosen.reduce((s, id) => s + focusCost(id), 0);
+  const focusLeft = Math.max(0, NIGHT_FOCUS - focusSpent);
+
+  // Room mood meters — Guest Happiness + Staff Morale. Boss commands visibly lift
+  // them while the night is live (capped); the committed read drops the lift.
+  const guestLift = committed ? 0 : Math.min(0.18, chosen.filter((a) => a === 'push-dj' || a === 'work-room').length * 0.05);
+  const staffLift = committed ? 0 : Math.min(0.18, chosen.filter((a) => a === 'check-bar' || a === 'send-bouncer' || a === 'work-room').length * 0.05);
+  const happy = guestHappiness(shownResult, planClub, pressures, guestLift);
+  const morale = staffMorale(shownResult, planClub, pressures, staffLift);
+
   // The event stream: ambient ticks (progress-derived) merged with boss/encounter
   // reactions. Newest first; capped to keep the floor reading like a room.
   const ambient: StreamEntry[] = committed
@@ -196,9 +211,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   };
 
   const onAction = (id: BossActionId) => {
-    if (committed || chosen.includes(id)) return; // once each; act anytime
+    if (committed || encounterBlocking) return;
+    if (focusLeft < focusCost(id)) return; // out of Owner Attention for tonight
     const outcome = resolveBossAction(id, preview, planClub);
-    setChosen((c) => [...c, id]);
+    setChosen((c) => [...c, id]); // repeats allowed; combineInterventions clamps the stack
     setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
     setMood(outcome.mood);
     setFlashZone(outcome.bubble.zone);
@@ -257,6 +273,12 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         <MiniMeter label="Door" value={pressures.door} mode="strain" />
         <MiniMeter label="Bath" value={pressures.bathroom} mode="strain" />
         <MiniMeter label="Energy" value={pressures.energy} mode="good" />
+      </View>
+
+      {/* Room mood — is the room happy, is the crew holding? */}
+      <View style={styles.meters}>
+        <MiniMeter label="Guests" value={happy} mode="good" />
+        <MiniMeter label="Crew" value={morale} mode="good" />
       </View>
 
       {/* A situation in the room — pinned to the floor, not a stacked card. */}
@@ -330,6 +352,14 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const bossDock = !committed ? (
     <View style={styles.dock}>
+      <View style={styles.focusRow}>
+        <Text variant="label" muted>OWNER ATTENTION</Text>
+        <View style={styles.focusDots}>
+          {Array.from({ length: NIGHT_FOCUS }).map((_, i) => (
+            <View key={i} style={[styles.focusDot, i < focusLeft && styles.focusDotOn]} />
+          ))}
+        </View>
+      </View>
       {mentorHint ? (
         <Text variant="label" color={colors.neonCyan} style={styles.dockHint} numberOfLines={1}>
           {mentorHint}
@@ -337,31 +367,32 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       ) : null}
       <View style={styles.dockRow}>
         {BOSS_ACTIONS.map((a) => {
-          const used = chosen.includes(a.id);
+          const disabled = encounterBlocking || focusLeft < focusCost(a.id);
           return (
             <Pressable
               key={a.id}
               onPress={() => onAction(a.id)}
-              disabled={used || encounterBlocking}
+              disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel={a.label}
-              accessibilityState={{ disabled: used }}
-              style={[
-                styles.dockBtn,
-                used && styles.dockBtnUsed,
-                encounterBlocking && !used && styles.dockBtnDim,
-              ]}
+              accessibilityState={{ disabled }}
+              style={[styles.dockBtn, disabled && styles.dockBtnDim]}
             >
-              <Text variant="heading" color={used ? colors.textMuted : colors.neonMagenta} style={styles.dockGlyph}>
+              <Text variant="heading" color={disabled ? colors.textMuted : colors.neonMagenta} style={styles.dockGlyph}>
                 {ACTION_GLYPH[a.id]}
               </Text>
-              <Text variant="label" color={used ? colors.textMuted : colors.textPrimary} style={styles.dockLabel} numberOfLines={1}>
+              <Text variant="label" color={disabled ? colors.textMuted : colors.textPrimary} style={styles.dockLabel} numberOfLines={1}>
                 {ACTION_SHORT[a.id]}
               </Text>
             </Pressable>
           );
         })}
       </View>
+      {focusLeft === 0 ? (
+        <Text variant="label" muted style={styles.dockHint} numberOfLines={1}>
+          Out of attention — let the night ride to last call.
+        </Text>
+      ) : null}
     </View>
   ) : null;
 
@@ -431,6 +462,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   dockHint: { textAlign: 'center', lineHeight: 16 },
+  focusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xs },
+  focusDots: { flexDirection: 'row', gap: 4 },
+  focusDot: { width: 9, height: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  focusDotOn: { backgroundColor: colors.neonMagenta, borderColor: colors.neonMagenta },
   dockRow: { flexDirection: 'row', gap: spacing.xs },
   dockBtn: {
     flex: 1,

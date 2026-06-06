@@ -6,7 +6,7 @@
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState, DayConfig, StaffMember } from '@/domain/types';
 import { resolveNight } from '@/sim/night';
-import { bossIntervention, combineInterventions, resolveBossAction } from './bossActions';
+import { bossIntervention, combineInterventions, focusCost, NIGHT_FOCUS, resolveBossAction } from './bossActions';
 
 const BARTENDERS = STARTING_ROSTER.filter((m) => m.role === 'bartender').map((m) => m.id);
 
@@ -19,6 +19,25 @@ function club(over: Partial<ClubState> = {}): ClubState {
 }
 const cfg = (over: Partial<DayConfig> = {}): DayConfig => ({ ...defaultDayConfig(STARTING_ROSTER), ...over });
 const preview = (c: ClubState, config: DayConfig, seed: number) => resolveNight(c, config, seed).result;
+
+describe('Owner Attention (Boss Focus)', () => {
+  it('gives a bounded per-night command budget', () => {
+    expect(NIGHT_FOCUS).toBeGreaterThan(0);
+    expect(NIGHT_FOCUS).toBeLessThanOrEqual(10); // not infinite
+  });
+
+  it('every action costs at least one Focus (no free spam)', () => {
+    for (const a of ['push-dj', 'check-bar', 'send-bouncer', 'work-room'] as const) {
+      expect(focusCost(a)).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('repeated calls stay bounded by the intervention clamp (diminishing returns)', () => {
+    const fivePushes = Array.from({ length: 5 }, () => ({ vibeBonus: 24, revenueMod: 1 }));
+    const r = combineInterventions(fivePushes);
+    expect(r.vibeBonus).toBeLessThanOrEqual(30); // stacking can't run away
+  });
+});
 
 describe('combineInterventions', () => {
   it('empty set is the identity (no-op) modifier', () => {
