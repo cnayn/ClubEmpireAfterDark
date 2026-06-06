@@ -922,9 +922,26 @@ export function FloorView({
               onPress={() => onZonePress?.('bar')}
               style={[styles.sideBar, { borderColor: zoneTint('bar'), shadowColor: zoneTint('bar'), shadowOpacity: 0.25 + glow('bar') * 0.45, shadowRadius: 8 + glow('bar') * 10 }]}
             >
-              <Text variant="label" style={[styles.zoneLabel, { color: zoneTint('bar') }]}>
-                BAR
-              </Text>
+              <View style={styles.sideBarHead}>
+                <Text variant="label" style={[styles.zoneLabel, { color: zoneTint('bar') }]}>
+                  BAR
+                </Text>
+                {/* A drink glyph that bobs continuously = the bar is pouring all
+                    night; it lifts/brightens on the shimmer loop so the station
+                    always reads as ACTIVE, not a static box. */}
+                <Animated.Text
+                  style={[
+                    styles.serviceGlyph,
+                    {
+                      color: zoneTint('bar'),
+                      opacity: shimmers[2].interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
+                      transform: [{ translateY: shimmers[2].interpolate({ inputRange: [0, 1], outputRange: [0, -2] }) }],
+                    },
+                  ]}
+                >
+                  🍸
+                </Animated.Text>
+              </View>
               <View style={styles.sideBackbar}>
                 {[10, 13, 8, 12, 9].map((h, i) => (
                   <View key={i} style={[styles.bottle, { height: h, backgroundColor: zoneTint('bar'), opacity: 0.4 + ((i * 17) % 7) / 18 }]} />
@@ -1044,6 +1061,8 @@ const styles = StyleSheet.create({
     gap: 2,
     shadowOffset: { width: 0, height: 0 },
   },
+  sideBarHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  serviceGlyph: { fontSize: 11 },
   sideBackbar: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, paddingVertical: 1 },
   sideBarPosts: { alignItems: 'center', marginTop: 2 },
   // Zone panels (door / bar) — tinted, glowing.
