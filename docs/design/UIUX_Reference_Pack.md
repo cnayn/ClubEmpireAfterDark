@@ -12,6 +12,69 @@
 
 ---
 
+## Canonical UI Direction (the north star for every UI build)
+
+> **This block is the canon.** Sections 1–13 below are how we realize it.
+> Every UI build pass must serve these six points or stop and re-align.
+
+### The fusion
+
+We want the **emotional floor-view pull of Nightclub City**, combined
+with the **organization and accessibility logic of The Sims** — shipped
+in original Club Empire IP, Neon Noir, mobile-first.
+
+### Source lessons (the borrow)
+
+**Nightclub City lesson — the *feeling*:**
+The player should *see* the club. The floor is alive. Guests are
+visible. The club changes visually when the player improves it. The
+player wants to come back and watch their own place.
+
+**The Sims lesson — the *clarity*:**
+The player should understand everything clearly. Build/Prep mode and
+Live/Night mode feel distinct. Objects are organized by category.
+Tapping an object explains what it does. The player improves the club
+**however they want**, not along one forced path.
+
+**Club Empire rule — the *line*:**
+We do **not** copy Nightclub City assets, UI, characters, icons, names,
+exact layout, or any protected IP. We **steal the feeling, not the
+product.**
+
+### The six canon points
+
+1. **Floor view is the main game surface.** The screen the app returns
+   to. The home of every primary interaction.
+2. **Club improvement must be visible on the floor.** Every upgrade the
+   player buys shows up the next time they open the room. No invisible
+   stats.
+3. **Guests and staff are readable** through sprites, clusters,
+   bubbles, posture, and mood — not numbers. (Detail: Sections 6, 7, 8.)
+4. **Build/Prep mode** is organized like a clean phone game, with
+   categorized catalogs: **Lighting, Sound, Bar, Seating, Decor, Door,
+   Bath, Staff.** Tap → explain. Preview on the floor. Reversible
+   before confirm. (Detail: Sections 3, 12.)
+5. **Live/Night mode** feels like **watching and commanding** the
+   club — observation as gameplay, boss actions as commands aimed at a
+   place. (Detail: Sections 1, 9.)
+6. **The player should feel: "This is my club. I built this place."**
+   Identity expression through customization paths; two players reach
+   the same tier with visibly different rooms. (Detail: Section 12.)
+
+### IP guardrail (non-negotiable)
+
+If a build prompt drifts toward an NCC asset, layout, icon, or
+character, **stop and re-translate** the prompt into Club Empire IP:
+
+- Allowed: "as magnetic as NCC," "as readable as a Sims build menu."
+- Not allowed: "make it look like NCC," "use the NCC bar icon," "copy
+  the NCC zone arrangement," "name a character like X."
+
+If unsure whether something is a borrow or a copy, **treat it as a
+copy** and ask. The fusion is the feeling, not the product.
+
+---
+
 ## 1. Core UI Principle
 
 **The club floor is the game.**
