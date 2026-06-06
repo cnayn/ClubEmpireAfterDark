@@ -32,11 +32,19 @@ surface — not the other way around.
 ### Allowed (the *feeling*)
 
 - A **visible club** the player sees, not a menu they imagine.
-- **Active guests inside the room** — not numbers in a panel.
-- **Party energy** as a visual surface (lights, motion, pulse).
-- **Decoration pride** — the player feels the upgrade they bought.
-- **Music identity** — the room reads differently on different nights.
+- **A magnetic top-down view** the player wants to come back to and watch
+  — the floor is the place the screen returns to by default.
+- **Active guests inside the room** — bodies on the floor, not numbers
+  in a panel.
+- **Party energy** as a visual surface (lights, motion, pulse synced to
+  the room).
+- **Decoration shows up immediately.** Every upgrade the player buys is
+  visible on the floor the next time they open it. No invisible buffs.
+- **Music identity** — the room reads differently on different nights /
+  events.
 - **Social nightlife feel** — the room has chaos, not just throughput.
+- **"One more night" loop visible on the floor itself** — closing time
+  ends, prep opens, the same floor is waiting.
 
 ### Forbidden (the IP)
 
@@ -65,6 +73,26 @@ style and not a simulation depth target:
 - **The player commands the space.** Boss actions feel like *pointing at
   a place*, not selecting from a menu.
 - **Reactions are visible.** The room confirms the decision.
+
+### Organization (Sims-style)
+
+- **Catalogs are categorized**, never flat lists. Upgrades group by
+  *function* (Lighting / Sound / Seating / Bar / Decor / Door / Bath).
+- **Build/Live separation.** A distinct *Prep* mode for arranging and
+  improving the room, distinct from *Night* mode when it runs. The
+  player should never be unsure which mode they're in.
+- **Object cards over stat sheets.** Tap an object → see what it does
+  in plain language, what it costs, what it changes on the floor.
+
+### Accessibility (Sims-style)
+
+- **Every option explains itself in one short line.** No hidden
+  prerequisites, no math reveal in a tooltip.
+- **No reading walls.** A glance teaches the screen; a tap teaches the
+  object.
+- **One canonical action per object.** Don't bury the verb behind a
+  context menu.
+- **Iconography first, text second.** Per Section 10 copy tone.
 
 We do **not** borrow: free-placement furniture, individual pathfinding,
 relationship sim depth, needs decay, autonomous Sim agency. Those are
@@ -242,6 +270,63 @@ The build session owns realization; this section is the guardrail.
   systems.
 - **Accessibility.** Pressure must be readable without color alone —
   pair color with icon and density.
+
+---
+
+## 12. Decorate & Improve (Player-Driven Customization)
+
+The player should be able to improve the club **however they want** — no
+single forced upgrade path, no hidden prerequisites, no "you must build
+X first" gating beyond what the economy already forces.
+
+### Principles
+
+- **Multiple valid paths.** A player who chases sound-first should
+  succeed differently from a player who chases comfort-first or
+  door-first. The economy gates speed; the player picks identity.
+- **The floor reflects every choice.** Buy a banquette → the banquette
+  shows on the floor. Buy a lighting rig → the dance floor lights
+  change. No invisible upgrades.
+- **No "right" build order.** The progression tree is a tree, not a
+  line. The Goal Board suggests; it does not dictate.
+- **Identity expression.** How the player builds the club IS who they
+  are as an owner. The same reputation tier can be hit through wildly
+  different floor configurations.
+
+### Prep mode (the "build/decorate" surface)
+
+- A distinct mode the player enters between nights.
+- **Categorized catalog** (per Section 3 organization rules):
+  Lighting / Sound / Seating / Bar / Decor / Door / Bath / Staff.
+- **Preview on the floor.** Selecting an upgrade shows where it lands
+  and what it changes — before the player commits cash.
+- **Reversible while previewing.** Once confirmed, the upgrade is real;
+  before confirmation, the player can wander.
+- **No micromanagement of placement.** The room knows where the bar is.
+  The player chooses *what* to install, not *which pixel*. (Per
+  `gameplay-north-star.md` — no free-placement furniture.)
+
+### What the player customizes
+
+- **Look** — palette accents, lighting style, decor pieces.
+- **Function** — bar setup, sound rig, seating capacity, bath capacity.
+- **Vibe** — music identity (event/theme), door policy posture.
+- **Crew shape** — who's hired, who's scheduled, who's specialized.
+
+### What the player does NOT customize (current build)
+
+- Individual tile-by-tile placement.
+- Free-form room shape.
+- NPC outfits, individual guest stats.
+- Anything that requires a system listed under "explicitly NOT
+  active" in `gameplay-north-star.md`.
+
+### Why this matters
+
+NCC's magnetic loop wasn't just "look at your club" — it was "look at
+*my* club, the one I built, the one nobody else built the same way."
+That's the loop we want. The Sims taught us how to make it readable.
+Club Empire ships it Neon Noir.
 
 ---
 
