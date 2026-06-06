@@ -394,7 +394,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     <Pressable
       onPress={() => {
         if (encounterBlocking) return;
-        if (running) setSpeed((s) => (s === 1 ? 2 : 1));
+        if (running) setSpeed((s) => (s >= 3 ? 1 : s + 1));
         else togglePause();
       }}
       onLongPress={togglePause}
@@ -685,8 +685,8 @@ const styles = StyleSheet.create({
   miniHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   miniTrack: { height: 10, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   miniFill: { height: 10, borderRadius: radius.pill },
-  miniLabel: { fontSize: 11 },
-  miniStatus: { fontSize: 10, letterSpacing: 0.5 },
+  miniLabel: { fontSize: 12 },
+  miniStatus: { fontSize: 11, letterSpacing: 0.5 },
   miniStatusAlert: { fontWeight: '700' },
   situation: {
     borderRadius: radius.md,

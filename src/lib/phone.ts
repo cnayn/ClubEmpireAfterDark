@@ -48,6 +48,11 @@ const CATEGORY_ORDER: PhoneCategory[] = ['crew', 'warning', 'guest', 'booking', 
  * fields via defaults).
  */
 export function buildInbox(club: ClubState, lastResult: NightResult | null): PhoneMessage[] {
+  // A brand-new owner who hasn't run a night yet gets a quiet phone — no booking
+  // leads or rumors before the club has even opened. The city starts talking
+  // once you've actually had a night (#9).
+  if (club.day <= 1 && !lastResult) return [];
+
   const out: PhoneMessage[] = [];
   const add = (m: PhoneMessage) => out.push(m);
 

@@ -162,8 +162,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const club = get().club;
     if (!club) return false;
     if (!canFireStaff(club.staff, id)) return false; // e.g. last bartender
+    // Refund the hire fee if this member was hired from the candidate pool, so
+    // hiring and then changing your mind never quietly drains your starting cash
+    // (fix: hire→fire used to lose the fee, which could soft-lock the first night).
+    // Starting-roster crew were never paid for, so getCandidate returns nothing →
+    // no refund, which is correct.
+    const candidate = getCandidate(id);
+    const refund = candidate ? hireCost(candidate) : 0;
     const nextClub: ClubState = {
       ...club,
+      cash: club.cash + refund,
       staff: club.staff.filter((m) => m.id !== id),
       // Safe handling: a fired member can't remain scheduled.
       lastConfig: {

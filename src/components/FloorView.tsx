@@ -286,7 +286,14 @@ function GuestSilhouette({
   return (
     <Animated.View style={[styles.silhouette, { opacity, transform: [{ translateX }, { translateY }] }]}>
       <View style={[styles.silhouetteHead, { backgroundColor: c, shadowColor: c }]} />
+      {/* Shoulders bar + torso + two splayed legs read as a little figure, not a
+          pencil. Cheap shapes only — no sprites/art. */}
+      <View style={[styles.shoulders, { backgroundColor: c }]} />
       <View style={[styles.body, { height: h, backgroundColor: c, shadowColor: c }]} />
+      <View style={styles.legs} pointerEvents="none">
+        <View style={[styles.leg, styles.legLeft, { backgroundColor: c }]} />
+        <View style={[styles.leg, styles.legRight, { backgroundColor: c }]} />
+      </View>
     </Animated.View>
   );
 }
@@ -1257,16 +1264,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     marginBottom: 1,
   },
+  // Shoulders bar — a touch wider than the torso so the figure reads human.
+  shoulders: { width: 7, height: 1.5, borderRadius: 1, marginBottom: -0.5 },
   body: {
-    width: 6,
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
+    width: 5,
+    borderTopLeftRadius: 2.5,
+    borderTopRightRadius: 2.5,
     borderBottomLeftRadius: 1,
     borderBottomRightRadius: 1,
     shadowOpacity: 0.5,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 0 },
   },
+  // Two splayed legs (an inverted V) under the torso.
+  legs: { flexDirection: 'row', width: 8, justifyContent: 'center' },
+  leg: { width: 1.5, height: 4, borderRadius: 1 },
+  legLeft: { transform: [{ rotate: '18deg' }], marginRight: 0.5 },
+  legRight: { transform: [{ rotate: '-18deg' }], marginLeft: 0.5 },
   // --- Cluster arrangements ---
   cluster: { alignItems: 'center', gap: 2 },
   clusterLine: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },

@@ -194,4 +194,23 @@ describe('hire / fire', () => {
     expect(useGameStore.getState().fireStaff('bar-rosa')).toBe(true);
     expect(useGameStore.getState().fireStaff('bar-milo')).toBe(false);
   });
+
+  it('refunds the hire fee on hire→fire so first-night cash is never silently lost (#10)', () => {
+    const club = useGameStore.getState().club!;
+    const start = 5000;
+    useGameStore.setState({ club: { ...club, cash: start } });
+    const fee = hireCost(getCandidate('bar-jin')!);
+    expect(useGameStore.getState().hireStaff('bar-jin')).toBe(true);
+    expect(useGameStore.getState().club!.cash).toBe(start - fee);
+    expect(useGameStore.getState().fireStaff('bar-jin')).toBe(true);
+    expect(useGameStore.getState().club!.cash).toBe(start); // fully refunded
+  });
+
+  it('firing a starting-roster member does not refund (they were never paid for)', () => {
+    const club = useGameStore.getState().club!;
+    useGameStore.setState({ club: { ...club, cash: 1000 } });
+    expect(getCandidate('bnc-dimitri')).toBeUndefined(); // starting crew, not a candidate
+    expect(useGameStore.getState().fireStaff('bnc-dimitri')).toBe(true);
+    expect(useGameStore.getState().club!.cash).toBe(1000);
+  });
 });

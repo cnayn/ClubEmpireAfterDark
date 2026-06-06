@@ -65,11 +65,14 @@ describe('buildInbox — derived from state', () => {
     );
   });
 
-  it('works on a fresh club with no last result, and never exceeds six', () => {
-    expect(() => buildInbox(club({ day: 1 }), null)).not.toThrow();
-    const fresh = buildInbox(club({ day: 1 }), null);
-    expect(fresh.length).toBeGreaterThan(0);
-    expect(fresh.length).toBeLessThanOrEqual(6);
+  it('a brand-new club (day 1, no night played) has a quiet phone (#9)', () => {
+    expect(buildInbox(club({ day: 1 }), null)).toEqual([]);
+  });
+
+  it('once the club has run a night, the inbox populates and never exceeds six', () => {
+    const played = buildInbox(club({ day: 2 }), result());
+    expect(played.length).toBeGreaterThan(0);
+    expect(played.length).toBeLessThanOrEqual(6);
   });
 
   it('works on an old save missing optional config/venue fields', () => {
