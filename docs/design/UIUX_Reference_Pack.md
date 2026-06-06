@@ -287,6 +287,64 @@ action should produce a visible floor change within one beat.
 Sound (future): each action gets a sub-second audio cue. Visuals carry
 the moment until audio lands.
 
+### Future command direction — tap-target, then act (FUTURE / DO NOT BUILD YET)
+
+> Long-term, boss actions should move **away from four permanent
+> buttons** sitting in an always-visible tray, and toward a more
+> Sims-style **tap-a-target-then-choose-an-action** model.
+
+The future shape:
+
+- The player **taps a zone** (bar, door, dance floor, DJ booth,
+  bathroom) — a small contextual menu surfaces with the actions
+  relevant to *that place*. (Bar → Check Bar, Run a Drink Deal
+  (future), Pull a Runner. Door → Send Bouncer, Tighten Policy
+  (future), Hold the Line.)
+- Or the player **taps a crew member** — a small contextual menu
+  surfaces with actions relevant to *that person*. (Caramel → Pull
+  to Floor, Send to Help John, Ask His Read. Rosa → Lead a Push,
+  Cover for a Break.)
+- The action tray becomes **smaller or hides entirely** once tap-
+  targeting is solid — the floor itself is the action surface.
+
+### Why this direction
+
+- Reinforces Canon point 5: "Live/Night mode feels like watching and
+  commanding the club — boss actions as commands aimed at a place."
+  Tap-target makes the *aim* literal.
+- Reinforces §15 Pacing Rule 2: deliberate owner decisions. You can't
+  spam an action that requires you to first pick a target.
+- Reinforces §16 Rule 6: actions stop being score buttons when they're
+  tied to a thing the player chose to look at.
+- Scales with future roles. When DJs / hosts / waiters land (future),
+  each new role unlocks new contextual actions without bloating a
+  global tray.
+
+### Phase gating
+
+- **Phase 1 (current):** four permanent boss actions in a fixed tray
+  stay. Don't redesign yet.
+- **Phase 2:** zones become tappable for *inspection* (open a zone
+  card on tap). Actions still live in the global tray.
+- **Phase 3:** zone-tap surfaces a contextual action menu. Global tray
+  shrinks to a passive "what can I do" prompt or hides.
+- **Phase 4:** crew-token tap surfaces per-character actions. Tray is
+  gone or vestigial.
+
+### What this does NOT change
+
+- The four current verbs (Push DJ, Check Bar, Send Bouncer, Work the
+  Room) remain valid actions; they just stop being four buttons. They
+  become **contextual options under the right tap-target.**
+- Cooldown discipline (§16 Rule 6) stays: tap-target-then-act doesn't
+  mean spammable.
+- "Ride it out" stays valid — doing nothing is still a choice.
+
+> **Implementation status:** FUTURE / DO NOT BUILD YET. Banked here so
+> Phase 1's tray-based UI is built with the knowledge it will *evolve*,
+> not be locked in. Avoid Phase 1 architecture that hard-codes "four
+> buttons forever."
+
 ---
 
 ## 10. Copy tone
