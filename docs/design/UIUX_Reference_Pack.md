@@ -953,6 +953,127 @@ If a build prompt drifts — "use the NCC icon," "match that exact
 layout," "name a character like X" — **stop and re-translate.** The
 fusion is the feeling, not the product.
 
+### Specifics from the uploaded reference frames (what's visible, what to avoid)
+
+> The latest reference frames clarified concretely which patterns are
+> emotional borrows vs which are direct copy hazards. The frames show
+> an isometric club floor, edge UI on top and bottom, chibi-style
+> guests, dance cages, a Buddha-statue lounge piece with a koi pond,
+> a top stats strip (popularity / luxury / money), a "Throw A Party"
+> button, a character-info popup, a bottom tool palette, a friend-
+> invite strip, and a character store with named purchasable
+> celebrities.
+
+#### Emotional borrows we keep (already canon, reinforced here)
+
+- **Isometric / 2.5D framing of the floor** — sells "this is a room"
+  at a glance. Phase 3 target (per §13). Composition is original.
+- **Floor at the center of the screen** — not buried under menus.
+- **Top edge: club identity + key stats. Bottom edge: tools / actions.
+  Floor: untouched by UI chrome.** That arrangement is the magnetic
+  pattern.
+- **Guests rendered as visible characters**, not dots. Cluster-friendly
+  in Phase 1; readable silhouettes in Phase 2.
+- **Identity-defining decor pieces** visible on the floor (a centerpiece
+  feature changes what the room *is*).
+- **Tap-a-thing-to-see-it** — a popup card with name + role + small
+  context, dismissible. Per §3 object cards.
+- **Top stats strip** as a Club Empire-voiced equivalent (we already
+  have reputation tier + cash + pressure language — those replace
+  popularity/luxury, in our voice).
+
+#### Concrete copy hazards (do NOT copy any of these)
+
+- **Chibi / oversized-head art style.** Recognizable as the reference
+  and tonally wrong for Neon Noir. Club Empire silhouettes are
+  proportioned closer to stylized adults — leaner, darker, more
+  shadow. Cluster sprites today; silhouette-readable in Phase 2.
+- **Celebrity parody / lookalike character names.** The reference's
+  character store uses parody names of real public figures. **Club
+  Empire never does this.** It's an IP and defamation risk *and* a
+  voice mismatch — our cast is original, named per
+  [`character-bible.md`](character-bible.md) (Caramel, John, Rosa,
+  Milo, Jin, Vince, Grace, Pavel, Dimitri, Marcus). New cast
+  additions follow the character pipeline in
+  [`content-intake-rules.md`](content-intake-rules.md).
+- **A character / celebrity store as a meta-pattern.** Club Empire
+  does not buy characters. Staff are *hired* (per
+  [`character-bible.md`](character-bible.md) +
+  `nightclub-staff-system` skill). VIPs are future relationship-layer
+  content, not store SKUs.
+- **Dance cages with pole performers, Buddha-statue koi-pond lounge
+  centerpieces, the specific zig-zag-tiled dance floor pattern, the
+  cyan/gold cubic floor tessellation.** These are *specific decor
+  designs* in the reference. Our decor pieces solve the same
+  *function* (a centerpiece that changes the room's identity) with
+  **original silhouettes** — a synth-rig podium, a neon arch, a sunken
+  velvet pit, etc. Decor names and designs live in future
+  [`level-and-floor-progression.md`](level-and-floor-progression.md)
+  category expansions, not here.
+- **Dancers as an active gameplay role.** Per
+  [`gameplay-north-star.md`](gameplay-north-star.md)'s "explicitly
+  NOT active" list, dancers are not a current role. Floor-decor
+  *animation* may evoke movement (a vibrating speaker rig, a
+  spinning light) — but no animated performer characters.
+- **The exact bottom tool-palette icons** (mailbox, gift box, head,
+  paint bucket, monitor, star). Original icon set required. Our edge
+  UI surfaces are our own: prep catalog, boss action tray, debrief,
+  goals.
+- **"Throw A Party" button copy and the disco-ball glyph.** Our
+  equivalent is the prep-mode event selector and the night-mode boss
+  action tray, in Club Empire voice (per §10 copy tone).
+- **Top stats labels "POPULARITY" / "LUXURY" with cyan numeric
+  pills.** Our equivalent is the reputation tier badge + cash +
+  on-floor pressure language. We do not use those words or that
+  visual treatment.
+- **"Click to Invite a Friend" social CTAs and friend-strip across the
+  bottom.** Club Empire is **offline-first** (per project canon and
+  the "no backend" guardrail in
+  [`level-and-floor-progression.md`](level-and-floor-progression.md)
+  §8). No social invite mechanics, no friend list, no friend-derived
+  income or staff.
+- **Character info popup as a portrait card with name + spend stat in
+  a glassy chrome.** Our equivalent: a Club Empire-styled card with
+  name + role + voice line, sitting *over* the floor edge, dismissed
+  on tap-elsewhere. No glassy chrome borrowed.
+- **Hugely-inflated currency display ($1.9B with comma-separated
+  pills).** Club Empire's economy is meaningful at much smaller
+  numbers (per
+  [`gameplay-north-star.md`](gameplay-north-star.md) balance canon).
+  The big-number aesthetic is part of the reference's casual-social
+  feel and conflicts with our management-driven tone.
+
+#### Composition translation (how the same surfaces become Club Empire)
+
+| Reference surface | Club Empire equivalent |
+| --- | --- |
+| Isometric floor center | 2D today → 2.5D Phase 3 (§13), original composition |
+| Top-left identity card | Club name + reputation tier badge + cash |
+| Top-right popularity/luxury pills | Pressure language across floor zones (§8) |
+| "Throw A Party" CTA | Event selector in Prep mode |
+| Bottom tool palette (NCC icon set) | Boss action tray (Push DJ / Check Bar / Send Bouncer / Work the Room) + goals + prep |
+| Character store (Buy/Wish parody celebs) | Hire/Schedule from named cast (`character-bible.md`) |
+| Friend invite strip | **Removed.** Offline-first, no social CTAs. |
+| Tapped character popup with $spent | Tap-staff card with name + role + voice line + (future) trust |
+| Buddha-statue lounge centerpiece | Future original Club Empire centerpiece (synth-rig podium, neon arch, sunken velvet pit) — banked, not specified |
+| Dance cages with performers | **Removed.** Decor only, no animated performer characters |
+
+#### Tone correction (so we don't drift toward the reference)
+
+The reference reads **bright, casual, friendly, social-game energy.**
+Club Empire reads **dark, gritty, magnetic, management-driven,
+adult-feeling**:
+
+- Palette stays Neon Noir (§4): neon pink, electric cyan, deep
+  violet, midnight black. No bright cyan/baby-blue dominants.
+- Lighting is *moody*. Highlights are *neon*. The room is not lit
+  like a daytime cartoon.
+- Copy is short and spoken-sounding (§10), not exclamation-heavy
+  marketing voice.
+
+If a Floor 1 mockup leans bright, friendly, and chibi, it has drifted
+toward the reference. Pull it back to Neon Noir.
+
 ---
 
 ## Cross-references
