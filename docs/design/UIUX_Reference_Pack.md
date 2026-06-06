@@ -810,6 +810,151 @@ assets, layouts, icons, characters, names, or UI chrome. Per Sections
 
 ---
 
+## 18. Screenshot Interpretation (how to read the reference, not copy it)
+
+> The uploaded Nightclub City screenshots are **emotional reference**,
+> not copy targets. They show *why* a visible club floor pulls the
+> player back. They are **not** asset packs, layout templates, or
+> icon libraries.
+
+### 1. Why these references work emotionally
+
+The screenshots succeed because every one of them puts the **club
+floor at the center of the screen** and lets the player **see what
+they built**. Specifically:
+
+- The club is *visible* — not hidden behind menus.
+- **UI sits around the edge** — it frames the floor, it does not cover
+  it.
+- **Guests are visible inside the room** — bodies, not numbers.
+- **Furniture changes the identity** of the room — buy something, see
+  something.
+- **Colorful nightlife energy** — light, motion, density read at a
+  glance.
+- The player **wants to come back and watch their own place** —
+  observation is part of the loop, not a pause.
+- **Object/menu accessibility like a clean phone game** — tap a thing,
+  understand a thing.
+
+That bundle of feelings is the **borrow target.** Original assets
+realize it.
+
+### 2. What Club Empire borrows (the *feeling*)
+
+- **Visible club floor as the main screen** (per Canon point 1; §14).
+- **Edge UI around the room** (per §14 acceptance: "UI does not cover
+  the floor").
+- **Guests visible inside the club** (per §6 cluster language).
+- **Furniture visibly changing the room identity** (per §12 + Progression §3).
+- **Player wants to watch their own club** (per §15 pacing).
+- **Colorful nightlife energy** (per §4 palette, §8 pressure language).
+- **Object/menu accessibility like a phone game** (per §3 Sims
+  organization + accessibility).
+
+### 3. What Club Empire must NOT copy
+
+Non-negotiable. Per Canon block IP guardrail + §2 Forbidden + §14
+Forbidden:
+
+- **Assets, sprites, textures** — original art only.
+- **Icons & UI chrome** — original icon set, original chrome.
+- **Exact UI layout** — our screen is composed for Club Empire's zones
+  and pressure language, not copied from a reference.
+- **Exact furniture designs** — a banquette can be a banquette; it
+  cannot be *that* banquette.
+- **Characters, names, faces** — Club Empire cast only.
+- **Branded references** of any kind inside the product.
+
+If a screen could be mistaken for the reference at a glance, redesign
+it. Same emotional target, original realization.
+
+### 4. The Club Empire version (so this isn't a clone)
+
+The reference is bright and casual. Club Empire is **darker, grittier,
+more adult-feeling.** Specifically:
+
+- **Neon Noir** — synthwave-adjacent palette per §4 (neon pink,
+  electric cyan, deep violet, midnight black).
+- **Starter cheap club first** (per Progression §2): Floor 1 opens
+  basement-tier, bare, thin crowd — and *that reads as a club*, not a
+  placeholder.
+- **Grows visually through upgrades** (per Progression §3): same
+  Floor 1 becomes brighter, more crowded, more decorated, more premium
+  as the player invests.
+- **Stronger management logic than the reference** — pressure meters,
+  service ratios, real reckoning (per §4 original mechanics).
+- **Staff drama** and **guest incidents** (per
+  [`character-bible.md`](character-bible.md) +
+  [`night-encounters.md`](night-encounters.md)).
+- **Original IP, top to bottom.** Steal the feeling, not the product.
+
+### 5. How Floor 1 Starter Club interprets this
+
+Floor 1 must hit the emotional bundle above using **only original
+assets** and Club Empire's own composition. The visible-at-a-glance
+checklist (per §14 + Progression §2):
+
+- **Entrance / Door** — visible at the top edge of the room.
+- **Bar** — visible rail with bartender slot.
+- **Dance Floor** — *central tile* (per the emotional reference: the
+  floor sits at the center).
+- **DJ Booth** — visible corner platform.
+- **Bathroom** — visible small tile with sign.
+- **Staff Area** — visible back-of-house slot.
+- **Locked VIP / Future expansion area** — visible silhouette with a
+  locked indicator (the player can see where growth goes from day
+  one).
+- **Guests and staff** rendered as **simple sprites / silhouettes** —
+  not dots, not numbers. Cluster-friendly per §6.
+- **UI lives on top, bottom, and edges** — never on the floor.
+- **Upgrades appear visibly on the floor** when purchased — banquette
+  bought → banquette visible; lighting rig bought → dance floor tint
+  changes.
+
+If a Floor 1 mockup could be confused with a reference screenshot,
+the composition is wrong even if every asset is original. Re-arrange
+zones into a Club Empire composition.
+
+### 6. How this supports future level/floor progression
+
+The same emotional principles ladder up through every phase (per §13
+roadmap and Progression §5):
+
+- **Phase 1 → 2:** the same Floor 1 grows readable sprites, more
+  movement, more identity furniture. The room becomes *watchable*.
+- **Phase 3:** 2.5D depth on the same Floor 1. Decorate mode matures.
+  Upgrades show with weight (shadow, light bleed). Different upgrade
+  paths produce visibly different rooms.
+- **Future floors (Phase 4):** Floor 2 / expansion unlocks (bigger
+  dance floor, second bar, VIP room, private event room) honor the
+  same emotional checklist — visible, edge UI, identity-through-
+  furniture, magnetic to return to.
+- **Long-term:** the player feels the **"one more night" pull** every
+  time they open the app. Original IP, Neon Noir, magnetic in our own
+  voice.
+
+The reference is a **floor**, in every sense: the bottom of the
+ambition for emotional pull, never the ceiling for how we ship it.
+
+### Build Prompt Translation (when the owner says "make it like NCC")
+
+The translation is canon in §14 and **re-stated here for emphasis**:
+
+When the owner says **"make it like Nightclub City,"** Claude A
+translates that to:
+
+> **"Make it magnetic like Nightclub City: visible club, visible
+> guests, visible decor, edge UI, colorful nightlife energy — but in
+> original Club Empire IP."**
+
+Same emotional target. Original realization. Always.
+
+If a build prompt drifts — "use the NCC icon," "match that exact
+layout," "name a character like X" — **stop and re-translate.** The
+fusion is the feeling, not the product.
+
+---
+
 ## Cross-references
 
 - Tone, mood, world: [`story-bible.md`](story-bible.md).
@@ -819,4 +964,6 @@ assets, layouts, icons, characters, names, or UI chrome. Per Sections
 - Phone surface content: [`phone-messages.md`](phone-messages.md).
 - Encounter engine: [`random-events.md`](random-events.md).
 - Floor/level/goal progression: [`level-and-floor-progression.md`](level-and-floor-progression.md).
+- Live-night bubble lines: [`bubble-bank.md`](bubble-bank.md).
+- Future bar/policy specs (banked): [`future-bar-and-policy-systems.md`](future-bar-and-policy-systems.md).
 - Intake pipeline: [`content-intake-rules.md`](content-intake-rules.md).
