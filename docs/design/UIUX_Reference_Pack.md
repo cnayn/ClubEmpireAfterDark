@@ -485,6 +485,119 @@ realization.
 
 ---
 
+## 14. Floor 1 Starter Club Room Direction
+
+> **Build target for Claude A's next UI pass.** Floor 1 is the **first
+> real club room** — the visible small nightclub players see on day one.
+> Not a dashboard, not an abstract board. A *room*.
+
+### What Floor 1 must visually include
+
+The room must contain — visibly, in a single screen — all of:
+
+- **Entrance / Door**
+- **Bar**
+- **Dance Floor**
+- **DJ Booth**
+- **Bathroom**
+- **Staff Area**
+- **Locked VIP / Future expansion area** (silhouette visible, locked
+  indicator on)
+
+Each zone is a *place* the player can see, not a label on a tab.
+
+### Emotional reference (what we're chasing)
+
+The reference screenshots succeed because:
+
+- The club is **visible**.
+- The floor is the **center** of the screen.
+- **Guests are visible** inside the room.
+- **Furniture changes the identity** of the room.
+- **UI sits around the edge** — it frames the floor, it does not cover
+  it.
+- **Color / light / music** create the pull.
+- The player **wants to watch their own club**.
+
+Floor 1 should hit those same emotional notes — in original IP.
+
+### Original Club Empire version
+
+Darker than the references. Neon Noir, synthwave / cyber nightlife,
+gritty stylish. More management-driven, more staff-drama-driven. The
+room feels like *a Club Empire club*, not a clone of anything else.
+
+Palette and tone per Section 4. Voice per Section 10.
+
+### Visual progression (same Floor 1, growing identity)
+
+- **Early Floor 1** looks cheap / simple. Basic sprites, bare zones,
+  thin crowd. This is the start of the story, not the failure state.
+- **As the player advances**, the *same* floor becomes brighter, more
+  crowded, more decorated, more premium. Upgrades land on the floor.
+- **Future floors** unlock later. A second floor, a bigger venue, an
+  expansion wing — supported by the long-term roadmap, not Phase 1.
+
+Same room, lived-in. The player's history is visible on the floor.
+
+### Build guidance for Claude A (phase-tagged)
+
+**Phase 1 — Make the current floor read as a real 2D club room.**
+- Simple sprites for guests and staff.
+- Simple object furniture (bar block, booth, decks, rope, bath sign).
+- Readable zones with clear edges.
+- UI lives at top/bottom edges, never on the floor.
+
+**Phase 2 — Improve sprite and object visuals.**
+- Guests and staff become readable people-shapes with posture and
+  mood. Still cluster-friendly.
+- Furniture gets identity (a *bar* reads as a bar, not a rectangle).
+- More idle movement, more "watchable club" feel.
+
+**Phase 3 — 2.5D depth / iso-leaning perspective using original assets
+only.**
+- Angle / depth via tint, shadow, z-order, light bleed.
+- **No 3D engine** unless later approved. No GLB, no
+  react-three-fiber, no Three.js.
+
+(Phases align with Section 13. Floor 1 is the room those phases polish.)
+
+### Acceptance criteria (strong)
+
+The build is done when:
+
+- A screenshot of the floor **reads as a nightclub immediately** — not
+  a UI mockup.
+- **Door / Bar / Dance Floor / DJ / Bathroom** are visually obvious
+  without labels.
+- Guests look like **people or simple sprites**, not dots.
+- **Upgrades appear visually** on the floor when purchased.
+- **UI does not cover the floor.** Edges only.
+- **Text supports the floor; text does not replace it.**
+
+### Forbidden (non-negotiable)
+
+- Copied Nightclub City assets, sprites, or icons.
+- Copied NCC layout or zone arrangement.
+- Copied characters or names.
+- Exact isometric clone of any reference.
+- Full pathfinding.
+- Free furniture placement (slot-based only, unless later approved).
+- Full NPC simulation.
+
+### Build-prompt translation rule
+
+When the owner says **"make it like Nightclub City,"** Claude A
+translates that to:
+
+> **"Make it magnetic like Nightclub City: visible club, visible
+> guests, visible decor, edge UI, colorful floor — in original Club
+> Empire IP."**
+
+Same emotional target, original realization. Always.
+
+---
+
 ## Cross-references
 
 - Tone, mood, world: [`story-bible.md`](story-bible.md).
