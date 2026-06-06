@@ -21,6 +21,34 @@
 
 ---
 
+## How encounters land during the night (pacing + comm canon)
+
+Encounters in this bank are **presented, not interrupted.** The room
+keeps running underneath any encounter overlay. The clock does not
+pause. Pressure builds visibly *before* an encounter modal appears.
+
+Canonical sources for *how* these beats surface visually and at what
+pace:
+
+- **Pacing rules** — [`UIUX_Reference_Pack.md`](UIUX_Reference_Pack.md)
+  **Section 15** (Night Pacing Philosophy). Observation is gameplay;
+  boss actions are deliberate; "ride it out" is valid.
+- **Readability rules** — UIUX **Section 16** (UI Rules for Night
+  Readability). Pressure visible before text; every problem gets a
+  zone + signal + owner response; the player knows what's happening
+  before the debrief.
+- **Live communication language** — UIUX **Section 17** (Staff, Guest,
+  Story Inside the Night). Staff speak through posture/ring/bubble
+  icons; guests through cluster tints/bubbles; story through bubbles,
+  phone overlays, staff warnings, and visible floor reactions.
+
+**Authoring implication:** the **Visual Cue** field on every beat
+below is the *primary* surface — text Dialogue supports it, never
+replaces it. If a beat can't surface visually before its text fires,
+revise the visual cue, not the dialogue.
+
+---
+
 ## 1. Door Tension
 
 ### Door – Line Is Getting Mean
