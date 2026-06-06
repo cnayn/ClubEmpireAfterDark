@@ -100,6 +100,15 @@ function staffState(role: 'bartender' | 'bouncer', tone: ZoneTone | undefined): 
   return tone === 'warn' ? 'on alert' : tone === 'busy' ? 'watching' : 'calm';
 }
 
+/** A short crew reaction shown as a speech bubble when their station is under
+ *  load — so the crew read as people actively carrying (or losing) the room,
+ *  not static initials. Tied to the same zone tone that drives their state. */
+function staffReaction(role: 'bartender' | 'bouncer', tone: ZoneTone | undefined): string | undefined {
+  if (tone === 'warn') return role === 'bartender' ? 'Slammed!' : 'Trouble!';
+  if (tone === 'busy') return role === 'bartender' ? 'Hands full' : 'Eyes up';
+  return undefined;
+}
+
 /** Character-driven tint — Caramel reads calm cyan, John reads hot magenta,
  *  every other staffer takes the zone color. Pure cosmetic. */
 function staffTint(id: string, role: 'bartender' | 'bouncer', baseTint: string): string {
@@ -116,10 +125,32 @@ const ROLE_GLYPH: Record<'bartender' | 'bouncer', string> = {
   bouncer: '◆',
 };
 
-function StaffToken({ s, role, color, state }: { s: FloorStaff; role: 'bartender' | 'bouncer'; color: string; state?: string }) {
+function StaffToken({
+  s,
+  role,
+  color,
+  state,
+  reaction,
+  onPress,
+}: {
+  s: FloorStaff;
+  role: 'bartender' | 'bouncer';
+  color: string;
+  state?: string;
+  reaction?: string;
+  onPress?: () => void;
+}) {
   const tint = staffTint(s.id, role, color);
-  return (
-    <View style={styles.token} accessibilityLabel={`${role} ${s.name}`}>
+  const body = (
+    <View style={styles.token} accessibilityLabel={`${role} ${s.name}`} accessibilityRole={onPress ? 'button' : undefined}>
+      {/* Crew reaction speech bubble when their station is under load. */}
+      {reaction ? (
+        <View style={[styles.crewBubble, { borderColor: tint }]} pointerEvents="none">
+          <Text variant="label" color={tint} numberOfLines={1} style={styles.crewBubbleText}>
+            {reaction}
+          </Text>
+        </View>
+      ) : null}
       <View style={[styles.avatar, { borderColor: tint, shadowColor: tint }]}>
         <Text variant="label" color={tint}>
           {s.initials}
@@ -139,6 +170,16 @@ function StaffToken({ s, role, color, state }: { s: FloorStaff; role: 'bartender
         </Text>
       ) : null}
     </View>
+  );
+  // Tapping a crew member opens their station's command sheet — the first step
+  // toward "tap the crew / tap the zone → choose an action" replacing the fixed
+  // boss-button tray. Falls back to a plain token when no handler is wired.
+  return onPress ? (
+    <Pressable onPress={onPress} accessibilityRole="button">
+      {body}
+    </Pressable>
+  ) : (
+    body
   );
 }
 
@@ -738,7 +779,7 @@ export function FloorView({
                 <View style={styles.doorPost}>
                   {floor.bouncers.length > 0 ? (
                     floor.bouncers.map((b) => (
-                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} />
+                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} reaction={staffReaction('bouncer', zones?.door)} onPress={onZonePress ? () => onZonePress('door') : undefined} />
                     ))
                   ) : (
                     <EmptyPost />
@@ -879,7 +920,7 @@ export function FloorView({
               <View style={styles.sideBarPosts}>
                 {floor.bartenders.length > 0 ? (
                   floor.bartenders.map((b) => (
-                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} />
+                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} reaction={staffReaction('bartender', zones?.bar)} onPress={onZonePress ? () => onZonePress('bar') : undefined} />
                   ))
                 ) : (
                   <EmptyPost />
@@ -1252,8 +1293,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   emptyAvatar: { borderColor: colors.border, borderStyle: 'dashed', shadowOpacity: 0 },
-  tokenName: { maxWidth: 56, textAlign: 'center', fontSize: 10 },
-  tokenState: { maxWidth: 56, textAlign: 'center', fontSize: 9 },
+  tokenName: { maxWidth: 56, textAlign: 'center', fontSize: 11 },
+  tokenState: { maxWidth: 56, textAlign: 'center', fontSize: 10 },
+  crewBubble: {
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    marginBottom: 2,
+  },
+  crewBubbleText: { fontSize: 9 },
   crowd: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1263,11 +1313,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   // --- Guest silhouette (head + body) ---
-  silhouette: { alignItems: 'center', width: 8 },
+  silhouette: { alignItems: 'center', width: 9 },
   silhouetteHead: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     shadowOpacity: 0.6,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 0 },

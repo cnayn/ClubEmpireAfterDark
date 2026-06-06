@@ -443,7 +443,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       accessibilityLabel={running ? `${speed}× — long press to pause` : 'Resume'}
       style={[styles.speed, encounterBlocking && styles.speedDisabled]}
     >
-      <Text variant="label" color={encounterBlocking ? colors.textMuted : colors.neonCyan}>
+      <Text variant="label" color={encounterBlocking ? colors.textMuted : colors.neonCyan} style={styles.clockText}>
         {clockLabel(progress)} · {speed}× {running && !sheetZone ? '▶' : '❚❚'}
       </Text>
     </Pressable>
@@ -710,6 +710,7 @@ const styles = StyleSheet.create({
   dockBtnDim: { opacity: 0.6 },
   dockGlyph: { fontSize: 22, lineHeight: 24 },
   dockLabel: { fontSize: 11 },
+  clockText: { fontSize: 14 },
   speed: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
