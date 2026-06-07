@@ -343,7 +343,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setEncChoice(ch);
     setReactions((b) => [...b.filter((x) => x.zone !== ch.bubble.zone), ch.bubble]);
     setFlashZone(ch.bubble.zone);
-    setBossStream((r) => [...r, { id: `enc-${ch.id}`, text: ch.outcome, tone: ch.bubble.tone }]);
+    setBossStream((r) => [...r, { id: `enc-${ch.id}-${r.length}`, text: ch.outcome, tone: ch.bubble.tone }]);
     setRunning(true); // resume after the call
   };
 
@@ -355,7 +355,9 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
     setMood(outcome.mood);
     setFlashZone(outcome.bubble.zone);
-    setBossStream((r) => [...r, { id: `ba-${id}`, text: outcome.call, tone: outcome.bubble.tone }]);
+    // Unique key per push — the same action can fire many times a night, so the
+    // id can't just be `ba-${id}` (that caused a duplicate-key console error).
+    setBossStream((r) => [...r, { id: `ba-${id}-${r.length}`, text: outcome.call, tone: outcome.bubble.tone }]);
   };
 
   // Tap targets — each opens the inspect sheet for the EXACT object tapped, not
@@ -414,8 +416,29 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           ? v >= 0.85 ? 'slammed' : v >= 0.66 ? 'backed up' : v >= 0.33 ? 'working' : 'steady'
           : v >= 0.85 ? 'overwhelmed' : v >= 0.66 ? 'tense' : v >= 0.33 ? 'watching' : 'calm';
       subtitle = `${role} · ${def.label} · ${state}`;
-    } else if (t.kind === 'queue') {
-      title = zone === 'bar' ? 'BAR QUEUE' : zone === 'door' ? 'DOOR LINE' : 'DANCE FLOOR';
+    } else {
+      // Station / queue cards carry an explicit Type · State sub-line too.
+      const stateWord =
+        zone === 'bar' ? meterRead('bar', pressures.bar).status
+        : zone === 'door' ? meterRead('door', pressures.door).status
+        : zone === 'bathroom' ? meterRead('bath', pressures.bathroom).status
+        : zone === 'floor' || zone === 'dj' ? meterRead('floor', pressures.energy).status
+        : zone === 'staff' ? meterRead('crew', morale).status
+        : '';
+      if (t.kind === 'queue') {
+        title = zone === 'bar' ? 'BAR QUEUE' : zone === 'door' ? 'DOOR LINE' : 'DANCE FLOOR';
+        subtitle = `Guest Cluster${stateWord ? ` · ${stateWord}` : ''}`;
+      } else {
+        const stationType =
+          zone === 'bar' ? 'Service Station'
+          : zone === 'door' ? 'Security'
+          : zone === 'dj' ? 'Music Station'
+          : zone === 'floor' ? 'Dance Floor'
+          : zone === 'bathroom' ? 'Facilities'
+          : zone === 'staff' ? 'Back of House'
+          : 'Locked';
+        subtitle = `${stationType}${stateWord ? ` · ${stateWord}` : ''}`;
+      }
     }
 
     // The station/crew read — names the SPECIFIC crew member when one was tapped.
@@ -551,7 +574,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     if (alertKey) {
       const k = alertKey;
       setIgnored((i) => [...i, k]);
-      setBossStream((r) => [...r, { id: `ride-${k}-${ignored.length}`, text: RIDE_TEXT[k] ?? 'You let it ride.', tone: 'warn' }]);
+      setBossStream((r) => [...r, { id: `ride-${k}-${r.length}`, text: RIDE_TEXT[k] ?? 'You let it ride.', tone: 'warn' }]);
     }
     setAlertKey(null);
     togglePause();
