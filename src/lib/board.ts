@@ -17,6 +17,43 @@ import type { ClubState, VenueZone } from '@/domain/types';
 
 export type BoardZone = 'door' | 'bar' | 'floor' | 'dj' | 'bathroom' | 'staff' | 'vip';
 
+export type CrewRole = 'bartender' | 'bouncer' | 'dj' | 'owner';
+
+/**
+ * A tappable thing on the floor. The night UI inspects the EXACT target the
+ * player touched — a specific crew member, the station background, or a guest
+ * cluster/queue — instead of collapsing every tap to the zone. Pure data; the
+ * UI builds the right card from it.
+ */
+export type InspectTarget =
+  | { kind: 'station'; zone: BoardZone }
+  | { kind: 'crew'; zone: BoardZone; staffId: string; role: 'bartender' | 'bouncer' }
+  | { kind: 'queue'; zone: BoardZone };
+
+/** The zone an InspectTarget belongs to (used for clock-pause + zone glow). */
+export function targetZone(t: InspectTarget): BoardZone {
+  return t.zone;
+}
+
+/**
+ * Where each crew role is ALLOWED to work — the foundation for future
+ * fixed-station assignment (Nightclub-City flavour), NOT free movement: no drag,
+ * no pathfinding, no per-NPC motion, no economy change. Pure data + lookups;
+ * nothing consumes this for gameplay yet, it just defines the legal stations.
+ */
+export const CREW_STATIONS: Record<CrewRole, BoardZone[]> = {
+  bartender: ['bar', 'floor', 'staff'],
+  bouncer: ['door', 'floor', 'staff'],
+  dj: ['dj'],
+  owner: ['floor', 'bar', 'door', 'dj', 'staff'],
+};
+export function allowedStations(role: CrewRole): BoardZone[] {
+  return CREW_STATIONS[role] ?? [];
+}
+export function canAssign(role: CrewRole, zone: BoardZone): boolean {
+  return allowedStations(role).includes(zone);
+}
+
 export interface BoardZoneDef {
   id: BoardZone;
   label: string;

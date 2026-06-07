@@ -4,7 +4,7 @@
 
 import { defaultDayConfig, STARTING_ROSTER } from '@/domain/staff';
 import type { ClubState } from '@/domain/types';
-import { BOARD_COLS, BOARD_ZONES, boardFurniture, boardTokens, FIRST_FLOOR_LAYOUT, tokensInZone, zoneActions, zonePlacement } from './board';
+import { allowedStations, BOARD_COLS, BOARD_ZONES, boardFurniture, boardTokens, canAssign, CREW_STATIONS, FIRST_FLOOR_LAYOUT, targetZone, tokensInZone, zoneActions, zonePlacement } from './board';
 
 function club(over: Partial<ClubState> = {}): ClubState {
   const staff = STARTING_ROSTER.map((m) => ({ ...m }));
@@ -84,6 +84,32 @@ describe('boardTokens / tokensInZone', () => {
 
   it('is deterministic for the same club', () => {
     expect(boardTokens(club())).toEqual(boardTokens(club()));
+  });
+});
+
+describe('InspectTarget + crew stations', () => {
+  it('targetZone reads the zone off any target kind', () => {
+    expect(targetZone({ kind: 'station', zone: 'bar' })).toBe('bar');
+    expect(targetZone({ kind: 'crew', zone: 'door', staffId: 'x', role: 'bouncer' })).toBe('door');
+    expect(targetZone({ kind: 'queue', zone: 'floor' })).toBe('floor');
+  });
+
+  it('allows each crew role only at its legal stations (foundation, not free movement)', () => {
+    expect(allowedStations('bartender')).toEqual(['bar', 'floor', 'staff']);
+    expect(allowedStations('bouncer')).toEqual(['door', 'floor', 'staff']);
+    expect(allowedStations('dj')).toEqual(['dj']);
+    expect(canAssign('bartender', 'bar')).toBe(true);
+    expect(canAssign('bartender', 'door')).toBe(false);
+    expect(canAssign('bouncer', 'door')).toBe(true);
+    expect(canAssign('dj', 'floor')).toBe(false);
+    expect(canAssign('owner', 'dj')).toBe(true);
+  });
+
+  it('every crew station is a real board zone', () => {
+    const zoneIds = new Set(BOARD_ZONES.map((z) => z.id));
+    for (const zones of Object.values(CREW_STATIONS)) {
+      for (const z of zones) expect(zoneIds.has(z)).toBe(true);
+    }
   });
 });
 

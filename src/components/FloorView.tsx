@@ -638,6 +638,8 @@ export function FloorView({
   clusters,
   pressures,
   onZonePress,
+  onStaffPress,
+  onClusterPress,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -657,8 +659,12 @@ export function FloorView({
   hideFooter?: boolean;
   clusters?: GuestCluster[];
   pressures?: { bar: number; door: number; bathroom: number; energy: number; crowd: number };
-  /** Tap a board zone to command it (opens a zone action sheet in the caller). */
+  /** Tap a board zone's BACKGROUND to inspect the station. */
   onZonePress?: (zone: BoardZone) => void;
+  /** Tap a specific crew token to inspect THAT crew member (not the zone). */
+  onStaffPress?: (staffId: string, role: 'bartender' | 'bouncer', zone: BoardZone) => void;
+  /** Tap a guest cluster/queue to inspect the crowd at that zone. */
+  onClusterPress?: (zone: BoardZone) => void;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -781,21 +787,26 @@ export function FloorView({
                 <View style={styles.doorPost}>
                   {floor.bouncers.length > 0 ? (
                     floor.bouncers.map((b) => (
-                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} reaction={staffReaction('bouncer', zones?.door)} onPress={onZonePress ? () => onZonePress('door') : undefined} />
+                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} reaction={staffReaction('bouncer', zones?.door)} onPress={onStaffPress ? () => onStaffPress(b.id, 'bouncer', 'door') : undefined} />
                     ))
                   ) : (
                     <EmptyPost />
                   )}
                 </View>
                 {doorCluster ? (
-                  <View style={styles.doorLine}>
+                  <Pressable
+                    style={styles.doorLine}
+                    onPress={onClusterPress ? () => onClusterPress('door') : undefined}
+                    accessibilityRole={onClusterPress ? 'button' : undefined}
+                    accessibilityLabel="Door line"
+                  >
                     <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
                     <View style={styles.stanchionRow} pointerEvents="none">
                       <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
                       <View style={[styles.stanchionRope, { backgroundColor: colors.warning }]} />
                       <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
                     </View>
-                  </View>
+                  </Pressable>
                 ) : null}
               </View>
               <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('door') }]}>
@@ -895,7 +906,13 @@ export function FloorView({
                 />
                 <View style={styles.crowd}>
                   {floorCluster ? (
-                    <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                    <Pressable
+                      onPress={onClusterPress ? () => onClusterPress('floor') : undefined}
+                      accessibilityRole={onClusterPress ? 'button' : undefined}
+                      accessibilityLabel="Dance floor crowd"
+                    >
+                      <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                    </Pressable>
                   ) : (
                     renderFallbackCrowd()
                   )}
@@ -951,13 +968,21 @@ export function FloorView({
               <View style={styles.sideBarPosts}>
                 {floor.bartenders.length > 0 ? (
                   floor.bartenders.map((b) => (
-                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} reaction={staffReaction('bartender', zones?.bar)} onPress={onZonePress ? () => onZonePress('bar') : undefined} />
+                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} reaction={staffReaction('bartender', zones?.bar)} onPress={onStaffPress ? () => onStaffPress(b.id, 'bartender', 'bar') : undefined} />
                   ))
                 ) : (
                   <EmptyPost />
                 )}
               </View>
-              {barCluster ? <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} /> : null}
+              {barCluster ? (
+                <Pressable
+                  onPress={onClusterPress ? () => onClusterPress('bar') : undefined}
+                  accessibilityRole={onClusterPress ? 'button' : undefined}
+                  accessibilityLabel="Bar queue"
+                >
+                  <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} />
+                </Pressable>
+              ) : null}
               {inZone('bar').length > 0 ? (
                 <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
               ) : null}

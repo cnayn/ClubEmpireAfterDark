@@ -27,7 +27,7 @@ import {
   resolveBossAction,
 } from '@/lib/bossActions';
 import { bossLifts, bossRelief, guestHappiness, staffMorale } from '@/lib/roomMood';
-import { type BoardZone, getBoardZone, zoneActions } from '@/lib/board';
+import { type BoardZone, getBoardZone, type InspectTarget, zoneActions } from '@/lib/board';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
@@ -181,7 +181,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
   // Which board zone's command sheet is open (tap a zone to command it).
-  const [sheetZone, setSheetZone] = useState<BoardZone | null>(null);
+  // What the player is inspecting — the EXACT floor object they tapped (a crew
+  // member, a station background, or a guest queue), not just the zone.
+  const [sheetTarget, setSheetTarget] = useState<InspectTarget | null>(null);
+  const sheetZone: BoardZone | null = sheetTarget?.zone ?? null;
   // The full boss tray is collapsed by default — tapping the floor is the primary
   // way to act; the tray is a fallback behind "More calls".
   const [dockExpanded, setDockExpanded] = useState(false);
@@ -355,60 +358,122 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setBossStream((r) => [...r, { id: `ba-${id}`, text: outcome.call, tone: outcome.bubble.tone }]);
   };
 
-  // Tap a board zone → open its command sheet (and flash the zone if it maps to a
-  // live pressure zone). Inspect-only zones (bathroom / staff) show status.
+  // Tap targets — each opens the inspect sheet for the EXACT object tapped, not
+  // a blanket zone. (flash the zone if it maps to a live pressure zone.)
+  const flashFor = (zone: BoardZone) => {
+    if (zone === 'door' || zone === 'bar' || zone === 'floor') setFlashZone(zone);
+  };
   const onZonePress = (zone: BoardZone) => {
     if (committed) return;
-    setSheetZone(zone);
-    if (zone === 'door' || zone === 'bar' || zone === 'floor') setFlashZone(zone);
+    setSheetTarget({ kind: 'station', zone });
+    flashFor(zone);
+  };
+  const onStaffPress = (staffId: string, role: 'bartender' | 'bouncer', zone: BoardZone) => {
+    if (committed) return;
+    setSheetTarget({ kind: 'crew', zone, staffId, role });
+    flashFor(zone);
+  };
+  const onClusterPress = (zone: BoardZone) => {
+    if (committed) return;
+    setSheetTarget({ kind: 'queue', zone });
+    flashFor(zone);
+  };
+
+  // The actions a target offers. Crew offer their own verb; a queue offers the
+  // service verb + Work the Room; a station offers its board actions. Related,
+  // not identical (per the tap-target spec).
+  const targetActions = (t: InspectTarget): BossActionId[] => {
+    if (t.kind === 'crew') return t.role === 'bartender' ? ['check-bar'] : ['send-bouncer'];
+    if (t.kind === 'queue') {
+      if (t.zone === 'bar') return ['check-bar', 'work-room'];
+      if (t.zone === 'door') return ['send-bouncer', 'work-room'];
+      if (t.zone === 'floor') return ['push-dj', 'work-room'];
+      return [];
+    }
+    return zoneActions(t.zone);
   };
 
   const renderZoneSheet = () => {
-    if (committed || !sheetZone) return null;
-    const def = getBoardZone(sheetZone);
-    const actions = zoneActions(sheetZone);
-    // What inspecting the zone REVEALS — the bar runs all night; checking it
-    // tells you whether the crew are clean/fast, sloppy, or skimming stock; the
-    // door tells you if it's calm or tense, etc. Read off the deterministic
-    // preview (serviceRatio / theft / incidents) + live energy.
+    if (committed || !sheetTarget) return null;
+    const t = sheetTarget;
+    const zone = t.zone;
+    const def = getBoardZone(zone);
     const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
+    const onDuty = [...floor.bartenders, ...floor.bouncers];
+    const tappedName = t.kind === 'crew' ? onDuty.find((s) => s.id === t.staffId)?.name : undefined;
+
+    // Title + sub-line identify exactly what was tapped.
+    let title = def.label.toUpperCase();
+    let subtitle: string | null = null;
+    if (t.kind === 'crew') {
+      title = (tappedName ?? 'CREW').toUpperCase();
+      const role = t.role === 'bartender' ? 'Bartender' : 'Bouncer';
+      const v = t.role === 'bartender' ? pressures.bar : pressures.door;
+      const state =
+        t.role === 'bartender'
+          ? v >= 0.85 ? 'slammed' : v >= 0.66 ? 'backed up' : v >= 0.33 ? 'working' : 'steady'
+          : v >= 0.85 ? 'overwhelmed' : v >= 0.66 ? 'tense' : v >= 0.33 ? 'watching' : 'calm';
+      subtitle = `${role} · ${def.label} · ${state}`;
+    } else if (t.kind === 'queue') {
+      title = zone === 'bar' ? 'BAR QUEUE' : zone === 'door' ? 'DOOR LINE' : 'DANCE FLOOR';
+    }
+
+    // The station/crew read — names the SPECIFIC crew member when one was tapped.
     const reveal = ((): { text: string; tone: BeatTone } | null => {
-      // Name the actual crew on the station so it reads as inspecting THEM, not
-      // a generic zone. (Reads only — no theft/hidden-trait system yet.)
-      const bartender = floor.bartenders[0]?.name;
-      const bouncer = floor.bouncers[0]?.name;
-      if (sheetZone === 'bar') {
-        const who = bartender ?? 'The bar';
-        if (preview.theft > 0) return { text: `Stock looks light — something’s off at ${bartender ?? 'the bar'}.`, tone: 'bad' };
+      if (zone === 'bar') {
+        const who = tappedName ?? floor.bartenders[0]?.name ?? 'The bar';
+        if (t.kind === 'queue') {
+          if (preview.serviceRatio < 0.85) return { text: 'Guests are waiting — the queue is service-bound.', tone: 'bad' };
+          if (fill >= 0.7) return { text: 'Busy queue, but drinks are moving.', tone: 'warn' };
+          return { text: 'Short queue — service is keeping up.', tone: 'good' };
+        }
+        if (preview.theft > 0) return { text: `Stock looks light — something’s off at ${tappedName ?? 'the bar'}.`, tone: 'bad' };
         if (preview.serviceRatio < 0.85) return { text: `${who} is slammed — pours are slow.`, tone: 'bad' };
         if (preview.serviceRatio < 1) return { text: `${who} is holding the line — just keeping pace.`, tone: 'warn' };
         return { text: `${who} is steady — drinks are moving.`, tone: 'good' };
       }
-      if (sheetZone === 'door') {
-        const who = bouncer ?? 'The door';
-        if (preview.incidents > 0) return { text: `Trouble at the door — ${bouncer ? `${bouncer} has their hands full` : 'nobody’s holding it'}.`, tone: 'bad' };
+      if (zone === 'door') {
+        const who = tappedName ?? floor.bouncers[0]?.name ?? 'The door';
+        if (t.kind === 'queue') {
+          if (preview.incidents > 0) return { text: 'Wrong crowd forming — the line’s pushing.', tone: 'bad' };
+          if (fill >= 0.7) return { text: 'Line’s heavy — guests are waiting to get in.', tone: 'warn' };
+          return { text: 'Line’s short — easy on the door.', tone: 'good' };
+        }
+        if (preview.incidents > 0) return { text: `Trouble at the door — ${tappedName ? `${tappedName} has their hands full` : 'nobody’s holding it'}.`, tone: 'bad' };
         if (fill >= 0.7) return { text: `${who} — line’s heavy, getting tense.`, tone: 'warn' };
         return { text: `${who} has it calm — nothing kicking off.`, tone: 'good' };
       }
-      if (sheetZone === 'floor' || sheetZone === 'dj') {
+      if (zone === 'floor' || zone === 'dj') {
         if (pressures.energy <= 0.3) return { text: 'The floor’s cooling — the room needs a lift.', tone: 'warn' };
         if (pressures.energy >= 0.66) return { text: 'Floor’s hot — they’re dancing.', tone: 'good' };
         return { text: 'Floor’s steady.', tone: 'info' };
       }
       return null;
     })();
+
+    const actions = targetActions(t);
+    const actionLabel = (id: BossActionId): string => {
+      if (t.kind === 'crew' && tappedName) return id === 'check-bar' ? `Check ${tappedName}` : id === 'send-bouncer' ? `Send ${tappedName}` : BOSS_ACTIONS.find((x) => x.id === id)?.label ?? id;
+      return BOSS_ACTIONS.find((x) => x.id === id)?.label ?? id;
+    };
+
     return (
       <View style={styles.situation}>
         <View style={styles.situationHead}>
           <Text variant="label" color={colors.neonCyan} style={styles.situationTag}>
-            {def.label.toUpperCase()}
+            {title}
           </Text>
-          <Pressable onPress={() => setSheetZone(null)} accessibilityRole="button">
+          <Pressable onPress={() => setSheetTarget(null)} accessibilityRole="button">
             <Text variant="label" muted>
               Close ✕
             </Text>
           </Pressable>
         </View>
+        {subtitle ? (
+          <Text variant="label" muted>
+            {subtitle}
+          </Text>
+        ) : null}
         {reveal ? (
           <Text variant="body" color={TONE_COLOR[reveal.tone]} style={styles.bannerBody}>
             {reveal.text}
@@ -418,7 +483,6 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           <>
             <View style={styles.tray}>
               {actions.map((id) => {
-                const a = BOSS_ACTIONS.find((x) => x.id === id);
                 const disabled = focusLeft < focusCost(id);
                 return (
                   <Pressable
@@ -429,7 +493,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
                     style={[styles.choice, disabled && styles.dockBtnDim]}
                   >
                     <Text variant="body" color={disabled ? colors.textMuted : colors.neonMagenta}>
-                      {a?.label ?? id}
+                      {actionLabel(id)}
                     </Text>
                   </Pressable>
                 );
@@ -439,14 +503,14 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
               Owner Attention: {focusLeft}/{NIGHT_FOCUS}
             </Text>
           </>
-        ) : sheetZone === 'bathroom' ? (
+        ) : zone === 'bathroom' ? (
           <Text variant="label" muted>
             Bathroom pressure {Math.round(pressures.bathroom * 100)}% —{' '}
             {pressures.bathroom >= 0.55 ? 'the line is backing up.' : 'holding for now.'}
           </Text>
-        ) : sheetZone === 'staff' ? (
+        ) : zone === 'staff' ? (
           <Text variant="label" muted>
-            On duty: {[...floor.bartenders, ...floor.bouncers].map((s) => s.name).join(', ') || 'nobody'}.
+            On duty: {onDuty.map((s) => s.name).join(', ') || 'nobody'}.
           </Text>
         ) : (
           <Text variant="label" muted>Nothing to command here yet.</Text>
@@ -773,6 +837,8 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         clusters={liveClusters}
         pressures={pressures}
         onZonePress={committed ? undefined : onZonePress}
+        onStaffPress={committed ? undefined : onStaffPress}
+        onClusterPress={committed ? undefined : onClusterPress}
       />
     </Screen>
   );
