@@ -265,6 +265,159 @@ DJ's name and state per UIUX §7 staff visual language.)
 It is **read-only derived UI** sitting on top of the state the night
 already computes. Same data, surfaced more legibly.
 
+### Tap Target Hierarchy (taxonomy of what tap returns what)
+
+> **Playtest issue:** today, tap-to-act is too coarse — tapping the
+> bar surfaces Rosa's actions whether the player meant Rosa, the
+> station, or the queue. This section is the **canon distinction**
+> between target types so each tap opens the **right** card.
+
+The night-mode floor has **five distinct tap-target types.** Each
+opens a different card.
+
+#### 1. Crew token tap
+
+The player tapped a **specific named staff member's token.** The
+card is *about that person.*
+
+- Subject is the named staff (Rosa, John, Caramel, Grace, etc.).
+- Read frames *their* state — slammed, hot, sloppy, calm.
+- Suggested action is whatever fits them right now (Check Bar on a
+  slammed Rosa; Send Bouncer on a hot John).
+- Voice line is in *their* voice (per
+  [`character-bible.md`](character-bible.md) +
+  [`bubble-bank.md`](bubble-bank.md)).
+
+> Examples: Tap Rosa → Rosa card. Tap John → John card. Tap
+> Caramel → Caramel card. (If two bartenders are on duty, tapping
+> the rail vs tapping a specific token resolves to different
+> cards — see Disambiguation below.)
+
+#### 2. Station / background tap
+
+The player tapped the **zone tile itself**, not a person standing on
+it. The card is *about the place.*
+
+- Subject is the station (Bar, Door, Dance Floor, DJ Booth,
+  Bathroom, Staff Area).
+- Read frames the *zone's* state — backed up, hot, cold, alive,
+  messy, clear.
+- Suggested action is the boss action aimed at that zone (Check
+  Bar, Send Bouncer, Push DJ, Work the Room).
+- Voice line is room-voiced, not character-voiced (per UIUX §10).
+
+> Examples: Tap Bar station tile → Bar station card. Tap Door
+> station tile → Door card. Tap DJ Booth tile → DJ booth card.
+
+#### 3. Guest cluster / queue tap
+
+The player tapped a **cluster of guests** (a queue, a dance-floor
+cluster, a regulars cluster). The card is *about the crowd, not the
+place or the staff.*
+
+- Subject is the cluster (Bar queue · Dance floor crowd · Bathroom
+  queue · Regulars cluster · a segment like "Students").
+- Read frames the *cluster's* mood and want — bored, angry, happy,
+  waiting; cheaper drinks, better music, faster service.
+- Suggested action is whatever addresses the crowd's want (could
+  be a boss action; could be "ride it out").
+- Voice line is observational, often a single guest line ("How
+  long?!", "Best place.")
+
+> Examples: Tap Bar queue → Queue card (7 waiting, angry).
+> Tap Dance floor crowd → Floor cluster card (mood, density).
+> Tap Regulars cluster → Regulars card (per UIUX §17 regulars
+> bubble pool).
+
+#### 4. Object / furniture tap
+
+The player tapped a **piece of decor or furniture** on the floor.
+The card is *about the object.*
+
+- Subject is the object (a lighting rig, a banquette, a sound
+  stack, a neon sign).
+- Read frames what the object *does* — its visible/mechanical effect,
+  per [`level-and-floor-progression.md`](level-and-floor-progression.md)
+  §3 upgrade categories.
+- Suggested action is contextual (upgrade tier, swap, future:
+  remove). In Phase 1 this is often "view only — adjust in Prep
+  mode."
+- No voice line; this is a Sims-style object card (per UIUX §3).
+
+> Examples: Tap lighting rig → Lighting card. Tap banquette →
+> Seating card.
+
+#### 5. Owner / avatar tap (FUTURE / DO NOT BUILD YET)
+
+The player taps an on-floor representation of *themselves* (the
+owner). The card is about owner presence — which zones the owner is
+currently affecting, recent Work-the-Room targets, future
+Party/Empire stance (FUTURE).
+
+> **Status: FUTURE / DO NOT BUILD YET.** Today the owner has no
+> on-floor avatar token. Banked so the hierarchy is complete; build
+> after the Party/Empire meter or its substitute exists.
+
+### Disambiguation rules (when targets overlap)
+
+When a tap could resolve to more than one target type, the
+hierarchy is:
+
+1. **A named crew token's hit area wins over the station tile it
+   stands on.** Tapping Rosa specifically opens Rosa's card, not
+   the Bar station card.
+2. **A guest cluster wins over the station tile underneath it.**
+   Tapping a dense queue at the rail opens the Queue card, not the
+   Bar station card.
+3. **An object wins over the station tile it lives on.** Tapping a
+   lighting rig opens the Lighting card, not the Dance Floor card.
+4. **The station tile is the fallback.** Tapping the empty area of
+   a zone — no crew, no cluster, no object — opens the Station
+   card.
+
+### Crew assignment / movement direction (FUTURE / DO NOT BUILD YET)
+
+> Long-term, crew should *feel movable* — the NCC magnetic pull
+> includes "I can put my staff where I want them." Today we ship a
+> **safe near-term version** so the floor stays coherent without
+> opening pathfinding or NPC AI.
+
+#### Near-term model (allowed now)
+
+- Crew are **assigned to fixed station slots** (Bar → bartender slot;
+  Door → bouncer slot; DJ Booth → DJ slot when DJ role exists).
+- No pathfinding.
+- No drag-and-drop.
+- No free placement.
+- No individual NPC AI.
+
+The visible movement when crew is reassigned is a **fade-out at the
+old slot, fade-in at the new slot** — no traversal animation
+required.
+
+#### Future direction (banked, do not build yet)
+
+- **Tap crew → choose assignment.** A small menu appears on the crew
+  card: "Send to Bar / Send to Door / Send to Back / Send to Help X."
+- **Crew visibly relocates between fixed station slots.** A short
+  slide animation between slots replaces the fade-out/fade-in once
+  the floor can render it cleanly.
+- **Drag-and-drop (later, maybe).** Only if the game's input model
+  supports it without losing precision on mobile, and only after the
+  tap-target hierarchy is mature.
+- **Auto-routing for emergencies (later).** Caramel could
+  auto-relocate to back-bar during a critical bar pressure event
+  (only if his loyalty / Stage 2 system exists — per
+  [`event-bible.md`](event-bible.md) Caramel chain).
+
+Every step on the future direction preserves the **no pathfinding /
+no NPC AI / no free placement** guardrails. Movement is between
+known slots, not across the floor.
+
+> **Status: FUTURE / DO NOT BUILD YET.** Banked so build session
+> knows the architecture should support "crew at slot X moves to
+> slot Y" without a refactor — not so it ships now.
+
 ### Why this is the missing bridge
 
 The player today sees pressure but cannot *interrogate* it. Boss
@@ -602,6 +755,10 @@ readability work this doc is scoped around:
   locations, choose where to open" pre-game flow. Floor 1 starts
   *already-yours* today; the venue-finding arc is a future
   onboarding layer, not part of this UI foundation pass.
+- **Crew free movement / pathfinding / drag-and-drop placement** —
+  see §4 "Crew assignment / movement direction." Near-term is
+  fixed-slot assignment only; future is slot-to-slot relocation;
+  free placement and pathfinding remain off-table.
 
 The **missing foundation today** is:
 
