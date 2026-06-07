@@ -182,6 +182,9 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
   // Which board zone's command sheet is open (tap a zone to command it).
   const [sheetZone, setSheetZone] = useState<BoardZone | null>(null);
+  // The full boss tray is collapsed by default — tapping the floor is the primary
+  // way to act; the tray is a fallback behind "More calls".
+  const [dockExpanded, setDockExpanded] = useState(false);
   // Zones that have already auto-paused the night this run (so each serious
   // situation stops the clock ONCE — a prompt to read the room, not a nag loop).
   const [alerted, setAlerted] = useState<Set<string>>(() => new Set());
@@ -645,11 +648,23 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     'send-bouncer': 'Door',
     'work-room': 'Work Room',
   };
+  // The one call that fits the current situation, so an active alert offers a
+  // single obvious tap instead of forcing a scan of four buttons.
+  const ALERT_ACTION: Record<string, BossActionId> = {
+    bar: 'check-bar',
+    door: 'send-bouncer',
+    bath: 'work-room',
+    energy: 'push-dj',
+    guests: 'work-room',
+    crew: 'work-room',
+  };
+  const alertAction = alertKey ? ALERT_ACTION[alertKey] : undefined;
 
   const bossDock = !committed ? (
     <View style={styles.dock}>
       <View style={styles.focusRow}>
-        <Text variant="label" muted>OWNER ATTENTION</Text>
+        {/* Primary instruction: tap the room. The tray is the fallback below. */}
+        <Text variant="label" color={colors.neonCyan}>TAP A ZONE TO ACT</Text>
         <View style={styles.focusDots}>
           {Array.from({ length: NIGHT_FOCUS }).map((_, i) => (
             <View key={i} style={[styles.focusDot, i < focusLeft && styles.focusDotOn]} />
@@ -661,29 +676,48 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           {mentorHint}
         </Text>
       ) : null}
-      <View style={styles.dockRow}>
-        {BOSS_ACTIONS.map((a) => {
-          const disabled = encounterBlocking || focusLeft < focusCost(a.id);
-          return (
-            <Pressable
-              key={a.id}
-              onPress={() => onAction(a.id)}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel={a.label}
-              accessibilityState={{ disabled }}
-              style={[styles.dockBtn, disabled && styles.dockBtnDim]}
-            >
-              <Text variant="heading" color={disabled ? colors.textMuted : colors.neonMagenta} style={styles.dockGlyph}>
-                {ACTION_GLYPH[a.id]}
-              </Text>
-              <Text variant="label" color={disabled ? colors.textMuted : colors.textPrimary} style={styles.dockLabel} numberOfLines={1}>
-                {ACTION_SHORT[a.id]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+
+      {/* One-tap shortcut for the active situation — the single call that fits. */}
+      {alertAction && focusLeft >= focusCost(alertAction) && !encounterBlocking ? (
+        <Pressable onPress={() => onAction(alertAction)} accessibilityRole="button" style={styles.alertShortcut}>
+          <Text variant="heading" color={colors.neonMagenta} style={styles.dockGlyph}>
+            {ACTION_GLYPH[alertAction]}
+          </Text>
+          <Text variant="body" color={colors.textPrimary}>
+            {ACTION_SHORT[alertAction]} — handle the {alertKey}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {/* Fallback: the full four-button tray, collapsed by default. */}
+      <Pressable onPress={() => setDockExpanded((v) => !v)} accessibilityRole="button" style={styles.dockToggle}>
+        <Text variant="label" muted>{dockExpanded ? 'Hide calls ▲' : 'More calls ▾'}</Text>
+      </Pressable>
+      {dockExpanded ? (
+        <View style={styles.dockRow}>
+          {BOSS_ACTIONS.map((a) => {
+            const disabled = encounterBlocking || focusLeft < focusCost(a.id);
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => onAction(a.id)}
+                disabled={disabled}
+                accessibilityRole="button"
+                accessibilityLabel={a.label}
+                accessibilityState={{ disabled }}
+                style={[styles.dockBtn, disabled && styles.dockBtnDim]}
+              >
+                <Text variant="heading" color={disabled ? colors.textMuted : colors.neonMagenta} style={styles.dockGlyph}>
+                  {ACTION_GLYPH[a.id]}
+                </Text>
+                <Text variant="label" color={disabled ? colors.textMuted : colors.textPrimary} style={styles.dockLabel} numberOfLines={1}>
+                  {ACTION_SHORT[a.id]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       {focusLeft === 0 ? (
         <Text variant="label" muted style={styles.dockHint} numberOfLines={1}>
           Out of attention — let the night ride to last call.
@@ -764,6 +798,18 @@ const styles = StyleSheet.create({
   focusDot: { width: 9, height: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   focusDotOn: { backgroundColor: colors.neonMagenta, borderColor: colors.neonMagenta },
   dockRow: { flexDirection: 'row', gap: spacing.xs },
+  alertShortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.neonMagenta,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  dockToggle: { alignSelf: 'center', paddingVertical: spacing.xs },
   dockBtn: {
     flex: 1,
     alignItems: 'center',
