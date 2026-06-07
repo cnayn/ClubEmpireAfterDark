@@ -164,22 +164,43 @@ export function resolveBossAction(id: BossActionId, preview: NightResult, club: 
     }
     case 'work-room':
     default: {
-      // Owner presence — protects culture, never prints money. Lands harder when a
-      // culture crowd (regulars/locals) is in or the room is unstable (cooling /
-      // low name). Bounded; combineInterventions caps the total swing.
+      // Owner presence — protects culture, never prints money. State-aware so it
+      // always READS: it lands hard with a culture crowd or a wobbling room, and
+      // openly does little in a near-empty room (no magic free win). Bounded;
+      // combineInterventions caps the swing.
       const top = topCrowd(crowdMix(club, club.lastConfig), 2);
       const cultureCrowd = top.includes('regulars') || top.includes('locals');
       const unstable = club.reputation < 35 || preview.regularLoyalty < 52;
-      const vibeBonus = 6 + (cultureCrowd ? 4 : 0) + (unstable ? 3 : 0);
-      const note = cultureCrowd
-        ? 'You worked the room — the regulars clocked that the boss was present.'
-        : unstable
-          ? 'You showed face before the room turned — steadied it without touching the till.'
-          : 'You worked the room — being seen helped more than the numbers show.';
+      let vibeBonus: number;
+      let label: string;
+      let note: string;
+      let tone: MoodTone = 'good';
+      if (fill < 0.15) {
+        // Near-empty room: presence can't do much, and the read says so (no win).
+        vibeBonus = 1;
+        tone = 'neutral';
+        label = 'Too quiet to matter';
+        note = 'You worked the room — but it’s too empty to matter yet.';
+      } else {
+        // Additive, bounded: lands harder with a culture crowd and/or a wobbling
+        // room; the read names whichever is driving it.
+        vibeBonus = 6 + (cultureCrowd ? 4 : 0) + (unstable ? 3 : 0);
+        if (cultureCrowd) {
+          label = 'Regulars noticed';
+          note = 'You worked the room — the regulars clocked that the boss was present.';
+        } else if (unstable) {
+          tone = 'info';
+          label = 'You steadied the room';
+          note = 'You showed face before the room turned — steadied it without touching the till.';
+        } else {
+          label = 'You worked the room';
+          note = 'You worked the room — being seen lifted the vibe more than the numbers show.';
+        }
+      }
       return {
         intervention: { vibeBonus, revenueMod: 1 },
-        bubble: { id: 'boss-room', label: 'Boss in room', tone: 'info', zone: 'floor' },
-        mood: { label: 'Boss working the room', tone: 'good' },
+        bubble: { id: 'boss-room', label, tone: tone === 'neutral' ? 'info' : 'good', zone: 'floor' },
+        mood: { label, tone },
         call: BOSS_CALL['work-room'],
         note,
       };

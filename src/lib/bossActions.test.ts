@@ -212,6 +212,16 @@ describe('Boss Actions v2 — stronger, clearer feedback', () => {
     expect(out.intervention.revenueMod).toBe(1);
   });
 
+  it('work-room openly does little in a near-empty room (no magic win) and says so', () => {
+    const c = club({ reputation: 70 });
+    const pv = { ...preview(c, cfg(), 5), guests: 1, capacity: 100 }; // force a near-empty floor
+    expect(pv.guests / pv.capacity).toBeLessThan(0.15);
+    const out = resolveBossAction('work-room', pv, c);
+    expect(out.intervention.vibeBonus).toBeLessThanOrEqual(1);
+    expect(out.intervention.revenueMod).toBe(1);
+    expect(out.note.toLowerCase()).toContain('empty');
+  });
+
   it('send-bouncer: Caramel de-escalates more effectively than John on a risky night', () => {
     const busyCfg = cfg({ coverLevel: 'low', drinkLevel: 'low' });
     const withJohn = club({ reputation: 100, baseCapacity: 200, staff: [...STARTING_ROSTER.map((m) => ({ ...m })), bouncer('bnc-john', 50)] });

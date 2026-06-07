@@ -751,7 +751,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     <View style={styles.dock}>
       <View style={styles.focusRow}>
         {/* Primary instruction: tap the room. The tray is the fallback below. */}
-        <Text variant="label" color={colors.neonCyan}>TAP A ZONE TO ACT</Text>
+        <Text variant="label" color={colors.neonCyan}>TAP THE ROOM TO ACT</Text>
         <View style={styles.focusDots}>
           {Array.from({ length: NIGHT_FOCUS }).map((_, i) => (
             <View key={i} style={[styles.focusDot, i < focusLeft && styles.focusDotOn]} />
@@ -764,7 +764,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         </Text>
       ) : null}
 
-      {/* One-tap shortcut for the active situation — the single call that fits. */}
+      {/* The visible tray holds ONE call: the situation's suggested action when a
+          situation is live, otherwise the global owner move (Work the Room).
+          Station calls (Check Bar / Push DJ / Send Bouncer) live on their
+          stations — tap the room — and stay in the collapsed fallback below. */}
       {alertAction && focusLeft >= focusCost(alertAction) && !encounterBlocking ? (
         <Pressable onPress={() => onAction(alertAction)} accessibilityRole="button" style={styles.alertShortcut}>
           <Text variant="heading" color={colors.neonMagenta} style={styles.dockGlyph}>
@@ -774,7 +777,22 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
             {ACTION_SHORT[alertAction]} — handle the {alertKey}
           </Text>
         </Pressable>
-      ) : null}
+      ) : (
+        <Pressable
+          onPress={() => onAction('work-room')}
+          disabled={encounterBlocking || focusLeft < focusCost('work-room')}
+          accessibilityRole="button"
+          accessibilityLabel="Work the Room"
+          style={[styles.alertShortcut, (encounterBlocking || focusLeft < focusCost('work-room')) && styles.dockBtnDim]}
+        >
+          <Text variant="heading" color={colors.neonMagenta} style={styles.dockGlyph}>
+            {ACTION_GLYPH['work-room']}
+          </Text>
+          <Text variant="body" color={colors.textPrimary}>
+            Work the Room — own the floor
+          </Text>
+        </Pressable>
+      )}
 
       {/* Fallback: the full four-button tray, collapsed by default. */}
       <Pressable onPress={() => setDockExpanded((v) => !v)} accessibilityRole="button" style={styles.dockToggle}>
