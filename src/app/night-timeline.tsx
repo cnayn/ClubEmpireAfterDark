@@ -27,6 +27,7 @@ import {
   resolveBossAction,
 } from '@/lib/bossActions';
 import { bossLifts, bossRelief, guestHappiness, staffMorale } from '@/lib/roomMood';
+import { type DjActionId, DJ_ACTIONS, djFocusCost, djIntervention, djLiveEffect, resolveDjAction } from '@/lib/djActions';
 import { type BoardZone, getBoardZone, type InspectTarget, zoneActions } from '@/lib/board';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
@@ -188,6 +189,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   // The full boss tray is collapsed by default — tapping the floor is the primary
   // way to act; the tray is a fallback behind "More calls".
   const [dockExpanded, setDockExpanded] = useState(false);
+  // DJ Booth multi-action pilot: the DJ calls made tonight + the last "Read the
+  // Room" result (shown in the DJ card).
+  const [djChosen, setDjChosen] = useState<DjActionId[]>([]);
+  const [djRead, setDjRead] = useState<{ read: string; suggested: DjActionId } | null>(null);
   // Zones that have already auto-paused the night this run (so each serious
   // situation stops the clock ONCE — a prompt to read the room, not a nag loop).
   const [alerted, setAlerted] = useState<Set<string>>(() => new Set());
@@ -280,12 +285,14 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       else worsen.energy -= 0.1; // energy / guests / crew
     }
   }
+  // DJ booth calls also warm the floor / nudge mood live (presentation only).
+  const djLive = committed ? { energy: 0, morale: 0, happy: 0 } : djLiveEffect(djChosen, preview, planClub, rawPressures.energy);
   const pressures: NightPressures = {
     crowd: rawPressures.crowd,
     bar: Math.max(0, Math.min(1, rawPressures.bar - relief.bar + worsen.bar)),
     door: Math.max(0, Math.min(1, rawPressures.door - relief.door + worsen.door)),
     bathroom: Math.max(0, Math.min(1, rawPressures.bathroom - relief.bathroom + worsen.bathroom)),
-    energy: Math.max(0, Math.min(1, rawPressures.energy + relief.energy + worsen.energy)),
+    energy: Math.max(0, Math.min(1, rawPressures.energy + relief.energy + worsen.energy + djLive.energy)),
   };
   const headline = pressureHeadline(pressures);
   const atEnd = committed != null || progress >= 1;
@@ -306,15 +313,16 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   // Owner Attention (Boss Focus): a bounded per-night command budget. Each call
   // costs Focus, so the owner acts repeatedly but never spams.
-  const focusSpent = chosen.reduce((s, id) => s + focusCost(id), 0);
+  const focusSpent =
+    chosen.reduce((s, id) => s + focusCost(id), 0) + djChosen.reduce((s, id) => s + djFocusCost(id), 0);
   const focusLeft = Math.max(0, NIGHT_FOCUS - focusSpent);
 
   // Room mood meters — Guest Happiness + Staff Morale. Boss commands visibly lift
   // them while the night is live (diminishing per repeat); the committed read drops
   // the lift since the result already reflects the calls in the resolver.
   const lifts = committed ? { happy: 0, morale: 0 } : bossLifts(chosen);
-  const happy = guestHappiness(shownResult, planClub, pressures, lifts.happy);
-  const morale = staffMorale(shownResult, planClub, pressures, lifts.morale);
+  const happy = guestHappiness(shownResult, planClub, pressures, lifts.happy + djLive.happy);
+  const morale = staffMorale(shownResult, planClub, pressures, lifts.morale + djLive.morale);
 
   // The event stream: ambient ticks (progress-derived) merged with boss/encounter
   // reactions. Newest first; capped to keep the floor reading like a room.
@@ -330,6 +338,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     const ignoreVibe = -3 * ignored.length;
     const combined = combineInterventions([
       bossIntervention(chosen, preview, planClub),
+      djIntervention(djChosen, preview, planClub, pressures.energy),
       ...(encChoice ? [encChoice.intervention] : []),
       ...(ignoreVibe < 0 ? [{ vibeBonus: ignoreVibe, revenueMod: 1 }] : []),
     ]);
@@ -358,6 +367,28 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     // Unique key per push — the same action can fire many times a night, so the
     // id can't just be `ba-${id}` (that caused a duplicate-key console error).
     setBossStream((r) => [...r, { id: `ba-${id}-${r.length}`, text: outcome.call, tone: outcome.bubble.tone }]);
+  };
+
+  // DJ Booth pilot — the four DJ calls. Read the Room is a free inspect (sets the
+  // DJ card read); the others cost Attention and fold into the books at commit.
+  const onDjAction = (id: DjActionId) => {
+    if (committed || encounterBlocking) return;
+    const cost = djFocusCost(id);
+    if (cost > 0 && focusLeft < cost) return;
+    const idx = djChosen.filter((x) => x === id).length;
+    const o = resolveDjAction(id, preview, planClub, rawPressures.energy, idx);
+    const bubbleTone = o.tone === 'neutral' ? 'info' : o.tone; // BubbleTone has no 'neutral'
+    const moodTone = o.tone === 'bad' ? 'warn' : o.tone === 'neutral' ? 'neutral' : (o.tone as MoodTone);
+    if (id === 'read-room') {
+      setDjRead({ read: o.read ?? o.note, suggested: o.suggested ?? 'read-room' });
+    } else {
+      setDjChosen((c) => [...c, id]); // repeats diminish; djIntervention clamps the stack
+      setDjRead(null);
+    }
+    setReactions((b) => [...b.filter((x) => x.zone !== 'floor'), { id: `dj-${id}`, label: o.call, tone: bubbleTone, zone: 'floor' }]);
+    setMood({ label: o.note, tone: moodTone });
+    setFlashZone('floor');
+    setBossStream((r) => [...r, { id: `dj-${id}-${r.length}`, text: o.call, tone: o.tone }]);
   };
 
   // Tap targets — each opens the inspect sheet for the EXACT object tapped, not
@@ -502,7 +533,43 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
             {reveal.text}
           </Text>
         ) : null}
-        {actions.length > 0 ? (
+        {zone === 'dj' ? (
+          // DJ Booth pilot: four distinct calls, each its own choice + tradeoff.
+          <>
+            <View style={styles.tray}>
+              {DJ_ACTIONS.map((a) => {
+                const cost = djFocusCost(a.id);
+                const disabled = cost > 0 && focusLeft < cost;
+                const suggested = djRead?.suggested === a.id;
+                return (
+                  <Pressable
+                    key={a.id}
+                    onPress={() => onDjAction(a.id)}
+                    disabled={disabled}
+                    accessibilityRole="button"
+                    accessibilityLabel={a.label}
+                    style={[styles.choice, disabled && styles.dockBtnDim, suggested && styles.djSuggested]}
+                  >
+                    <Text variant="body" color={disabled ? colors.textMuted : colors.neonMagenta}>
+                      {a.label}
+                    </Text>
+                    <Text variant="label" muted numberOfLines={1} style={styles.djHint}>
+                      {a.hint}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {djRead ? (
+              <Text variant="label" color={colors.neonCyan} style={styles.bannerHint}>
+                {djRead.read} → try {DJ_ACTIONS.find((x) => x.id === djRead.suggested)?.label ?? 'a call'}.
+              </Text>
+            ) : null}
+            <Text variant="label" muted>
+              Owner Attention: {focusLeft}/{NIGHT_FOCUS} · Read the Room is free
+            </Text>
+          </>
+        ) : actions.length > 0 ? (
           <>
             <View style={styles.tray}>
               {actions.map((id) => {
@@ -988,6 +1055,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   choiceOutcome: { lineHeight: 22 },
+  djSuggested: { borderColor: colors.neonCyan, borderWidth: 1 },
+  djHint: { textAlign: 'center', fontSize: 10, marginTop: 2 },
   stream: { gap: 4, paddingHorizontal: spacing.xs },
   streamRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   streamDot: { width: 6, height: 6, borderRadius: radius.pill, marginTop: 6 },
