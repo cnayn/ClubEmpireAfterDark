@@ -768,7 +768,7 @@ export function FloorView({
             layout model so the plan is data-driven, not a hand-stacked column. */}
 
         {/* TOP BAND (row 0) — DOOR across the back wall + locked VIP corner. */}
-        <View style={styles.band}>
+        <View style={[styles.band, fill && styles.topBandFill]}>
           <View style={{ flex: zonePlacement('door')?.colSpan ?? 3 }}>
             <Pressable
               accessibilityRole="button"
@@ -1001,7 +1001,7 @@ export function FloorView({
         </View>
 
         {/* BOTTOM BAND (row 3) — BATHROOM + STAFF AREA, secondary. */}
-        <View style={styles.band}>
+        <View style={[styles.band, fill && styles.bottomBandFill]}>
           <View style={{ flex: zonePlacement('bathroom')?.colSpan ?? 2 }}>
             <TiledRoom
               tint={bathTint}
@@ -1063,6 +1063,11 @@ const styles = StyleSheet.create({
   // In full-bleed, the dance-floor band absorbs the spare height so the floor is
   // the hero without starving / clipping the door / VIP / DJ bands.
   midBandGrow: { flex: 1, minHeight: 0 },
+  // …and the secondary bands keep a floor on their height so DOOR / VIP-locked /
+  // bathroom / staff always render fully even when the door is quiet (little
+  // content) — they were collapsing to a thin clipped strip otherwise.
+  topBandFill: { minHeight: 96 },
+  bottomBandFill: { minHeight: 76 },
   // The below-room band gets the remaining space and scrolls internally if the
   // meters + status + stream are taller than it — never overlapping the room.
   belowScroll: { flex: 2 },
