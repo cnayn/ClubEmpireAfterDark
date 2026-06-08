@@ -39,13 +39,13 @@ import type { BeatTone } from '@/lib/timeline';
 import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS, phaseForProgress } from '@/lib/nightClock';
 import {
   encounterTrigger,
-  liveEmotes,
   livePressures,
   livingStreamTicks,
   type NightPressures,
   pressureHeadline,
   type StreamTick,
 } from '@/lib/nightPressure';
+import { crewVoice, guestVoice } from '@/lib/floorVoices';
 import { nightZones, type ZoneKey } from '@/lib/venue';
 import type { ClubState, DayConfig } from '@/domain/types';
 import { useGameStore } from '@/state/store';
@@ -331,8 +331,19 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const moodAccent = committed ? colors.neonViolet : moodFresh ? MOOD_COLOR[mood!.tone] : TONE_COLOR[headline.tone];
   const moodLabel = committed ? "That's a wrap." : moodFresh ? mood!.label : headline.label;
 
-  // Bubbles fade in with the live pressure (room talks itself into life).
-  const liveBubbles = committed ? floorBubbles(committed) : liveEmotes(preview, planClub, pressures).concat(reactions);
+  // One overheard guest line, picked from the top crowd segment + current state
+  // (floor-content voice bank), rotating slowly so the room re-speaks every few
+  // beats instead of every frame — throttled to a single live voice + the
+  // player's own action reactions.
+  const topSegment = topCrowd(crowdMix(planClub, plan), 1)[0];
+  const voiceBucket = Math.floor(liveProgress / 0.08);
+  const gv = committed ? null : guestVoice(topSegment, pressures, voiceBucket);
+  const guestBubble: FloorBubble | null = gv
+    ? { id: `gv-${voiceBucket}-${gv.zone}`, label: gv.line, tone: gv.tone, zone: gv.zone }
+    : null;
+  const liveBubbles = committed
+    ? floorBubbles(committed)
+    : ([guestBubble, ...reactions].filter(Boolean) as FloorBubble[]);
   const liveFlash = committed ? undefined : flashZone ?? headline.zone;
   const liveScale = committed ? 1 : liveCrowdFraction(progress);
   // Readable guest clusters per zone — the room reads as a club, not just dots.
@@ -484,6 +495,12 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
     const onDuty = [...floor.bartenders, ...floor.bouncers];
     const tappedName = t.kind === 'crew' ? onDuty.find((s) => s.id === t.staffId)?.name : undefined;
+    // The tapped crew member's own voice (floor-content bank), busy variant when
+    // their station is under pressure — so tapping Rosa ≠ tapping John.
+    const crewLine =
+      t.kind === 'crew'
+        ? crewVoice(t.staffId, t.role, (t.role === 'bartender' ? pressures.bar : pressures.door) >= 0.66)
+        : null;
 
     // Title + sub-line identify exactly what was tapped.
     let title = def.label.toUpperCase();
@@ -578,6 +595,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         {subtitle ? (
           <Text variant="label" muted>
             {subtitle}
+          </Text>
+        ) : null}
+        {crewLine ? (
+          <Text variant="body" color={colors.textPrimary} style={styles.crewQuote}>
+            “{crewLine}”
           </Text>
         ) : null}
         {reveal ? (
@@ -1125,6 +1147,7 @@ const styles = StyleSheet.create({
   rideItOut: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginTop: spacing.xs },
   // Slightly larger live-night text for readability until phone testing works.
   bannerBody: { fontSize: 16, lineHeight: 22 },
+  crewQuote: { fontSize: 15, lineHeight: 21, fontStyle: 'italic' },
   bannerHint: { fontSize: 14, lineHeight: 19 },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: {
