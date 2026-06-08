@@ -33,7 +33,6 @@ import type {
   GuestCluster,
   GuestMood,
   Vibe,
-  VenueFloorChips,
 } from '@/lib/dashboard';
 import type { NightZones, ZoneKey, ZoneTone } from '@/lib/venue';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -201,25 +200,6 @@ function Bubble({ b }: { b: FloorBubble }) {
       <Text variant="label" color={BUBBLE_COLOR[b.tone]}>
         {b.label}
       </Text>
-    </View>
-  );
-}
-
-/** Small "object" markers for equipped furniture in a zone — a tiny zone-tinted
- *  square + short name, so decoration reads as visible club objects on the
- *  floor instead of muted text chips. */
-function ObjectStrip({ names, tint }: { names: string[]; tint: string }) {
-  if (names.length === 0) return null;
-  return (
-    <View style={styles.furnRow}>
-      {names.map((n) => (
-        <View key={n} style={[styles.furnChip, { borderColor: tint, shadowColor: tint }]}>
-          <View style={[styles.furnIcon, { backgroundColor: tint }]} />
-          <Text variant="label" color={tint} style={styles.furnText}>
-            {n}
-          </Text>
-        </View>
-      ))}
     </View>
   );
 }
@@ -627,7 +607,6 @@ export function FloorView({
   pulse = false,
   zones,
   flashZone,
-  venueChips,
   crowdTags,
   regularTags,
   djLabel,
@@ -651,7 +630,6 @@ export function FloorView({
   liveScale?: number;
   zones?: NightZones;
   flashZone?: ZoneKey;
-  venueChips?: VenueFloorChips;
   crowdTags?: string[];
   regularTags?: string[];
   djLabel?: string;
@@ -831,9 +809,8 @@ export function FloorView({
             </View>
           </View>
         </View>
-        {venueChips ? <ObjectStrip names={venueChips.door} tint={zoneTint('door')} /> : null}
         {inZone('door').length > 0 ? (
-          <View style={styles.bubbleRow}>{inZone('door').map((b) => <Bubble key={b.id} b={b} />)}</View>
+          <View style={styles.bubbleRow}>{inZone('door').map((b, i) => <Bubble key={`${b.id}-${i}`} b={b} />)}</View>
         ) : null}
 
         {/* MIDDLE BAND (rows 1–2) — DANCE FLOOR hero on the LEFT; the RIGHT
@@ -940,7 +917,7 @@ export function FloorView({
               </View>
 
               {inZone('floor').length > 0 ? (
-                <View style={styles.bubbleRow}>{inZone('floor').map((b) => <Bubble key={b.id} b={b} />)}</View>
+                <View style={styles.bubbleRow}>{inZone('floor').map((b, i) => <Bubble key={`${b.id}-${i}`} b={b} />)}</View>
               ) : null}
             </Pressable>
           </View>
@@ -1004,12 +981,11 @@ export function FloorView({
                 </Pressable>
               ) : null}
               {inZone('bar').length > 0 ? (
-                <View style={styles.bubbleRow}>{inZone('bar').map((b) => <Bubble key={b.id} b={b} />)}</View>
+                <View style={styles.bubbleRow}>{inZone('bar').map((b, i) => <Bubble key={`${b.id}-${i}`} b={b} />)}</View>
               ) : null}
             </Pressable>
           </View>
         </View>
-        {venueChips ? <ObjectStrip names={venueChips.bar} tint={zoneTint('bar')} /> : null}
 
         {/* BOTTOM BAND (row 3) — BATHROOM + STAFF AREA, secondary. */}
         <View style={styles.band}>

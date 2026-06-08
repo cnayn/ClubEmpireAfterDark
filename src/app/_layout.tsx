@@ -31,7 +31,9 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* The night sequence runs full-screen, above the tabs. */}
         <Stack.Screen name="day-prep" options={{ title: 'Tonight' }} />
-        <Stack.Screen name="night-timeline" options={{ title: 'The Night', headerBackVisible: false }} />
+        {/* Night is full-bleed: hide the native header so the floor fills from the
+            top (the in-screen HUD shows club / time / phase instead). */}
+        <Stack.Screen name="night-timeline" options={{ headerShown: false }} />
         <Stack.Screen name="results" options={{ title: 'Last Night', headerBackVisible: false }} />
         <Stack.Screen name="phone" options={{ title: 'Phone' }} />
       </Stack>

@@ -13,7 +13,7 @@ import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { REGULAR_COPY, topRegulars } from '@/domain/regulars';
 import { mentorNote } from '@/lib/mentor';
 import { inboxCount } from '@/lib/phone';
-import { buildFloorView, floorBubbles, goalBoard, venueFloorChips } from '@/lib/dashboard';
+import { buildFloorView, floorBubbles, goalBoard } from '@/lib/dashboard';
 import { money } from '@/lib/format';
 import { useGameStore } from '@/state/store';
 import { colors, radius, spacing } from '@/theme/tokens';
@@ -190,7 +190,7 @@ export default function DashboardScreen() {
       </Card>
 
       {/* The living venue — the home screen's centerpiece */}
-      <FloorView floor={floor} bubbles={bubbles} venueChips={venueFloorChips(club)} djLabel={DJ_FLOOR_LABEL[club.lastConfig.dj ?? 'house']} />
+      <FloorView floor={floor} bubbles={bubbles} djLabel={DJ_FLOOR_LABEL[club.lastConfig.dj ?? 'house']} />
     </Screen>
   );
 }

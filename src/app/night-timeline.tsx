@@ -34,7 +34,7 @@ import { DJ_FLOOR_LABEL } from '@/domain/dj';
 import { topRegulars } from '@/domain/regulars';
 import { nightMentorLine } from '@/lib/mentor';
 import { type Encounter, type EncounterChoice, pickEncounter } from '@/lib/encounters';
-import { buildFloorView, type FloorBubble, floorBubbles, floorClusters, venueFloorChips } from '@/lib/dashboard';
+import { buildFloorView, type FloorBubble, floorBubbles, floorClusters } from '@/lib/dashboard';
 import type { BeatTone } from '@/lib/timeline';
 import { clockLabel, liveCrowdFraction, NIGHT_DURATION_MS, NIGHT_TICK_MS, phaseForProgress } from '@/lib/nightClock';
 import {
@@ -997,7 +997,6 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         pulse={!committed}
         zones={zones}
         flashZone={liveFlash}
-        venueChips={venueFloorChips(planClub)}
         crowdTags={topCrowd(crowdMix(planClub, plan), 3).map((id) => CROWD_SEGMENTS[id].name)}
         regularTags={topRegulars(club.regularBase, 2)
           .filter((r) => r.score >= 15)
