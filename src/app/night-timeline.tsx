@@ -27,7 +27,7 @@ import {
   resolveBossAction,
 } from '@/lib/bossActions';
 import { bossLifts, bossRelief, guestHappiness, staffMorale } from '@/lib/roomMood';
-import { type DjActionId, DJ_ACTIONS, djFocusCost, djIntervention, djLiveEffect, resolveDjAction } from '@/lib/djActions';
+import { type DjActionId, DJ_ACTIONS, djFocusCost, djIntervention, resolveDjAction } from '@/lib/djActions';
 import { type BoardZone, getBoardZone, type InspectTarget, zoneActions } from '@/lib/board';
 import { CROWD_SEGMENTS, crowdMix, topCrowd } from '@/domain/crowd';
 import { DJ_FLOOR_LABEL } from '@/domain/dj';
@@ -64,6 +64,9 @@ const MOOD_COLOR: Record<MoodTone, string> = {
   warn: colors.warning,
   neutral: colors.textMuted,
 };
+
+// How fast a Drop Bass / Change Mix live floor spike fades (progress units; ~12s at 1x).
+const DJ_PULSE_DECAY = 0.05;
 
 // Every meter has an identity: an icon, a label, and a plain-English STATE word
 // (never an anonymous bar). Strain meters (bar/door/bath) read low = good; mood
@@ -183,6 +186,9 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [moodAt, setMoodAt] = useState(0);
   // Hype the Room is a TIMED window: the floor stays warmer until this progress.
   const [hypeUntil, setHypeUntil] = useState(0);
+  // Drop Bass / Change Mix are TRANSIENT spikes that decay back to baseline (so
+  // they're not a permanent free boost). The latest one + when it fired.
+  const [djPulse, setDjPulse] = useState<{ at: number; energy: number; happy: number; morale: number } | null>(null);
   const [bossStream, setBossStream] = useState<StreamEntry[]>([]);
   const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
@@ -291,7 +297,16 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     }
   }
   // DJ booth calls also warm the floor / nudge mood live (presentation only).
-  const djLive = committed ? { energy: 0, morale: 0, happy: 0 } : djLiveEffect(djChosen, preview, planClub, rawPressures.energy);
+  // Live DJ floor effect DECAYS back to baseline (~0.05 progress ≈ 12s at 1x), so
+  // Drop Bass / Change Mix surge then settle — not a stuck permanent boost. The
+  // committed books still reflect the DJ calls via djIntervention (bounded).
+  const djLive =
+    committed || !djPulse
+      ? { energy: 0, morale: 0, happy: 0 }
+      : (() => {
+          const k = Math.max(0, 1 - (progress - djPulse.at) / DJ_PULSE_DECAY);
+          return { energy: djPulse.energy * k, happy: djPulse.happy * k, morale: djPulse.morale * k };
+        })();
   // Hype the Room: a sustained warm window that SCALES WITH THE CROWD (more
   // bodies → bigger lift) and fades when the window ends.
   const hypeActive = !committed && progress < hypeUntil;
@@ -397,7 +412,12 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     } else {
       setDjChosen((c) => [...c, id]); // repeats diminish; djIntervention clamps the stack
       setDjRead(null);
-      if (id === 'hype-room') setHypeUntil(progress + 0.06); // ~10-15s warm window
+      if (id === 'hype-room') {
+        setHypeUntil(progress + 0.06); // ~10-15s sustained warm window, then settles
+      } else {
+        // Drop Bass / Change Mix: a transient spike that decays back to baseline.
+        setDjPulse({ at: progress, energy: o.energy, happy: o.happy, morale: o.morale });
+      }
     }
     setReactions((b) => [...b.filter((x) => x.zone !== 'floor'), { id: `dj-${id}`, label: o.call, tone: bubbleTone, zone: 'floor' }]);
     setMood({ label: id === 'hype-room' ? 'Hyping the room…' : o.note, tone: moodTone });
@@ -580,12 +600,12 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
                     disabled={disabled}
                     accessibilityRole="button"
                     accessibilityLabel={a.label}
-                    style={[styles.choice, disabled && styles.dockBtnDim, suggested && styles.djSuggested]}
+                    style={[styles.choice, styles.djCard, disabled && styles.dockBtnDim, suggested && styles.djSuggested]}
                   >
                     <Text variant="body" color={disabled ? colors.textMuted : colors.neonMagenta}>
                       {a.label}
                     </Text>
-                    <Text variant="label" muted numberOfLines={1} style={styles.djHint}>
+                    <Text variant="label" muted style={styles.djHint}>
                       {a.hint}
                     </Text>
                   </Pressable>
@@ -1120,7 +1140,9 @@ const styles = StyleSheet.create({
   },
   choiceOutcome: { lineHeight: 22 },
   djSuggested: { borderColor: colors.neonCyan, borderWidth: 1 },
-  djHint: { textAlign: 'center', fontSize: 10, marginTop: 2 },
+  // DJ action cards: full-width rows with left-aligned, fully-wrapping descriptions.
+  djCard: { flexBasis: '100%', alignItems: 'flex-start' },
+  djHint: { fontSize: 11, marginTop: 2, lineHeight: 15 },
   leaveItRow: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginTop: spacing.xs },
   nightContent: { paddingHorizontal: spacing.sm, paddingTop: spacing.xs, paddingBottom: 0, gap: spacing.sm, flex: 1 },
   hud: { gap: 2 },

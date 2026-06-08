@@ -828,7 +828,7 @@ export function FloorView({
 
         {/* MIDDLE BAND (rows 1–2) — DANCE FLOOR hero on the LEFT; the RIGHT
             column stacks the DJ booth over the bar (col 3 of the plan). */}
-        <View style={styles.band}>
+        <View style={[styles.band, fill && styles.midBandGrow]}>
           <View style={{ flex: zonePlacement('floor')?.colSpan ?? 3 }}>
             <Pressable
               accessibilityRole="button"
@@ -1056,8 +1056,13 @@ void _unusedDotOpacity;
 const styles = StyleSheet.create({
   fillWrap: { flex: 1, gap: spacing.sm },
   // Full-bleed room is the hero (≈60% of the body) and CLIPS its own content so
-  // the bands never spill onto the section below.
-  roomFill: { flex: 3, minHeight: 0, overflow: 'hidden' },
+  // the bands never spill onto the section below. Top-aligned so the door/VIP and
+  // bottom bands sit at their natural height (no clipping) while the MIDDLE band
+  // (dance floor) grows to fill — see midBandGrow.
+  roomFill: { flex: 3, minHeight: 0, overflow: 'hidden', justifyContent: 'flex-start' },
+  // In full-bleed, the dance-floor band absorbs the spare height so the floor is
+  // the hero without starving / clipping the door / VIP / DJ bands.
+  midBandGrow: { flex: 1, minHeight: 0 },
   // The below-room band gets the remaining space and scrolls internally if the
   // meters + status + stream are taller than it — never overlapping the room.
   belowScroll: { flex: 2 },
