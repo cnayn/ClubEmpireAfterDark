@@ -566,7 +566,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
               </Text>
             ) : null}
             <Text variant="label" muted>
-              Owner Attention: {focusLeft}/{NIGHT_FOCUS} · Read the Room is free
+              Owner Focus: {focusLeft} major calls left · inspecting is free
             </Text>
           </>
         ) : actions.length > 0 ? (
@@ -590,7 +590,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
               })}
             </View>
             <Text variant="label" muted>
-              Owner Attention: {focusLeft}/{NIGHT_FOCUS}
+              Owner Focus: {focusLeft} major calls left
             </Text>
           </>
         ) : zone === 'bathroom' ? (
@@ -605,6 +605,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         ) : (
           <Text variant="label" muted>Nothing to command here yet.</Text>
         )}
+        {/* Inspecting and walking away is always free — never costs Focus. */}
+        <Pressable onPress={() => setSheetTarget(null)} accessibilityRole="button" style={styles.leaveItRow}>
+          <Text variant="label" color={colors.neonCyan}>Leave it alone ▸</Text>
+        </Pressable>
       </View>
     );
   };
@@ -892,14 +896,42 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       ) : null}
       {focusLeft === 0 ? (
         <Text variant="label" muted style={styles.dockHint} numberOfLines={1}>
-          Out of attention — let the night ride to last call.
+          No major calls left — keep tapping to inspect the room, or ride to last call.
         </Text>
       ) : null}
     </View>
   ) : null;
 
+  // Compact top HUD — club identity + time/phase + cash/rep + any live situation.
+  // Edge-only; the floor stays the hero.
+  const phaseName = committed ? 'Closed' : ['Doors open', 'Building', 'Peak', 'Last call'][phaseForProgress(liveProgress, 4)];
+  const topHud = (
+    <View style={styles.hud}>
+      <View style={styles.hudRow}>
+        <Text variant="label" color={colors.neonMagenta} numberOfLines={1} style={styles.hudName}>
+          {club.name}
+        </Text>
+        <Text variant="label" muted numberOfLines={1}>
+          {clockLabel(liveProgress)} · {phaseName}
+        </Text>
+        <Text variant="label" color={colors.success} numberOfLines={1}>
+          ${club.cash}
+        </Text>
+        <Text variant="label" color={colors.neonViolet} numberOfLines={1}>
+          ★{club.reputation}
+        </Text>
+      </View>
+      {!committed && alertMsg && !running ? (
+        <Text variant="label" color={colors.warning} numberOfLines={1}>
+          ⚠ {alertMsg}
+        </Text>
+      ) : null}
+    </View>
+  );
+
   return (
     <Screen
+      header={topHud}
       footer={
         atEnd ? (
           <Button label="See the books" onPress={toResults} />
@@ -1057,6 +1089,10 @@ const styles = StyleSheet.create({
   choiceOutcome: { lineHeight: 22 },
   djSuggested: { borderColor: colors.neonCyan, borderWidth: 1 },
   djHint: { textAlign: 'center', fontSize: 10, marginTop: 2 },
+  leaveItRow: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginTop: spacing.xs },
+  hud: { gap: 2 },
+  hudRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  hudName: { flexShrink: 1, fontSize: 13, letterSpacing: 0.5 },
   stream: { gap: 4, paddingHorizontal: spacing.xs },
   streamRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   streamDot: { width: 6, height: 6, borderRadius: radius.pill, marginTop: 6 },

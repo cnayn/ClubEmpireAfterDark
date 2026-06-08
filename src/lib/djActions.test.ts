@@ -25,14 +25,14 @@ function result(over: Partial<NightResult> = {}): NightResult {
 }
 
 describe('DJ_ACTIONS menu', () => {
-  it('offers exactly the four pilot actions', () => {
-    expect(DJ_ACTIONS.map((a) => a.id)).toEqual(['drop-bass', 'refresh-set', 'dedicate-song', 'read-room']);
+  it('offers exactly the four pilot actions (inspect first)', () => {
+    expect(DJ_ACTIONS.map((a) => a.id)).toEqual(['read-room', 'drop-bass', 'change-mix', 'hype-room']);
   });
   it('reading the room is free; the rest cost one attention', () => {
     expect(djFocusCost('read-room')).toBe(0);
     expect(djFocusCost('drop-bass')).toBe(1);
-    expect(djFocusCost('refresh-set')).toBe(1);
-    expect(djFocusCost('dedicate-song')).toBe(1);
+    expect(djFocusCost('change-mix')).toBe(1);
+    expect(djFocusCost('hype-room')).toBe(1);
   });
 });
 
@@ -51,19 +51,20 @@ describe('the four actions are different, not four free boosts', () => {
     expect(fourth.energy).toBeLessThan(first.energy);
   });
 
-  it('Refresh Set helps a flat floor but openly does little when the floor is alive', () => {
-    const flat = resolveDjAction('refresh-set', result(), club(), 0.2);
-    const alive = resolveDjAction('refresh-set', result(), club(), 0.8);
+  it('Change Mix helps a flat floor but openly does little when the floor is alive', () => {
+    const flat = resolveDjAction('change-mix', result(), club(), 0.2);
+    const alive = resolveDjAction('change-mix', result(), club(), 0.8);
     expect(flat.intervention.vibeBonus).toBeGreaterThan(alive.intervention.vibeBonus);
     expect(alive.note.toLowerCase()).toContain('already');
   });
 
-  it('Dedicate Song lifts happiness more with regulars in, and is weak in an empty room', () => {
-    const regularsClub = club({ regularBase: { locals: 40, students: 0, regulars: 30, musicheads: 0, vipcurious: 0, rough: 0 } });
-    const withReg = resolveDjAction('dedicate-song', result({ guests: 40, capacity: 60 }), regularsClub, 0.5);
-    const empty = resolveDjAction('dedicate-song', result({ guests: 2, capacity: 60 }), club(), 0.5);
-    expect(withReg.happy).toBeGreaterThan(empty.happy);
-    expect(empty.note.toLowerCase()).toContain('barely');
+  it('Hype the Room is a safer, smaller lift than Drop Bass and never strains the crew', () => {
+    const hype = resolveDjAction('hype-room', result(), club(), 0.5);
+    const bass = resolveDjAction('drop-bass', result(), club(), 0.5);
+    expect(hype.energy).toBeLessThan(bass.energy); // smaller lift
+    expect(hype.morale).toBeGreaterThanOrEqual(0); // no strain
+    expect(bass.morale).toBeLessThan(0); // bass does strain
+    expect(hype.intervention.revenueMod).toBe(1);
   });
 
   it('Read the Room gives no boost but returns a read + a suggestion', () => {
@@ -77,7 +78,7 @@ describe('the four actions are different, not four free boosts', () => {
 
 describe('djIntervention / djLiveEffect — bounded, deterministic', () => {
   it('combines taken actions and stays clamped', () => {
-    const ids = ['drop-bass', 'drop-bass', 'dedicate-song'] as const;
+    const ids = ['drop-bass', 'drop-bass', 'change-mix'] as const;
     const iv = djIntervention([...ids], result(), club(), 0.4);
     expect(iv.vibeBonus).toBeLessThanOrEqual(30);
     expect(iv.revenueMod).toBe(1);

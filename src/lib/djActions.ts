@@ -16,7 +16,7 @@ import type { BeatTone } from '@/lib/timeline';
 import type { ClubState, NightResult } from '@/domain/types';
 import type { Intervention } from '@/sim/night';
 
-export type DjActionId = 'drop-bass' | 'refresh-set' | 'dedicate-song' | 'read-room';
+export type DjActionId = 'read-room' | 'drop-bass' | 'change-mix' | 'hype-room';
 
 export interface DjActionDef {
   id: DjActionId;
@@ -24,15 +24,15 @@ export interface DjActionDef {
   hint: string;
 }
 
-/** The DJ booth menu (display order). */
+/** The DJ booth menu (display order): inspect first, then the three calls. */
 export const DJ_ACTIONS: DjActionDef[] = [
-  { id: 'drop-bass', label: 'Drop Bass', hint: 'Big energy now — runs the booth hot.' },
-  { id: 'refresh-set', label: 'Refresh Set', hint: 'Change direction for the crowd.' },
-  { id: 'dedicate-song', label: 'Dedicate Song', hint: 'A moment for the regulars.' },
-  { id: 'read-room', label: 'Read the Room', hint: 'See what the crowd wants first.' },
+  { id: 'read-room', label: 'Read the Room', hint: 'Free — see what the crowd wants.' },
+  { id: 'drop-bass', label: 'Drop Bass', hint: 'Big spike now — runs the booth hot.' },
+  { id: 'change-mix', label: 'Change Mix', hint: 'Switch it up if they’re not feeling it.' },
+  { id: 'hype-room', label: 'Hype the Room', hint: 'Slower, safer lift.' },
 ];
 
-/** Reading the room is free; the three committing moves cost one Owner Attention. */
+/** Reading the room is free (inspection); the three committing calls cost Focus. */
 export function djFocusCost(id: DjActionId): number {
   return id === 'read-room' ? 0 : 1;
 }
@@ -68,7 +68,6 @@ export function resolveDjAction(
   const top = topCrowd(crowdMix(club, club.lastConfig), 3);
   const musicHeads = top.includes('musicheads');
   const regulars = top.includes('regulars') || top.includes('locals');
-  const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
 
   switch (id) {
     case 'drop-bass': {
@@ -85,14 +84,14 @@ export function resolveDjAction(
         happy: 0.04 * f,
       };
     }
-    case 'refresh-set': {
+    case 'change-mix': {
       // ADAPT: strong only when the floor is actually flat; openly pointless when
       // it's already alive. Low morale cost, slower than Drop Bass.
       if (energy >= 0.6) {
         return {
           intervention: { vibeBonus: 1, revenueMod: 1 },
-          call: 'You refreshed the set.',
-          note: 'Set already works — the floor’s with it.',
+          call: 'You changed the mix.',
+          note: 'The set already works — the floor’s with it.',
           tone: 'info',
           energy: 0.02,
           morale: 0,
@@ -102,42 +101,31 @@ export function resolveDjAction(
       const vibe = (10 + (musicHeads ? 4 : 0)) * f;
       return {
         intervention: { vibeBonus: vibe, revenueMod: 1 },
-        call: 'You refreshed the set.',
-        note: 'Changed direction — the floor started to come back.',
+        call: 'You changed the mix.',
+        note: 'Switched direction — the floor started to come back.',
         tone: 'good',
         energy: 0.16 * f,
         morale: 0,
         happy: 0.03 * f,
       };
     }
-    case 'dedicate-song': {
-      // CROWD MOMENT: lifts happiness (more with regulars in), weak in an empty
-      // or wrong-crowd room. Not a raw energy spike.
-      if (fill < 0.2) {
-        return {
-          intervention: { vibeBonus: 1, revenueMod: 1 },
-          call: 'You dedicated a song.',
-          note: 'Barely anyone here to dedicate it to.',
-          tone: 'info',
-          energy: 0.02,
-          morale: 0,
-          happy: 0.02,
-        };
-      }
-      const vibe = (6 + (regulars ? 6 : 0)) * f;
+    case 'hype-room': {
+      // BUILD: a slower, SAFER lift than Drop Bass — no morale strain, best when
+      // the floor is warming but not fully alive. Modest, never a spike.
+      const vibe = (8 + (regulars ? 3 : 0)) * f;
       return {
         intervention: { vibeBonus: vibe, revenueMod: 1 },
-        call: 'You dedicated a song.',
-        note: regulars ? 'Dedicated a song — the regulars lit up.' : 'Dedicated a song — a warm moment on the floor.',
+        call: 'You hyped the room.',
+        note: energy >= 0.66 ? 'Room’s already up — you kept it rolling.' : 'Built the room up — the floor’s climbing.',
         tone: 'good',
-        energy: 0.05 * f,
-        morale: 0.03,
-        happy: (0.1 + (regulars ? 0.06 : 0)) * f,
+        energy: 0.12 * f,
+        morale: 0.02,
+        happy: 0.04 * f,
       };
     }
     case 'read-room':
     default: {
-      // INSPECT: no real boost — returns what the crowd wants + a suggestion.
+      // INSPECT (free): no boost — returns what the crowd wants + a suggestion.
       let read: string;
       let suggested: DjActionId;
       if (energy <= 0.35) {
@@ -146,14 +134,14 @@ export function resolveDjAction(
       } else if (musicHeads) {
         read = 'Music heads want it harder.';
         suggested = 'drop-bass';
-      } else if (energy < 0.6) {
-        read = 'Crowd’s drifting — change it up.';
-        suggested = 'refresh-set';
-      } else if (regulars) {
-        read = 'Regulars are in — give them a moment.';
-        suggested = 'dedicate-song';
+      } else if (energy < 0.5) {
+        read = 'Crowd’s drifting — switch it up.';
+        suggested = 'change-mix';
+      } else if (energy < 0.7) {
+        read = 'Floor’s warming — build on it.';
+        suggested = 'hype-room';
       } else {
-        read = 'Current set is fine — leave it.';
+        read = 'Floor’s alive — leave it rolling.';
         suggested = 'read-room';
       }
       return {
