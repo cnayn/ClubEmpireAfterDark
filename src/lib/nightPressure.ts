@@ -50,7 +50,11 @@ export function livePressures(preview: NightResult, club: ClubState, progress: n
   const bar = clamp01(strain * 0.7 + crowd * 0.5);
   const door = clamp01((preview.incidents > 0 ? 0.45 : 0) + crowd * 0.5 + (relaxedDoor ? 0.15 : 0) + (rough ? 0.15 : 0));
   const bathroom = clamp01(crowd * 0.8 + (rough || students ? 0.15 : 0) - hygieneRelief * 0.5);
-  const energy = clamp01(0.4 + djHeat + (musicheads ? 0.15 : 0) + (preview.regularLoyalty - 50) / 100);
+  // Floor energy now TRACKS THE NIGHT: cold at the doors, building to a warm peak
+  // as the crowd fills in, cooling at last call. Previously this was flat (no
+  // progress term), so the dance floor never moved on its own — that was the main
+  // "the room feels frozen" gap. Still bounded 0..1 and presentation-only.
+  const energy = clamp01(0.28 + crowd * 0.38 + djHeat + (musicheads ? 0.12 : 0) + (preview.regularLoyalty - 50) / 120);
 
   return { crowd, bar, door, bathroom, energy };
 }

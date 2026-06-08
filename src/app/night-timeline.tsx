@@ -178,6 +178,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [chosen, setChosen] = useState<BossActionId[]>([]);
   const [reactions, setReactions] = useState<FloorBubble[]>([]);
   const [mood, setMood] = useState<{ label: string; tone: MoodTone } | null>(null);
+  // Progress at which the last action result was shown — so the main floor text
+  // reverts to LIVE room status a few beats after a call (it doesn't freeze).
+  const [moodAt, setMoodAt] = useState(0);
+  // Hype the Room is a TIMED window: the floor stays warmer until this progress.
+  const [hypeUntil, setHypeUntil] = useState(0);
   const [bossStream, setBossStream] = useState<StreamEntry[]>([]);
   const [flashZone, setFlashZone] = useState<ZoneKey | undefined>(undefined);
   const [encChoice, setEncChoice] = useState<EncounterChoice | null>(null);
@@ -287,12 +292,16 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   }
   // DJ booth calls also warm the floor / nudge mood live (presentation only).
   const djLive = committed ? { energy: 0, morale: 0, happy: 0 } : djLiveEffect(djChosen, preview, planClub, rawPressures.energy);
+  // Hype the Room: a sustained warm window that SCALES WITH THE CROWD (more
+  // bodies → bigger lift) and fades when the window ends.
+  const hypeActive = !committed && progress < hypeUntil;
+  const hypeEnergy = hypeActive ? 0.1 + 0.22 * rawPressures.crowd : 0;
   const pressures: NightPressures = {
     crowd: rawPressures.crowd,
     bar: Math.max(0, Math.min(1, rawPressures.bar - relief.bar + worsen.bar)),
     door: Math.max(0, Math.min(1, rawPressures.door - relief.door + worsen.door)),
     bathroom: Math.max(0, Math.min(1, rawPressures.bathroom - relief.bathroom + worsen.bathroom)),
-    energy: Math.max(0, Math.min(1, rawPressures.energy + relief.energy + worsen.energy + djLive.energy)),
+    energy: Math.max(0, Math.min(1, rawPressures.energy + relief.energy + worsen.energy + djLive.energy + hypeEnergy)),
   };
   const headline = pressureHeadline(pressures);
   const atEnd = committed != null || progress >= 1;
@@ -301,8 +310,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   const floor = buildFloorView(planClub, shownResult);
   const zones = nightZones(shownResult);
-  const moodAccent = committed ? colors.neonViolet : mood ? MOOD_COLOR[mood.tone] : TONE_COLOR[headline.tone];
-  const moodLabel = committed ? "That's a wrap." : mood ? mood.label : headline.label;
+  // Show a fresh action result briefly (~0.06 progress ≈ a few beats), then fall
+  // back to the live headline so the floor keeps narrating as the room changes.
+  const moodFresh = !committed && mood !== null && progress - moodAt < 0.06;
+  const moodAccent = committed ? colors.neonViolet : moodFresh ? MOOD_COLOR[mood!.tone] : TONE_COLOR[headline.tone];
+  const moodLabel = committed ? "That's a wrap." : moodFresh ? mood!.label : headline.label;
 
   // Bubbles fade in with the live pressure (room talks itself into life).
   const liveBubbles = committed ? floorBubbles(committed) : liveEmotes(preview, planClub, pressures).concat(reactions);
@@ -363,6 +375,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setChosen((c) => [...c, id]); // repeats allowed; combineInterventions clamps the stack
     setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
     setMood(outcome.mood);
+    setMoodAt(progress);
     setFlashZone(outcome.bubble.zone);
     // Unique key per push — the same action can fire many times a night, so the
     // id can't just be `ba-${id}` (that caused a duplicate-key console error).
@@ -384,11 +397,28 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     } else {
       setDjChosen((c) => [...c, id]); // repeats diminish; djIntervention clamps the stack
       setDjRead(null);
+      if (id === 'hype-room') setHypeUntil(progress + 0.06); // ~10-15s warm window
     }
     setReactions((b) => [...b.filter((x) => x.zone !== 'floor'), { id: `dj-${id}`, label: o.call, tone: bubbleTone, zone: 'floor' }]);
-    setMood({ label: o.note, tone: moodTone });
+    setMood({ label: id === 'hype-room' ? 'Hyping the room…' : o.note, tone: moodTone });
+    setMoodAt(progress);
     setFlashZone('floor');
     setBossStream((r) => [...r, { id: `dj-${id}-${r.length}`, text: o.call, tone: o.tone }]);
+  };
+
+  // "Leave it alone" — a deliberate owner choice (free): log that you let the
+  // zone ride and clear its situation banner if it was the active alert, so the
+  // night continues cleanly instead of nagging. No Focus, no boost.
+  const ALERT_KEY_FOR: Partial<Record<BoardZone, string>> = { bar: 'bar', door: 'door', bathroom: 'bath', floor: 'energy', dj: 'energy' };
+  const leaveAlone = (zone: BoardZone) => {
+    const noun = zone === 'dj' ? 'booth' : zone;
+    setBossStream((r) => [...r, { id: `leave-${zone}-${r.length}`, text: `You let the ${noun} ride.`, tone: 'neutral' }]);
+    const k = ALERT_KEY_FOR[zone];
+    if (k && alertKey === k) {
+      setAlertMsg(null);
+      setAlertKey(null);
+    }
+    setSheetTarget(null);
   };
 
   // Tap targets — each opens the inspect sheet for the EXACT object tapped, not
@@ -472,35 +502,37 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       }
     }
 
-    // The station/crew read — names the SPECIFIC crew member when one was tapped.
+    // The station/crew read — derived from LIVE state (current pressure + crowd +
+    // whether you recently acted on the zone), so what you see CHANGES across the
+    // night because the room is actually different, not because of varied text.
+    // (Honest, actionable reads only — no theft/skimming/hidden-behaviour hints.)
     const reveal = ((): { text: string; tone: BeatTone } | null => {
+      const quiet = pressures.crowd < 0.2; // early / thin room
       if (zone === 'bar') {
         const who = tappedName ?? floor.bartenders[0]?.name ?? 'The bar';
-        if (t.kind === 'queue') {
-          if (preview.serviceRatio < 0.85) return { text: 'Guests are waiting — the queue is service-bound.', tone: 'bad' };
-          if (fill >= 0.7) return { text: 'Busy queue, but drinks are moving.', tone: 'warn' };
-          return { text: 'Short queue — service is keeping up.', tone: 'good' };
-        }
-        if (preview.theft > 0) return { text: `Stock looks light — something’s off at ${tappedName ?? 'the bar'}.`, tone: 'bad' };
-        if (preview.serviceRatio < 0.85) return { text: `${who} is slammed — pours are slow.`, tone: 'bad' };
-        if (preview.serviceRatio < 1) return { text: `${who} is holding the line — just keeping pace.`, tone: 'warn' };
-        return { text: `${who} is steady — drinks are moving.`, tone: 'good' };
+        if (quiet) return { text: `Too quiet — ${who} has nothing to push.`, tone: 'neutral' };
+        if (relief.bar > 0.05 && pressures.bar < 0.5) return { text: 'Bar cooled down after your last check.', tone: 'good' };
+        if (pressures.bar >= 0.8) return { text: `${who} is slammed. Pours are falling behind.`, tone: 'bad' };
+        if (pressures.bar >= 0.6) return { text: 'Queue’s growing — drinks are backing up.', tone: 'warn' };
+        if (pressures.bar >= 0.33) return { text: `${who} has the line moving.`, tone: 'info' };
+        return { text: 'Bar’s clear. No need to step in.', tone: 'good' };
       }
       if (zone === 'door') {
         const who = tappedName ?? floor.bouncers[0]?.name ?? 'The door';
-        if (t.kind === 'queue') {
-          if (preview.incidents > 0) return { text: 'Wrong crowd forming — the line’s pushing.', tone: 'bad' };
-          if (fill >= 0.7) return { text: 'Line’s heavy — guests are waiting to get in.', tone: 'warn' };
-          return { text: 'Line’s short — easy on the door.', tone: 'good' };
-        }
-        if (preview.incidents > 0) return { text: `Trouble at the door — ${tappedName ? `${tappedName} has their hands full` : 'nobody’s holding it'}.`, tone: 'bad' };
-        if (fill >= 0.7) return { text: `${who} — line’s heavy, getting tense.`, tone: 'warn' };
-        return { text: `${who} has it calm — nothing kicking off.`, tone: 'good' };
+        if (quiet) return { text: 'Door’s quiet — nobody waiting.', tone: 'neutral' };
+        if (relief.door > 0.05 && pressures.door < 0.5) return { text: `Door settled after you sent ${tappedName ?? 'a bouncer'}.`, tone: 'good' };
+        if (preview.incidents > 0 && pressures.door >= 0.6) return { text: `Trouble at the door — ${tappedName ? `${tappedName} has their hands full` : 'nobody’s holding it'}.`, tone: 'bad' };
+        if (pressures.door >= 0.7) return { text: `Line’s hot — ${who} is under pressure.`, tone: 'bad' };
+        if (pressures.door >= 0.4) return { text: `${who} — line’s building, watch it.`, tone: 'warn' };
+        return { text: `${who} has it calm.`, tone: 'good' };
       }
       if (zone === 'floor' || zone === 'dj') {
-        if (pressures.energy <= 0.3) return { text: 'The floor’s cooling — the room needs a lift.', tone: 'warn' };
+        if (quiet) return { text: 'Floor’s empty — nothing to lift yet.', tone: 'neutral' };
+        if (hypeActive) return { text: 'Room’s hyped — the floor’s riding the wave.', tone: 'good' };
+        if (pressures.energy <= 0.3) return { text: 'Floor’s cold — they need a jolt.', tone: 'bad' };
         if (pressures.energy >= 0.66) return { text: 'Floor’s hot — they’re dancing.', tone: 'good' };
-        return { text: 'Floor’s steady.', tone: 'info' };
+        if (pressures.energy >= 0.45) return { text: 'Floor’s warming up.', tone: 'info' };
+        return { text: 'Floor’s flat — give it a push.', tone: 'warn' };
       }
       return null;
     })();
@@ -606,7 +638,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           <Text variant="label" muted>Nothing to command here yet.</Text>
         )}
         {/* Inspecting and walking away is always free — never costs Focus. */}
-        <Pressable onPress={() => setSheetTarget(null)} accessibilityRole="button" style={styles.leaveItRow}>
+        <Pressable onPress={() => leaveAlone(zone)} accessibilityRole="button" style={styles.leaveItRow}>
           <Text variant="label" color={colors.neonCyan}>Leave it alone ▸</Text>
         </Pressable>
       </View>
@@ -664,13 +696,13 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       style={[styles.speed, encounterBlocking && styles.speedDisabled]}
     >
       <Text variant="label" color={encounterBlocking ? colors.textMuted : colors.neonCyan} style={styles.clockText}>
-        {clockLabel(progress)} · {speed}× {running && !sheetZone ? '▶' : '❚❚'}
+        {speed}× {running && !sheetZone ? '▶' : '❚❚'}
       </Text>
     </Pressable>
   ) : (
     <View style={styles.speed}>
       <Text variant="label" color={colors.neonViolet}>
-        02:30 · done
+        done
       </Text>
     </View>
   );
@@ -909,16 +941,15 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     <View style={styles.hud}>
       <View style={styles.hudRow}>
         <Text variant="label" color={colors.neonMagenta} numberOfLines={1} style={styles.hudName}>
-          {club.name}
+          {club.name} · Night {club.day}
         </Text>
-        <Text variant="label" muted numberOfLines={1}>
+        <Text variant="label" color={moodAccent} numberOfLines={1}>
           {clockLabel(liveProgress)} · {phaseName}
         </Text>
-        <Text variant="label" color={colors.success} numberOfLines={1}>
-          ${club.cash}
-        </Text>
-        <Text variant="label" color={colors.neonViolet} numberOfLines={1}>
-          ★{club.reputation}
+        <Text variant="label" numberOfLines={1}>
+          <Text variant="label" color={colors.success}>${club.cash}</Text>
+          <Text variant="label" muted>{'  '}</Text>
+          <Text variant="label" color={colors.neonViolet}>★{club.reputation}</Text>
         </Text>
       </View>
       {!committed && alertMsg && !running ? (
@@ -960,7 +991,6 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         bubbles={liveBubbles}
         moodAccent={moodAccent}
         moodLabel={moodLabel}
-        title="Tonight"
         pulse={!committed}
         zones={zones}
         flashZone={liveFlash}
