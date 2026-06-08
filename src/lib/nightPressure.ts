@@ -49,7 +49,10 @@ export function livePressures(preview: NightResult, club: ClubState, progress: n
   const strain = 1 - clamp01(preview.serviceRatio);
   const bar = clamp01(strain * 0.7 + crowd * 0.5);
   const door = clamp01((preview.incidents > 0 ? 0.45 : 0) + crowd * 0.5 + (relaxedDoor ? 0.15 : 0) + (rough ? 0.15 : 0));
-  const bathroom = clamp01(crowd * 0.8 + (rough || students ? 0.15 : 0) - hygieneRelief * 0.5);
+  // Bathroom lags the core zones: it only builds once the room is already busy
+  // (crowd past ~0.35), so the player notices bar / floor / door first and the
+  // bathroom becomes a later / crowded-room concern rather than an opener.
+  const bathroom = clamp01(Math.max(0, crowd - 0.35) * 1.15 + (rough || students ? 0.1 : 0) - hygieneRelief * 0.5);
   // Floor energy now TRACKS THE NIGHT: cold at the doors, building to a warm peak
   // as the crowd fills in, cooling at last call. Previously this was flat (no
   // progress term), so the dance floor never moved on its own — that was the main
