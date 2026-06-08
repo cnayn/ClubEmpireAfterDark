@@ -273,6 +273,7 @@ function GuestSilhouette({
   shimmer,
   offset = 0,
   color,
+  intensity = 1,
 }: {
   mood: GuestMood;
   motion: Motion;
@@ -280,6 +281,9 @@ function GuestSilhouette({
   shimmer: Animated.Value;
   offset?: number;
   color?: string;
+  /** 0..~1.2 — scales motion amplitude (the floor crowd passes live energy so
+   *  the crowd moves more as the floor heats up, barely when it's cold). */
+  intensity?: number;
 }) {
   const c = color ?? MOOD_COLOR[mood];
   // Slight deterministic per-person variation (height + a tiny lean) so a cluster
@@ -296,18 +300,19 @@ function GuestSilhouette({
   let translateY: Animated.AnimatedInterpolation<number> | number = 0;
   let translateX: Animated.AnimatedInterpolation<number> | number = 0;
   let opacity: number | Animated.AnimatedInterpolation<number> = op;
-  if (pulse && motion !== 'still') {
+  const amp = Math.max(0, intensity); // motion amplitude scale (energy-driven on the floor)
+  if (pulse && motion !== 'still' && amp > 0.01) {
     if (motion === 'bounce') {
-      // Dancing — a bigger, livelier hop so a packed floor visibly moves.
-      translateY = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -5 - offset * 0.5, 0] });
+      // Dancing — hop scales with energy: a hot floor jumps, a cold one barely moves.
+      translateY = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, (-5 - offset * 0.5) * amp, 0] });
       opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [Math.max(0.55, op * 0.7), op] });
     } else if (motion === 'shuffle') {
-      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1.6 + offset * 0.2, 0] });
+      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, (1.6 + offset * 0.2) * amp, 0] });
     } else if (motion === 'shake') {
       // Angry — a sharper, harder jitter that reads as agitation.
-      translateX = shimmer.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 2.2, -2.2, 2.2, 0] });
+      translateX = shimmer.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, 2.2 * amp, -2.2 * amp, 2.2 * amp, 0] });
     } else if (motion === 'sway') {
-      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-1.2, 1.2, -1.2] });
+      translateX = shimmer.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-1.2 * amp, 1.2 * amp, -1.2 * amp] });
     }
   }
 
@@ -350,11 +355,14 @@ function TokenCluster({
   pulse,
   shimmer,
   showLabel = true,
+  intensity = 1,
 }: {
   cluster: GuestCluster;
   pulse: boolean;
   shimmer: Animated.Value;
   showLabel?: boolean;
+  /** Motion amplitude scale for this cluster (the floor passes live energy). */
+  intensity?: number;
 }) {
   const color = MOOD_COLOR[cluster.mood];
   const motion = motionFor(cluster.zone, cluster.mood);
@@ -386,6 +394,7 @@ function TokenCluster({
             pulse={pulse}
             shimmer={shimmer}
             offset={i}
+            intensity={intensity}
           />
         ))}
       </View>
@@ -720,6 +729,10 @@ export function FloorView({
   };
 
   const floorTint = zoneTint('floor');
+  // The dance-floor crowd's motion scales with live floor energy: barely moving
+  // when cold, jumping when hot / Hyped / after a Drop Bass (energy spikes feed
+  // glow('floor')). Same source as the energy wash, so glow + crowd move together.
+  const floorEnergyIntensity = 0.25 + glow('floor') * 0.95;
   const djTint = djLabel ? colors.neonMagenta : colors.textMuted;
   const bathTint = pressures && pressures.bathroom >= 0.55 ? colors.warning : colors.textMuted;
   const staffAreaTint = colors.neonViolet;
@@ -908,7 +921,7 @@ export function FloorView({
                       accessibilityRole={onClusterPress ? 'button' : undefined}
                       accessibilityLabel="Dance floor crowd"
                     >
-                      <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                      <TokenCluster cluster={floorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} intensity={floorEnergyIntensity} />
                     </Pressable>
                   ) : (
                     renderFallbackCrowd()
