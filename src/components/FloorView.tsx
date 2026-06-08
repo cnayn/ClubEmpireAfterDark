@@ -703,6 +703,15 @@ export function FloorView({
     return djLabel ? 0.4 : 0;
   };
 
+  // A LIVE zone tone from the current pressure (0..1), so crew state/reactions
+  // track the night's arc — not the fixed final preview. Mirrors the meter
+  // thresholds: calm → busy → warn.
+  const liveTone = (p: number | undefined): ZoneTone | undefined =>
+    p === undefined ? undefined : p >= 0.66 ? 'warn' : p >= 0.33 ? 'busy' : undefined;
+  // Per-zone motion intensity (same pattern as the floor's energy intensity):
+  // the queue/line churns harder as its pressure rises, calm when low.
+  const zoneIntensity = (p: number | undefined): number => 0.25 + (p ?? 0) * 0.95;
+
   const liveDots = Math.max(0, Math.round(floor.dots * Math.max(0, Math.min(1, liveScale))));
 
   /** Fallback floor crowd as scattered silhouettes (when no `floor` cluster is
@@ -782,7 +791,7 @@ export function FloorView({
                 <View style={styles.doorPost}>
                   {floor.bouncers.length > 0 ? (
                     floor.bouncers.map((b) => (
-                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', zones?.door)} reaction={staffReaction('bouncer', zones?.door)} onPress={onStaffPress ? () => onStaffPress(b.id, 'bouncer', 'door') : undefined} />
+                      <StaffToken key={b.id} s={b} role="bouncer" color={zoneTint('door')} state={staffState('bouncer', liveTone(pressures?.door))} reaction={staffReaction('bouncer', liveTone(pressures?.door))} onPress={onStaffPress ? () => onStaffPress(b.id, 'bouncer', 'door') : undefined} />
                     ))
                   ) : (
                     <EmptyPost />
@@ -795,7 +804,7 @@ export function FloorView({
                     accessibilityRole={onClusterPress ? 'button' : undefined}
                     accessibilityLabel="Door line"
                   >
-                    <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} />
+                    <TokenCluster cluster={doorCluster} pulse={pulse} shimmer={shimmers[0]} showLabel={false} intensity={zoneIntensity(pressures?.door)} />
                     <View style={styles.stanchionRow} pointerEvents="none">
                       <View style={[styles.stanchionPost, { backgroundColor: zoneTint('door') }]} />
                       <View style={[styles.stanchionRope, { backgroundColor: colors.warning }]} />
@@ -978,7 +987,7 @@ export function FloorView({
               <View style={styles.sideBarPosts}>
                 {floor.bartenders.length > 0 ? (
                   floor.bartenders.map((b) => (
-                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', zones?.bar)} reaction={staffReaction('bartender', zones?.bar)} onPress={onStaffPress ? () => onStaffPress(b.id, 'bartender', 'bar') : undefined} />
+                    <StaffToken key={b.id} s={b} role="bartender" color={zoneTint('bar')} state={staffState('bartender', liveTone(pressures?.bar))} reaction={staffReaction('bartender', liveTone(pressures?.bar))} onPress={onStaffPress ? () => onStaffPress(b.id, 'bartender', 'bar') : undefined} />
                   ))
                 ) : (
                   <EmptyPost />
@@ -990,7 +999,7 @@ export function FloorView({
                   accessibilityRole={onClusterPress ? 'button' : undefined}
                   accessibilityLabel="Bar queue"
                 >
-                  <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} />
+                  <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} intensity={zoneIntensity(pressures?.bar)} />
                 </Pressable>
               ) : null}
               {inZone('bar').length > 0 ? (
