@@ -1068,15 +1068,15 @@ const styles = StyleSheet.create({
   // the bands never spill onto the section below. Top-aligned so the door/VIP and
   // bottom bands sit at their natural height (no clipping) while the MIDDLE band
   // (dance floor) grows to fill — see midBandGrow.
-  roomFill: { flex: 3, minHeight: 0, overflow: 'hidden', justifyContent: 'flex-start' },
-  // In full-bleed, the dance-floor band absorbs the spare height so the floor is
-  // the hero without starving / clipping the door / VIP / DJ bands.
-  midBandGrow: { flex: 1, minHeight: 0 },
-  // …and the secondary bands keep a floor on their height so DOOR / VIP-locked /
-  // bathroom / staff always render fully even when the door is quiet (little
-  // content) — they were collapsing to a thin clipped strip otherwise.
-  topBandFill: { minHeight: 96 },
-  bottomBandFill: { minHeight: 76 },
+  roomFill: { flex: 3, minHeight: 0, overflow: 'hidden' },
+  // In full-bleed the three bands PROPORTIONALLY divide the room's bounded height
+  // (≈22% / 56% / 22%) — so the floor stays the hero AND the door/VIP and
+  // bath/staff bands always get a full share, while the room can never exceed its
+  // allotment (flex fits the container → no overflow/clipping/collision). Pixel
+  // min-heights caused the earlier overflow; flex shares fit any screen.
+  topBandFill: { flex: 2, minHeight: 0 },
+  midBandGrow: { flex: 5, minHeight: 0 },
+  bottomBandFill: { flex: 2, minHeight: 0 },
   // The below-room band gets the remaining space and scrolls internally if the
   // meters + status + stream are taller than it — never overlapping the room.
   belowScroll: { flex: 2 },
@@ -1251,7 +1251,7 @@ const styles = StyleSheet.create({
   grid: {
     position: 'relative',
     flex: 1,
-    minHeight: 140,
+    minHeight: 100,
     borderRadius: radius.sm,
     overflow: 'hidden',
     backgroundColor: colors.bg,
