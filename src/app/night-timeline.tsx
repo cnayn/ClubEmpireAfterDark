@@ -45,7 +45,7 @@ import {
   pressureHeadline,
   type StreamTick,
 } from '@/lib/nightPressure';
-import { crewVoice, guestVoice } from '@/lib/floorVoices';
+import { crewVoice, djBoothVoice, guestVoice, workRoomVoice } from '@/lib/floorVoices';
 import { nightZones, type ZoneKey } from '@/lib/venue';
 import type { ClubState, DayConfig } from '@/domain/types';
 import { useGameStore } from '@/state/store';
@@ -406,6 +406,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     // Unique key per push — the same action can fire many times a night, so the
     // id can't just be `ba-${id}` (that caused a duplicate-key console error).
     setBossStream((r) => [...r, { id: `ba-${id}-${r.length}`, text: outcome.call, tone: outcome.bubble.tone }]);
+    // Working the room surfaces a written acknowledgement from nearby cast/guests.
+    if (id === 'work-room') {
+      const onDutyIds = [...floor.bartenders, ...floor.bouncers].map((s) => s.id);
+      setBossStream((r) => [...r, { id: `wr-ack-${r.length}`, text: workRoomVoice(onDutyIds), tone: 'good' }]);
+    }
   };
 
   // DJ Booth pilot — the four DJ calls. Read the Room is a free inspect (sets the
@@ -495,12 +500,15 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     const fill = preview.capacity > 0 ? preview.guests / preview.capacity : 0;
     const onDuty = [...floor.bartenders, ...floor.bouncers];
     const tappedName = t.kind === 'crew' ? onDuty.find((s) => s.id === t.staffId)?.name : undefined;
-    // The tapped crew member's own voice (floor-content bank), busy variant when
-    // their station is under pressure — so tapping Rosa ≠ tapping John.
+    // The inspected subject's own written voice (floor-content bank): a crew
+    // member (busy variant when their station's slammed) or the DJ booth (by
+    // floor energy) — so tapping Rosa ≠ tapping John ≠ tapping the booth.
     const crewLine =
       t.kind === 'crew'
         ? crewVoice(t.staffId, t.role, (t.role === 'bartender' ? pressures.bar : pressures.door) >= 0.66)
-        : null;
+        : zone === 'dj'
+          ? djBoothVoice(pressures.energy)
+          : null;
 
     // Title + sub-line identify exactly what was tapped.
     let title = def.label.toUpperCase();

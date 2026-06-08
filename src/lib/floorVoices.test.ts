@@ -3,7 +3,7 @@
  * state. Deterministic; no sim/RNG/save.
  */
 
-import { crewVoice, guestVoice, guestVoiceState } from './floorVoices';
+import { crewVoice, djBoothVoice, guestVoice, guestVoiceState, workRoomVoice } from './floorVoices';
 
 const P = (over: Partial<{ crowd: number; bar: number; door: number; energy: number }> = {}) => ({
   crowd: 0.5, bar: 0.2, door: 0.2, energy: 0.6, ...over,
@@ -65,5 +65,17 @@ describe('crewVoice — named cast sound like themselves, with a busy variant', 
   it('an unknown id falls back to a short role-generic line', () => {
     expect(crewVoice('bar-nobody', 'bartender', false)).toBeTruthy();
     expect(crewVoice('bnc-nobody', 'bouncer', true)).toBeTruthy();
+  });
+});
+
+describe('djBoothVoice / workRoomVoice — written DJ + owner-presence lines', () => {
+  it('DJ booth voice shifts with floor energy', () => {
+    expect(djBoothVoice(0.2)).not.toBe(djBoothVoice(0.5));
+    expect(djBoothVoice(0.9)).not.toBe(djBoothVoice(0.5));
+  });
+  it('work-room acknowledgement prefers Caramel, then Rosa, else a regular', () => {
+    expect(workRoomVoice(['bnc-kareem']).toLowerCase()).toContain('room');
+    expect(workRoomVoice(['bar-rosa']).toLowerCase()).toContain('bar');
+    expect(workRoomVoice(['bar-milo']).toLowerCase()).toContain('owner');
   });
 });

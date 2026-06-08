@@ -151,3 +151,18 @@ export function crewVoice(staffId: string, role: 'bartender' | 'bouncer', underP
   const v = CREW_LINES[staffId] ?? CREW_FALLBACK[role];
   return underPressure ? v.busy : v.tap;
 }
+
+/** The (unnamed) DJ booth's own voice, by live floor energy (floor-content §DJ booth). */
+export function djBoothVoice(energy: number): string {
+  if (energy >= 0.66) return 'Room’s already there, boss.';
+  if (energy <= 0.3) return 'Trying. Room’s checked out.';
+  return 'Set’s reading.';
+}
+
+/** Working the room surfaces a short acknowledgement from nearby cast/guests —
+ *  Caramel on the door, else Rosa on the bar, else a regular (floor-content §Owner). */
+export function workRoomVoice(onDutyIds: string[]): string {
+  if (onDutyIds.includes('bnc-kareem')) return 'Good. Room sees you.';
+  if (onDutyIds.includes('bar-rosa')) return 'Tell the bar I said hi.';
+  return 'Owner on the floor. Good.';
+}
