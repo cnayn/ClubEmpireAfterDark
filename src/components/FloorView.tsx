@@ -18,7 +18,7 @@
  */
 
 import { ReactNode, useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/Card';
 import { Pill } from '@/components/Controls';
@@ -1033,7 +1033,17 @@ export function FloorView({
         </View>
       </View>
 
-      {belowRoom ? <View style={styles.belowRoom}>{belowRoom}</View> : null}
+      {belowRoom ? (
+        fill ? (
+          // Full-bleed: the meters/status/stream get their OWN bounded, scrollable
+          // band BELOW the floor — so they never overlap the room when tall.
+          <ScrollView style={styles.belowScroll} contentContainerStyle={styles.belowScrollContent} showsVerticalScrollIndicator={false}>
+            {belowRoom}
+          </ScrollView>
+        ) : (
+          <View style={styles.belowRoom}>{belowRoom}</View>
+        )
+      ) : null}
 
       {hideFooter ? null : (
         <Text variant="label" muted>
@@ -1056,8 +1066,13 @@ void _unusedDotOpacity;
 
 const styles = StyleSheet.create({
   fillWrap: { flex: 1, gap: spacing.sm },
-  // Full-bleed room grows to fill the screen body so the floor is the hero.
-  roomFill: { flex: 1, minHeight: 0 },
+  // Full-bleed room is the hero (≈60% of the body) and CLIPS its own content so
+  // the bands never spill onto the section below.
+  roomFill: { flex: 3, minHeight: 0, overflow: 'hidden' },
+  // The below-room band gets the remaining space and scrolls internally if the
+  // meters + status + stream are taller than it — never overlapping the room.
+  belowScroll: { flex: 2 },
+  belowScrollContent: { gap: spacing.md, paddingBottom: spacing.sm },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   room: {
     backgroundColor: colors.bg,
