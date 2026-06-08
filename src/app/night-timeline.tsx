@@ -962,6 +962,8 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
 
   return (
     <Screen
+      scroll={false}
+      contentStyle={styles.nightContent}
       header={topHud}
       footer={
         atEnd ? (
@@ -987,6 +989,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       }
     >
       <FloorView
+        fill
         floor={floor}
         bubbles={liveBubbles}
         moodAccent={moodAccent}
@@ -1120,6 +1123,7 @@ const styles = StyleSheet.create({
   djSuggested: { borderColor: colors.neonCyan, borderWidth: 1 },
   djHint: { textAlign: 'center', fontSize: 10, marginTop: 2 },
   leaveItRow: { alignSelf: 'flex-start', paddingVertical: spacing.xs, marginTop: spacing.xs },
+  nightContent: { paddingHorizontal: spacing.sm, paddingTop: spacing.xs, paddingBottom: 0, gap: spacing.sm, flex: 1 },
   hud: { gap: 2 },
   hudRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   hudName: { flexShrink: 1, fontSize: 13, letterSpacing: 0.5 },

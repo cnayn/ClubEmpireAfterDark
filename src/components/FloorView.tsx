@@ -640,6 +640,7 @@ export function FloorView({
   onZonePress,
   onStaffPress,
   onClusterPress,
+  fill = false,
 }: {
   floor: FloorViewModel;
   bubbles?: FloorBubble[];
@@ -665,6 +666,9 @@ export function FloorView({
   onStaffPress?: (staffId: string, role: 'bartender' | 'bouncer', zone: BoardZone) => void;
   /** Tap a guest cluster/queue to inspect the crowd at that zone. */
   onClusterPress?: (zone: BoardZone) => void;
+  /** Full-bleed mode (night screen): drop the Card chrome and let the room flex
+   *  to fill the whole screen, so the floor is the hero — not a small card. */
+  fill?: boolean;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
   const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
@@ -744,8 +748,8 @@ export function FloorView({
 
   const onDutyCount = floor.bartenders.length + floor.bouncers.length;
 
-  return (
-    <Card title={title} accent={moodAccent}>
+  const inner = (
+    <>
       <View style={styles.head}>
         <Text variant="label" muted>
           {floor.eventName}
@@ -758,7 +762,7 @@ export function FloorView({
         </Text>
       ) : null}
 
-      <View style={[styles.room, { borderColor: accent, shadowColor: accent }]}>
+      <View style={[styles.room, fill && styles.roomFill, { borderColor: accent, shadowColor: accent }]}>
         {/* Back wall — a subtle scanline strip evokes a back wall behind the door. */}
         <View style={[styles.backWall, { borderColor: accent }]} pointerEvents="none">
           {[0, 1, 2].map((i) => (
@@ -884,11 +888,27 @@ export function FloorView({
                       key={i}
                       style={[
                         styles.tile,
-                        { backgroundColor: floorTint, opacity: 0.04 + ((i + Math.floor(i / 4)) % 2) * 0.05 + glow('floor') * 0.04 },
+                        { backgroundColor: floorTint, opacity: 0.04 + ((i + Math.floor(i / 4)) % 2) * 0.05 + glow('floor') * 0.12 },
                       ]}
                     />
                   ))}
                 </View>
+                {/* Energy wash: the whole floor glows warmer as energy rises and
+                    goes dark/cold when it drops — so 'cold / warming / alive' reads
+                    at a glance without the meter. Pulses on the beat when hot. */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.energyWash,
+                    {
+                      backgroundColor: floorTint,
+                      opacity: shimmers[1].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.02 + glow('floor') * 0.16, 0.02 + glow('floor') * 0.28],
+                      }),
+                    },
+                  ]}
+                />
                 {/* Three pulsing spotlights on staggered loops read as a live
                     nightclub light rig (counter-phased so light "sweeps"). When
                     pulse is off (dashboard) the shimmers sit at 0.5 = steady glow. */}
@@ -1022,8 +1042,11 @@ export function FloorView({
             : 'Doors closed — open the club tonight.'}
         </Text>
       )}
-    </Card>
+    </>
   );
+  // Night screen uses full-bleed (no Card chrome, room flexes to fill); other
+  // screens (dashboard) keep the titled Card.
+  return fill ? <View style={styles.fillWrap}>{inner}</View> : <Card title={title} accent={moodAccent}>{inner}</Card>;
 }
 
 // Dummy reference to silence the unused-var lint while keeping the prop in the
@@ -1032,6 +1055,9 @@ const _unusedDotOpacity = (n: number) => n;
 void _unusedDotOpacity;
 
 const styles = StyleSheet.create({
+  fillWrap: { flex: 1, gap: spacing.sm },
+  // Full-bleed room grows to fill the screen body so the floor is the hero.
+  roomFill: { flex: 1, minHeight: 0 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   room: {
     backgroundColor: colors.bg,
@@ -1201,6 +1227,7 @@ const styles = StyleSheet.create({
   },
   grid: {
     position: 'relative',
+    flex: 1,
     minHeight: 140,
     borderRadius: radius.sm,
     overflow: 'hidden',
@@ -1209,6 +1236,8 @@ const styles = StyleSheet.create({
   },
   // 4x3 tile grid behind the dance floor — reads as a real club floor.
   tiles: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', flexWrap: 'wrap' },
+  // Full-floor energy glow (opacity scales with floor energy).
+  energyWash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.sm },
   tile: { width: '25%', height: '33.33%' },
   // A soft beam from the DJ booth direction; sits behind the silhouettes.
   spotlight: {
