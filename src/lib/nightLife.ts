@@ -46,10 +46,13 @@ export function cumulativeArrivalFraction(progress: number): number {
   return clamp01(area / total);
 }
 
-/** Gross take so far tonight (cover + bar + VIP), filling along the arrival
- *  curve. Presentation only — the committed books still come from the resolver. */
+/** Gross take so far tonight (cover + bar + VIP + booking fee — the same sum
+ *  the resolver calls revenue), filling along the arrival curve. Presentation
+ *  only — the committed books still come from the resolver, and can land a
+ *  little higher when the owner's calls earn a revenue bump (the HUD labels
+ *  the live read as an estimate). */
 export function liveTill(preview: NightResult, progress: number): number {
-  const gross = preview.coverRevenue + preview.barRevenue + preview.vipBonus;
+  const gross = preview.coverRevenue + preview.barRevenue + preview.vipBonus + preview.bookingFee;
   return Math.round(gross * cumulativeArrivalFraction(progress));
 }
 

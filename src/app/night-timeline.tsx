@@ -434,7 +434,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       ...(encChoice ? [encChoice.intervention] : []),
       ...(ignoreVibe < 0 ? [{ vibeBonus: ignoreVibe, revenueMod: 1 }] : []),
       // Ejected troublemakers save vibe (diminishing); slipped ones cost it.
-      troublemakerIntervention(tmEjected.length, tmSlipped.length),
+      // At commit, EVERY unejected troublemaker counts as slipped — skipping to
+      // the books early doesn't waive the reckoning (the night still ran; you
+      // just weren't there to handle it).
+      troublemakerIntervention(tmEjected.length, tms.filter((t) => !tmEjected.includes(t.id)).length),
     ]);
     const r = runNight(plan, combined, chosen);
     if (r) setCommitted(r);
@@ -1087,21 +1090,23 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         <Text variant="label" color={moodAccent} numberOfLines={1}>
           {clockLabel(liveProgress)} · {phaseName}
         </Text>
-        <Text variant="label" numberOfLines={1}>
-          <Text variant="label" color={colors.success}>${club.cash}</Text>
-          <Text variant="label" muted>{'  '}</Text>
-          <Text variant="label" color={colors.neonViolet}>★{club.reputation}</Text>
-        </Text>
-      </View>
-      {/* Live night counters — tonight's till fills as the room earns; the
-          occupancy count rises and thins with the arrival curve. */}
-      <View style={styles.hudRow}>
-        <Text variant="label" color={colors.success} numberOfLines={1}>
-          Tonight ${tillNow}
-        </Text>
-        <Text variant="label" muted numberOfLines={1}>
-          {committed ? 'Doors closed' : `${insideNow} in the room`}
-        </Text>
+        {/* While the night is LIVE the right slot carries the live counters —
+            tonight's till (~estimate; the owner's calls can land it higher) and
+            who's in the room. Cash/rep don't move mid-night, so they return
+            once the doors close. One row — the floor keeps its height. */}
+        {committed ? (
+          <Text variant="label" numberOfLines={1}>
+            <Text variant="label" color={colors.success}>${club.cash}</Text>
+            <Text variant="label" muted>{'  '}</Text>
+            <Text variant="label" color={colors.neonViolet}>★{club.reputation}</Text>
+          </Text>
+        ) : (
+          <Text variant="label" numberOfLines={1}>
+            <Text variant="label" color={colors.success}>~${tillNow}</Text>
+            <Text variant="label" muted>{'  '}</Text>
+            <Text variant="label" color={colors.neonCyan}>{insideNow} in</Text>
+          </Text>
+        )}
       </View>
       {!committed && alertMsg && !running ? (
         <Text variant="label" color={colors.warning} numberOfLines={1}>

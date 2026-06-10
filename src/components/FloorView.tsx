@@ -354,6 +354,9 @@ function TroublemakerToken({
       disabled={!onPress}
       accessibilityRole="button"
       accessibilityLabel="Eject troublemaker"
+      // The visual token is ~30px wide; pad the hit area to the 44px touch
+      // minimum without reflowing the zone layout.
+      hitSlop={{ left: 11, right: 11, top: 4, bottom: 4 }}
       style={styles.tmWrap}
     >
       <Animated.View
@@ -706,7 +709,6 @@ export function FloorView({
   fill?: boolean;
 }) {
   const accent = moodAccent ?? VIBE_COLOR[floor.vibe];
-  const dotOpacity = floor.density === 'packed' ? 1 : floor.density === 'busy' ? 0.85 : 0.6;
   const inZone = (z: FloorBubble['zone']) => bubbles.filter((b) => b.zone === z);
 
   // Three staggered shimmer loops give the floor a non-uniform motion source
@@ -920,7 +922,9 @@ export function FloorView({
                   {/* Tonight's genre vs the crowd — surfacing the resolver's
                       musicFit, tinted by how well it lands. */}
                   {musicTag ? (
-                    <View style={[styles.crowdTag, { borderColor: musicTag.color }]}>
+                    // borderWidth 1 (vs the hairline crowd tags) so the music
+                    // read pops from the segment chips at a glance.
+                    <View style={[styles.crowdTag, { borderColor: musicTag.color, borderWidth: 1 }]}>
                       <Text variant="label" color={musicTag.color}>
                         {musicTag.label}
                       </Text>
@@ -1088,6 +1092,17 @@ export function FloorView({
                   <EmptyPost />
                 )}
               </View>
+              {/* Troublemaker renders ABOVE the queue cluster: the eject
+                  affordance is interactive and must stay visible when the bar
+                  column runs tight on short screens; the cluster is decor. */}
+              {tmIn('bar').map((t) => (
+                <TroublemakerToken
+                  key={t.id}
+                  pulse={pulse}
+                  shimmer={shimmers[0]}
+                  onPress={onTroublemakerPress ? () => onTroublemakerPress(t.id) : undefined}
+                />
+              ))}
               {barCluster ? (
                 <Pressable
                   onPress={onClusterPress ? () => onClusterPress('bar') : undefined}
@@ -1097,14 +1112,6 @@ export function FloorView({
                   <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} intensity={zoneIntensity(pressures?.bar)} />
                 </Pressable>
               ) : null}
-              {tmIn('bar').map((t) => (
-                <TroublemakerToken
-                  key={t.id}
-                  pulse={pulse}
-                  shimmer={shimmers[0]}
-                  onPress={onTroublemakerPress ? () => onTroublemakerPress(t.id) : undefined}
-                />
-              ))}
               {inZone('bar').length > 0 ? (
                 <View style={styles.bubbleRow}>{inZone('bar').map((b, i) => <Bubble key={`${b.id}-${i}`} b={b} />)}</View>
               ) : null}
@@ -1159,11 +1166,6 @@ export function FloorView({
   // screens (dashboard) keep the titled Card.
   return fill ? <View style={styles.fillWrap}>{inner}</View> : <Card title={title} accent={moodAccent}>{inner}</Card>;
 }
-
-// Dummy reference to silence the unused-var lint while keeping the prop in the
-// component signature for future use (kept dim by callers).
-const _unusedDotOpacity = (n: number) => n;
-void _unusedDotOpacity;
 
 const styles = StyleSheet.create({
   fillWrap: { flex: 1, gap: spacing.sm },
@@ -1237,6 +1239,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
     shadowOffset: { width: 0, height: 0 },
+    // Clip own content on short screens — the column must never spill past the
+    // room's bands (the room itself clips, which would eat the EJECT tag).
+    overflow: 'hidden',
   },
   sideBarHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   serviceGlyph: { fontSize: 11 },

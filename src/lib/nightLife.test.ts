@@ -51,10 +51,10 @@ describe('cumulativeArrivalFraction — the till curve', () => {
 });
 
 describe('liveTill / guestsInside', () => {
-  it('the till fills toward the gross take', () => {
-    const r = result({ coverRevenue: 200, barRevenue: 560, vipBonus: 40 });
+  it('the till fills toward the gross take, booking fee included', () => {
+    const r = result({ coverRevenue: 200, barRevenue: 520, vipBonus: 40, bookingFee: 40, revenue: 800 });
     expect(liveTill(r, 0)).toBe(0);
-    expect(liveTill(r, 1)).toBe(800);
+    expect(liveTill(r, 1)).toBe(800); // matches the resolver's revenue sum
     expect(liveTill(r, 0.5)).toBeGreaterThan(0);
     expect(liveTill(r, 0.5)).toBeLessThan(800);
   });
