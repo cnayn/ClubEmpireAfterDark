@@ -45,7 +45,7 @@ import {
   pressureHeadline,
   type StreamTick,
 } from '@/lib/nightPressure';
-import { crewVoice, djBoothVoice, guestVoice, workRoomVoice } from '@/lib/floorVoices';
+import { crewVoice, crewVoiceState, djBoothVoice, djSendVoice, guestCard, guestVoices, workRoomAck } from '@/lib/floorVoices';
 import {
   guestsInside,
   hypeLevel,
@@ -364,19 +364,22 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const moodAccent = committed ? colors.neonViolet : moodFresh ? MOOD_COLOR[mood!.tone] : TONE_COLOR[headline.tone];
   const moodLabel = committed ? "That's a wrap." : moodFresh ? mood!.label : headline.label;
 
-  // One overheard guest line, picked from the top crowd segment + current state
-  // (floor-content voice bank), rotating slowly so the room re-speaks every few
-  // beats instead of every frame — throttled to a single live voice + the
-  // player's own action reactions.
-  const topSegment = topCrowd(crowdMix(planClub, plan), 1)[0];
+  // Overheard guest lines from the floor-content voice bank: up to TWO at once,
+  // always in different zones (one bar + one door, never stacked), and only when
+  // their states are actually true — a calm room stays quiet. The speaking
+  // segment and the line rotate on a slow progress bucket so the room re-speaks
+  // every few beats (not every frame) and repeat nights use the bank's breadth.
+  const topSegments = topCrowd(crowdMix(planClub, plan), 3);
   const voiceBucket = Math.floor(liveProgress / 0.08);
-  const gv = committed ? null : guestVoice(topSegment, pressures, voiceBucket);
-  const guestBubble: FloorBubble | null = gv
-    ? { id: `gv-${voiceBucket}-${gv.zone}`, label: gv.line, tone: gv.tone, zone: gv.zone }
-    : null;
-  const liveBubbles = committed
-    ? floorBubbles(committed)
-    : ([guestBubble, ...reactions].filter(Boolean) as FloorBubble[]);
+  const guestBubbles: FloorBubble[] = committed
+    ? []
+    : guestVoices(topSegments, pressures, voiceBucket).map((v) => ({
+        id: `gv-${voiceBucket}-${v.zone}`,
+        label: v.line,
+        tone: v.tone,
+        zone: v.zone,
+      }));
+  const liveBubbles = committed ? floorBubbles(committed) : [...guestBubbles, ...reactions];
   const liveFlash = committed ? undefined : flashZone ?? headline.zone;
   const liveScale = committed ? 1 : liveCrowdFraction(progress);
   // Readable guest clusters per zone — the room reads as a club, not just dots.
@@ -457,19 +460,34 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     if (committed || encounterBlocking) return;
     if (focusLeft < focusCost(id)) return; // out of Owner Attention for tonight
     const outcome = resolveBossAction(id, preview, planClub);
-    setChosen((c) => [...c, id]); // repeats allowed; combineInterventions clamps the stack
-    setReactions((b) => [...b.filter((x) => x.zone !== outcome.bubble.zone), outcome.bubble]);
-    setMood(outcome.mood);
-    setMoodAt(progress);
-    setFlashZone(outcome.bubble.zone);
-    // Unique key per push — the same action can fire many times a night, so the
-    // id can't just be `ba-${id}` (that caused a duplicate-key console error).
-    setBossStream((r) => [...r, { id: `ba-${id}-${r.length}`, text: outcome.call, tone: outcome.bubble.tone }]);
-    // Working the room surfaces a written acknowledgement from nearby cast/guests.
+    // The room answers the owner's call in its own WRITTEN voice (floor-content
+    // §Owner / §DJ booth), not a system message: working the room gets an
+    // acknowledgement from whoever's actually on duty (Caramel / Rosa / a
+    // regular, rotating across repeats); pushing the booth gets the DJ's
+    // energy-matched line. Other calls keep their outcome bubble.
+    let bubble = outcome.bubble;
+    let voiceLine: string | null = null;
     if (id === 'work-room') {
       const onDutyIds = [...floor.bartenders, ...floor.bouncers].map((s) => s.id);
-      setBossStream((r) => [...r, { id: `wr-ack-${r.length}`, text: workRoomVoice(onDutyIds), tone: 'good' }]);
+      const ack = workRoomAck(onDutyIds, chosen.filter((x) => x === 'work-room').length);
+      voiceLine = `${ack.speaker}: “${ack.line}”`;
+      bubble = { id: outcome.bubble.id, label: voiceLine, tone: 'good', zone: ack.zone };
+    } else if (id === 'push-dj') {
+      voiceLine = `DJ: “${djSendVoice(pressures.energy)}”`;
+      bubble = { ...outcome.bubble, label: voiceLine };
     }
+    setChosen((c) => [...c, id]); // repeats allowed; combineInterventions clamps the stack
+    setReactions((b) => [...b.filter((x) => x.zone !== bubble.zone), bubble]);
+    setMood(outcome.mood);
+    setMoodAt(progress);
+    setFlashZone(bubble.zone);
+    // Unique key per push — the same action can fire many times a night, so the
+    // id can't just be `ba-${id}` (that caused a duplicate-key console error).
+    setBossStream((r) => {
+      const next = [...r, { id: `ba-${id}-${r.length}`, text: outcome.call, tone: outcome.bubble.tone }];
+      if (voiceLine) next.push({ id: `vx-${id}-${r.length}`, text: voiceLine, tone: 'good' as BeatTone });
+      return next;
+    });
   };
 
   // DJ Booth pilot — the four DJ calls. Read the Room is a free inspect (sets the
@@ -494,11 +512,19 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         setDjPulse({ at: progress, energy: o.energy, happy: o.happy, morale: o.morale });
       }
     }
-    setReactions((b) => [...b.filter((x) => x.zone !== 'floor'), { id: `dj-${id}`, label: o.call, tone: bubbleTone, zone: 'floor' }]);
+    // The booth answers the call in its own WRITTEN voice (floor-content §DJ
+    // booth), matched to live floor energy — honest about a checked-out room
+    // ("Trying. Room's checked out.") and a room that's already up.
+    const spoken = id === 'read-room' ? o.call : `DJ: “${djSendVoice(pressures.energy)}”`;
+    setReactions((b) => [...b.filter((x) => x.zone !== 'floor'), { id: `dj-${id}`, label: spoken, tone: bubbleTone, zone: 'floor' }]);
     setMood({ label: id === 'hype-room' ? 'Hyping the room…' : o.note, tone: moodTone });
     setMoodAt(progress);
     setFlashZone('floor');
-    setBossStream((r) => [...r, { id: `dj-${id}-${r.length}`, text: o.call, tone: o.tone }]);
+    setBossStream((r) => {
+      const next = [...r, { id: `dj-${id}-${r.length}`, text: o.call, tone: o.tone }];
+      if (id !== 'read-room') next.push({ id: `djv-${id}-${r.length}`, text: spoken, tone: o.tone });
+      return next;
+    });
   };
 
   // Tap a flagged troublemaker IN TIME and the bouncer walks them out — the
@@ -573,14 +599,42 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     const onDuty = [...floor.bartenders, ...floor.bouncers];
     const tappedName = t.kind === 'crew' ? onDuty.find((s) => s.id === t.staffId)?.name : undefined;
     // The inspected subject's own written voice (floor-content bank): a crew
-    // member (busy variant when their station's slammed) or the DJ booth (by
-    // floor energy) — so tapping Rosa ≠ tapping John ≠ tapping the booth.
+    // member or the DJ booth (by floor energy) — so tapping Rosa ≠ tapping
+    // John ≠ tapping the booth. Crew speak in one of three live-derived states
+    // — fresh (early/calm) · working (mid) · worn (late + station running hot)
+    // — each in their own written voice; tapping Rosa late on a slammed night
+    // sounds like tired-Rosa. Derived live, presentation only: no fatigue
+    // mechanics, no accumulating stats, no performance effects.
     const crewLine =
       t.kind === 'crew'
-        ? crewVoice(t.staffId, t.role, (t.role === 'bartender' ? pressures.bar : pressures.door) >= 0.66)
+        ? crewVoice(
+            t.staffId,
+            t.role,
+            crewVoiceState(liveProgress, t.role === 'bartender' ? pressures.bar : pressures.door),
+            { barStrained: pressures.bar >= 0.66 }
+          )
         : zone === 'dj'
           ? djBoothVoice(pressures.energy)
           : null;
+
+    // Tapping a guest cluster opens the crowd's Block 2 info card — Type · Mood
+    // (matched to the live night-state, zone-aware) · Want · Tell, in the top
+    // segment's written voice — instead of a generic queue read.
+    const card =
+      t.kind === 'queue' && (zone === 'bar' || zone === 'door' || zone === 'floor') && topSegments[0]
+        ? guestCard(topSegments[0], pressures, zone)
+        : null;
+    // The Mood row's accent tracks the matched state's feel (a hot floor reads
+    // good, a tense door reads bad, a calm room reads muted).
+    const cardMoodColor = !card?.state
+      ? colors.textMuted
+      : card.state === 'door-tense'
+        ? colors.danger
+        : card.state === 'bar-slow' || card.state === 'cooling'
+          ? colors.warning
+          : card.state === 'floor-hot'
+            ? colors.success
+            : colors.neonCyan;
 
     // Title + sub-line identify exactly what was tapped.
     let title = def.label.toUpperCase();
@@ -605,7 +659,11 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         : '';
       if (t.kind === 'queue') {
         title = zone === 'bar' ? 'BAR QUEUE' : zone === 'door' ? 'DOOR LINE' : 'DANCE FLOOR';
-        subtitle = `Guest Cluster${stateWord ? ` · ${stateWord}` : ''}`;
+        // The card names WHO this crowd is (the night's top segment), not just
+        // "Guest Cluster".
+        subtitle = card
+          ? `${CROWD_SEGMENTS[topSegments[0]].name}${stateWord ? ` · ${stateWord}` : ''}`
+          : `Guest Cluster${stateWord ? ` · ${stateWord}` : ''}`;
       } else {
         const stationType =
           zone === 'bar' ? 'Service Station'
@@ -682,7 +740,28 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
             “{crewLine}”
           </Text>
         ) : null}
-        {reveal ? (
+        {card ? (
+          // Block 2 guest info card: Type · Mood (live-state-matched) · Want · Tell.
+          <View style={styles.guestCard}>
+            <Text variant="body" style={styles.guestCardRow}>
+              <Text variant="label" color={colors.neonCyan}>Type · </Text>
+              {card.type}
+            </Text>
+            <Text variant="body" style={styles.guestCardRow}>
+              <Text variant="label" color={cardMoodColor}>Mood · </Text>
+              {card.mood}
+            </Text>
+            <Text variant="body" style={styles.guestCardRow}>
+              <Text variant="label" color={colors.neonCyan}>Want · </Text>
+              {card.want}
+            </Text>
+            <Text variant="body" style={styles.guestCardRow}>
+              <Text variant="label" color={colors.neonCyan}>Tell · </Text>
+              {card.tell}
+            </Text>
+          </View>
+        ) : null}
+        {!card && reveal ? (
           <Text variant="body" color={TONE_COLOR[reveal.tone]} style={styles.bannerBody}>
             {reveal.text}
           </Text>
@@ -1153,7 +1232,7 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         pulse={!committed}
         zones={zones}
         flashZone={liveFlash}
-        crowdTags={topCrowd(crowdMix(planClub, plan), 3).map((id) => CROWD_SEGMENTS[id].name)}
+        crowdTags={topSegments.map((id) => CROWD_SEGMENTS[id].name)}
         regularTags={topRegulars(club.regularBase, 2)
           .filter((r) => r.score >= 15)
           .map((r) => `${r.name} back`)}
@@ -1270,6 +1349,9 @@ const styles = StyleSheet.create({
   // Slightly larger live-night text for readability until phone testing works.
   bannerBody: { fontSize: 16, lineHeight: 22 },
   crewQuote: { fontSize: 15, lineHeight: 21, fontStyle: 'italic' },
+  // Block 2 guest info card rows (Type · Mood · Want · Tell).
+  guestCard: { gap: 4 },
+  guestCardRow: { fontSize: 14, lineHeight: 19 },
   bannerHint: { fontSize: 14, lineHeight: 19 },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: {
