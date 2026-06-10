@@ -46,6 +46,17 @@ import {
   type StreamTick,
 } from '@/lib/nightPressure';
 import { crewVoice, djBoothVoice, guestVoice, workRoomVoice } from '@/lib/floorVoices';
+import {
+  guestsInside,
+  hypeLevel,
+  liveTill,
+  musicMatch,
+  type MusicMatchLevel,
+  nightTroublemakers,
+  type Troublemaker,
+  troublemakerIntervention,
+  troublemakerTicks,
+} from '@/lib/nightLife';
 import { nightZones, type ZoneKey } from '@/lib/venue';
 import type { ClubState, DayConfig } from '@/domain/types';
 import { useGameStore } from '@/state/store';
@@ -171,6 +182,12 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const [encounter] = useState<Encounter | null>(() => (preview ? pickEncounter(preview, planClub) : null));
   const encTrigger = encounter ? encounterTrigger(encounter.zone) : null;
 
+  // Nightclub City layer — tonight's troublemaker schedule (deterministic from
+  // the preview, no RNG) + which ones the owner ejected in time. Tapping a
+  // flagged guest is free; the time window is the challenge.
+  const [tms] = useState<Troublemaker[]>(() => (preview ? nightTroublemakers(preview, planClub) : []));
+  const [tmEjected, setTmEjected] = useState<string[]>([]);
+
   // Real-time clock state.
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(true);
@@ -285,6 +302,15 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   // resolver; this just makes the room visibly respond after an action.
   const rawPressures = livePressures(preview, planClub, liveProgress);
   const relief = committed ? { bar: 0, door: 0, bathroom: 0, energy: 0 } : bossRelief(chosen);
+  // Troublemakers tonight: a LIVE one agitates its zone until handled; a
+  // SLIPPED one (window missed — it boiled over) drags the room for the rest
+  // of the night. Ejecting in time simply removes the drag — that's the save.
+  const tmActive = committed
+    ? []
+    : tms.filter((t) => !tmEjected.includes(t.id) && progress >= t.at && progress < t.until);
+  const tmSlipped = committed
+    ? []
+    : tms.filter((t) => !tmEjected.includes(t.id) && progress >= t.until);
   // Riding out a serious situation has a visible cost: that zone keeps slipping
   // (strain creeps up / energy keeps dropping) for the rest of the night.
   const worsen = { bar: 0, door: 0, bathroom: 0, energy: 0 };
@@ -294,6 +320,13 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       else if (k === 'door') worsen.door += 0.12;
       else if (k === 'bath') worsen.bathroom += 0.12;
       else worsen.energy -= 0.1; // energy / guests / crew
+    }
+    for (const t of [...tmActive, ...tmSlipped]) {
+      const slipped = tmSlipped.includes(t);
+      const strain = slipped ? 0.12 : 0.1;
+      if (t.zone === 'bar') worsen.bar += strain;
+      else if (t.zone === 'door') worsen.door += strain;
+      worsen.energy -= slipped ? 0.08 : 0.05;
     }
   }
   // DJ booth calls also warm the floor / nudge mood live (presentation only).
@@ -362,12 +395,33 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
   const happy = guestHappiness(shownResult, planClub, pressures, lifts.happy + djLive.happy);
   const morale = staffMorale(shownResult, planClub, pressures, lifts.morale + djLive.morale);
 
+  // Nightclub City reads — the till fills as the room earns, the occupancy
+  // counter rises and thins with the arrival curve, HYPE is the one big floor
+  // read, and the music chip surfaces the resolver's musicFit. All presentation.
+  const tillNow = committed ? committed.revenue : liveTill(preview, progress);
+  const insideNow = committed ? 0 : guestsInside(preview, progress);
+  const hype = hypeLevel(pressures.energy);
+  const music = musicMatch(planClub, plan);
+  const MUSIC_TAG_COLOR: Record<MusicMatchLevel, string> = {
+    hot: colors.success,
+    warm: colors.neonCyan,
+    cold: colors.warning,
+  };
+
   // The event stream: ambient ticks (progress-derived) merged with boss/encounter
   // reactions. Newest first; capped to keep the floor reading like a room.
   const ambient: StreamEntry[] = committed
     ? []
     : livingStreamTicks(preview, planClub, progress).map((t: StreamTick) => ({ id: `tk-${t.id}`, text: t.text, tone: t.tone }));
-  const stream: StreamEntry[] = [...bossStream].reverse().concat([...ambient].reverse()).slice(0, 4);
+  // Troublemaker warnings/slips surface ahead of the ambient ticks — they're the
+  // time-sensitive read.
+  const tmStream: StreamEntry[] = committed
+    ? []
+    : troublemakerTicks(tms, tmEjected, progress).map((t) => ({ id: t.id, text: t.text, tone: t.tone }));
+  const stream: StreamEntry[] = [...bossStream]
+    .reverse()
+    .concat([...tmStream].reverse(), [...ambient].reverse())
+    .slice(0, 4);
 
   const commit = () => {
     if (committed) return committed;
@@ -379,6 +433,8 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
       djIntervention(djChosen, preview, planClub, pressures.energy),
       ...(encChoice ? [encChoice.intervention] : []),
       ...(ignoreVibe < 0 ? [{ vibeBonus: ignoreVibe, revenueMod: 1 }] : []),
+      // Ejected troublemakers save vibe (diminishing); slipped ones cost it.
+      troublemakerIntervention(tmEjected.length, tmSlipped.length),
     ]);
     const r = runNight(plan, combined, chosen);
     if (r) setCommitted(r);
@@ -440,6 +496,19 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
     setMoodAt(progress);
     setFlashZone('floor');
     setBossStream((r) => [...r, { id: `dj-${id}-${r.length}`, text: o.call, tone: o.tone }]);
+  };
+
+  // Tap a flagged troublemaker IN TIME and the bouncer walks them out — the
+  // room keeps its vibe. Free (reactive defense, not a Focus call); the time
+  // window is the challenge. Folds into the books at commit.
+  const onEject = (id: string) => {
+    if (committed) return;
+    const t = tms.find((x) => x.id === id);
+    if (!t || tmEjected.includes(id) || progress < t.at || progress >= t.until) return;
+    setTmEjected((e) => [...e, id]);
+    setReactions((b) => [...b.filter((x) => x.zone !== t.zone), { id: `tm-out-${id}`, label: 'Walked out', tone: 'good', zone: t.zone }]);
+    setFlashZone(t.zone);
+    setBossStream((r) => [...r, { id: `tm-out-${id}-${r.length}`, text: 'Your bouncer walked one out.', tone: 'good' }]);
   };
 
   // "Leave it alone" — a deliberate owner choice (free): log that you let the
@@ -803,15 +872,37 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         />
       </View>
 
+      {/* HYPE — the one big floor read (Nightclub City style): the room's
+          energy as a single prominent bar. Same live value the floor meter
+          used to carry, promoted to the headline read. */}
+      <View>
+        <View style={styles.progressHead}>
+          <Text variant="label" muted style={styles.bannerHint}>
+            ⚡ HYPE
+          </Text>
+          <Text variant="label" color={METER_TONE_COLOR[hype.tone]} style={[styles.bannerHint, styles.hypeWord]}>
+            {hype.label}
+          </Text>
+        </View>
+        <View style={[styles.hypeTrack, hype.tone === 'bad' && { borderColor: METER_TONE_COLOR.bad, borderWidth: 1 }]}>
+          <View
+            style={[
+              styles.hypeFill,
+              { width: `${Math.round(pressures.energy * 100)}%`, backgroundColor: METER_TONE_COLOR[hype.tone] },
+            ]}
+          />
+        </View>
+      </View>
+
       {/* Pressure strip (strain) + Mood strip (happy / morale). Two rows: the
-          top row reads what's HEAVY (bar/door/bath/energy), the bottom row
-          reads how the room FEELS (guest happiness / staff morale) so the
-          owner sees who they're hurting and who they're helping. */}
+          top row reads what's HEAVY (bar/door/bath — floor energy lives on the
+          HYPE bar above), the bottom row reads how the room FEELS (guest
+          happiness / staff morale) so the owner sees who they're hurting and
+          who they're helping. */}
       <View style={styles.meters}>
         <MiniMeter kind="bar" label="Bar" value={pressures.bar} />
         <MiniMeter kind="door" label="Door" value={pressures.door} />
         <MiniMeter kind="bath" label="Bath" value={pressures.bathroom} />
-        <MiniMeter kind="floor" label="Floor" value={pressures.energy} />
       </View>
 
       {/* Room mood — is the room happy, is the crew holding? */}
@@ -1002,6 +1093,16 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
           <Text variant="label" color={colors.neonViolet}>★{club.reputation}</Text>
         </Text>
       </View>
+      {/* Live night counters — tonight's till fills as the room earns; the
+          occupancy count rises and thins with the arrival curve. */}
+      <View style={styles.hudRow}>
+        <Text variant="label" color={colors.success} numberOfLines={1}>
+          Tonight ${tillNow}
+        </Text>
+        <Text variant="label" muted numberOfLines={1}>
+          {committed ? 'Doors closed' : `${insideNow} in the room`}
+        </Text>
+      </View>
       {!committed && alertMsg && !running ? (
         <Text variant="label" color={colors.warning} numberOfLines={1}>
           ⚠ {alertMsg}
@@ -1058,6 +1159,10 @@ function LivingNight({ club, plan }: { club: ClubState; plan: DayConfig }) {
         hideFooter
         clusters={liveClusters}
         pressures={pressures}
+        troublemakers={tmActive.map((t) => ({ id: t.id, zone: t.zone }))}
+        onTroublemakerPress={committed ? undefined : onEject}
+        musicTag={committed ? undefined : { label: music.label, color: MUSIC_TAG_COLOR[music.level] }}
+        earning={!committed && pressures.crowd >= 0.25}
         onZonePress={committed ? undefined : onZonePress}
         onStaffPress={committed ? undefined : onStaffPress}
         onClusterPress={committed ? undefined : onClusterPress}
@@ -1127,6 +1232,10 @@ const styles = StyleSheet.create({
   progressTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: radius.pill },
   meters: { flexDirection: 'row', gap: spacing.sm },
+  // HYPE — the big single floor read; taller than the mini meters on purpose.
+  hypeTrack: { height: 14, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  hypeFill: { height: 14, borderRadius: radius.pill },
+  hypeWord: { fontWeight: '700', letterSpacing: 1 },
   mini: { flex: 1, gap: 3 },
   miniHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   miniTrack: { height: 10, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },

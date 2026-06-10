@@ -335,6 +335,42 @@ function GuestSilhouette({
   );
 }
 
+/** A flagged rowdy guest — red ring, agitated shake, EJECT tag. Tap to have
+ *  the bouncer walk them out before the window closes (Nightclub City's classic
+ *  night interaction). Pure presentation; the outcome folds into the bounded
+ *  intervention at commit — no per-guest sim, no RNG. */
+function TroublemakerToken({
+  pulse,
+  shimmer,
+  onPress,
+}: {
+  pulse: boolean;
+  shimmer: Animated.Value;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Eject troublemaker"
+      style={styles.tmWrap}
+    >
+      <Animated.View
+        style={[
+          styles.tmRing,
+          { opacity: pulse ? shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1 },
+        ]}
+      >
+        <GuestSilhouette mood="angry" motion="shake" pulse={pulse} shimmer={shimmer} offset={2} intensity={1.2} />
+      </Animated.View>
+      <Text variant="label" color={colors.danger} style={styles.tmTag}>
+        EJECT
+      </Text>
+    </Pressable>
+  );
+}
+
 /** Arrangement style for a cluster — picks flex/wrap/gap so the cluster reads
  *  as a "line at the door" / "queue at the bar" / "spread on the dance floor" /
  *  "small knot at the bathroom or regulars area". */
@@ -625,6 +661,10 @@ export function FloorView({
   hideFooter = false,
   clusters,
   pressures,
+  troublemakers,
+  onTroublemakerPress,
+  musicTag,
+  earning = false,
   onZonePress,
   onStaffPress,
   onClusterPress,
@@ -647,6 +687,14 @@ export function FloorView({
   hideFooter?: boolean;
   clusters?: GuestCluster[];
   pressures?: { bar: number; door: number; bathroom: number; energy: number; crowd: number };
+  /** Live flagged troublemakers to render in their zone (tap to eject). */
+  troublemakers?: Array<{ id: string; zone: 'door' | 'bar' | 'floor' }>;
+  /** Tap a flagged troublemaker — the eject call (free, time-windowed). */
+  onTroublemakerPress?: (id: string) => void;
+  /** Tonight's music vs the crowd — a tinted chip on the floor panel. */
+  musicTag?: { label: string; color: string };
+  /** When true the bar shows a small rising "+$" pulse — the room is earning. */
+  earning?: boolean;
   /** Tap a board zone's BACKGROUND to inspect the station. */
   onZonePress?: (zone: BoardZone) => void;
   /** Tap a specific crew token to inspect THAT crew member (not the zone). */
@@ -687,6 +735,8 @@ export function FloorView({
 
   const clusterIn = (zone: ClusterZone): GuestCluster | undefined =>
     clusters?.find((c) => c.zone === zone);
+
+  const tmIn = (zone: 'door' | 'bar' | 'floor') => (troublemakers ?? []).filter((t) => t.zone === zone);
 
   const doorCluster = clusterIn('door');
   const barCluster = clusterIn('bar');
@@ -812,6 +862,14 @@ export function FloorView({
                     </View>
                   </Pressable>
                 ) : null}
+                {tmIn('door').map((t) => (
+                  <TroublemakerToken
+                    key={t.id}
+                    pulse={pulse}
+                    shimmer={shimmers[1]}
+                    onPress={onTroublemakerPress ? () => onTroublemakerPress(t.id) : undefined}
+                  />
+                ))}
               </View>
               <Text variant="label" style={[styles.zoneStamp, { color: zoneTint('door') }]}>
                 DOOR
@@ -857,9 +915,18 @@ export function FloorView({
                 ) : null}
               </View>
 
-              {crowdTags && crowdTags.length > 0 ? (
+              {musicTag || (crowdTags && crowdTags.length > 0) ? (
                 <View style={styles.crowdTagRow}>
-                  {crowdTags.map((t) => (
+                  {/* Tonight's genre vs the crowd — surfacing the resolver's
+                      musicFit, tinted by how well it lands. */}
+                  {musicTag ? (
+                    <View style={[styles.crowdTag, { borderColor: musicTag.color }]}>
+                      <Text variant="label" color={musicTag.color}>
+                        {musicTag.label}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(crowdTags ?? []).map((t) => (
                     <View key={t} style={styles.crowdTag}>
                       <Text variant="label" color={colors.neonCyan}>
                         {t}
@@ -936,6 +1003,19 @@ export function FloorView({
                     renderFallbackCrowd()
                   )}
                 </View>
+                {/* Flagged troublemakers sit on the floor's edge, above the crowd. */}
+                {tmIn('floor').length > 0 ? (
+                  <View style={styles.tmFloorOverlay}>
+                    {tmIn('floor').map((t) => (
+                      <TroublemakerToken
+                        key={t.id}
+                        pulse={pulse}
+                        shimmer={shimmers[2]}
+                        onPress={onTroublemakerPress ? () => onTroublemakerPress(t.id) : undefined}
+                      />
+                    ))}
+                  </View>
+                ) : null}
               </View>
 
               {inZone('floor').length > 0 ? (
@@ -977,6 +1057,21 @@ export function FloorView({
                 >
                   🍸
                 </Animated.Text>
+                {/* Rising "+$" pulse while the room is earning — the till feedback
+                    (Nightclub City's coin pop), driven by the same shimmer loop. */}
+                {earning ? (
+                  <Animated.Text
+                    style={[
+                      styles.earnPop,
+                      {
+                        opacity: shimmers[0].interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.95] }),
+                        transform: [{ translateY: shimmers[0].interpolate({ inputRange: [0, 1], outputRange: [1, -4] }) }],
+                      },
+                    ]}
+                  >
+                    +$
+                  </Animated.Text>
+                ) : null}
               </View>
               <View style={styles.sideBackbar}>
                 {[10, 13, 8, 12, 9].map((h, i) => (
@@ -1002,6 +1097,14 @@ export function FloorView({
                   <TokenCluster cluster={barCluster} pulse={pulse} shimmer={shimmers[2]} showLabel={false} intensity={zoneIntensity(pressures?.bar)} />
                 </Pressable>
               ) : null}
+              {tmIn('bar').map((t) => (
+                <TroublemakerToken
+                  key={t.id}
+                  pulse={pulse}
+                  shimmer={shimmers[0]}
+                  onPress={onTroublemakerPress ? () => onTroublemakerPress(t.id) : undefined}
+                />
+              ))}
               {inZone('bar').length > 0 ? (
                 <View style={styles.bubbleRow}>{inZone('bar').map((b, i) => <Bubble key={`${b.id}-${i}`} b={b} />)}</View>
               ) : null}
@@ -1473,6 +1576,24 @@ const styles = StyleSheet.create({
   },
   moodPipText: { fontSize: 9, fontWeight: '700', lineHeight: 12 },
   bubbleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
+  // --- Troublemaker (tap-to-eject) ---
+  tmWrap: { alignItems: 'center', gap: 1 },
+  tmRing: {
+    borderWidth: 1.5,
+    borderColor: colors.danger,
+    borderRadius: radius.pill,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    backgroundColor: colors.surface,
+    shadowColor: colors.danger,
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  tmTag: { fontSize: 8, letterSpacing: 1, fontWeight: '700' },
+  tmFloorOverlay: { position: 'absolute', right: 6, bottom: 4, flexDirection: 'row', gap: 4 },
+  // Rising "+$" earning pulse beside the bar's drink glyph.
+  earnPop: { fontSize: 10, fontWeight: '700', color: colors.success },
   // Furniture as small "object" badges — tinted square + name, so decoration
   // reads like things ON the floor rather than text below it.
   furnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
